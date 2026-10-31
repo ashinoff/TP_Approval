@@ -1,0 +1,11 @@
+.git
+.env*
+!.env.example
+node_modules
+storage
+backups
+.npm-cache
+.test-data*
+dist
+*.docx
+*.pdf

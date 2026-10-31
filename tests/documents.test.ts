@@ -1,0 +1,7 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {xmlBlocks,documentModel,checkAnchor,compareText} from '../apps/api/src/documents.js';
+import {zip,docxParts} from './zip.js';
+test('OOXML anchors include tables, preserve text offsets, and exclude instructions/deleted text',()=>{const blocks=xmlBlocks('<w:document><w:body><w:p><w:r><w:t>До </w:t><w:tab/><w:t>после</w:t></w:r><w:del><w:r><w:delText>секрет</w:delText></w:r></w:del><w:r><w:instrText>PAGE</w:instrText></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Ячейка</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>','word/document.xml');assert.equal(blocks.length,2);assert.equal(blocks[0].text,'До \tпосле');assert.equal(blocks[1].text,'Ячейка');});
+test('Anchor verification rejects changed bytes, offsets, quote and paragraph identity',async()=>{const m=await documentModel(zip(docxParts));const b=m.blocks[0];const a={kind:'OOXML_PARAGRAPH_V1' as const,part:b.part,blockId:b.id,blockHash:b.sha256,fileHash:m.sha256,start:0,end:13,quote:b.text.slice(0,13)};checkAnchor(m,a);for(const patch of [{fileHash:'0'.repeat(64)},{start:1},{end:9999},{quote:'подмена'},{blockId:'other'}])assert.throws(()=>checkAnchor(m,{...a,...patch}));});
+test('Text comparison distinguishes added and removed text and bounds expensive input',()=>{const r=compareText('Мощность 150 кВт','Мощность 15 кВт');assert.ok(r.some(c=>c.type==='removed'&&c.text.includes('150')));assert.ok(r.some(c=>c.type==='added'&&c.text.includes('15')));assert.throws(()=>compareText('x'.repeat(200001),''));});
