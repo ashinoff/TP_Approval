@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ТП Согласование — целевой макет</title>
+<!--
+  Эталонный макет для реализации в apps/web. Данные синтетические.
+  Это не код приложения: структура, токены, состояния и тексты — ориентир.
+  Экраны переключаются кнопками в верхней служебной полосе (её в приложении нет).
+-->
+<style>
+:root{
+  /* Палитра */
+  --petrol:#10303d;        /* боковое меню, тёмный фон */
+  --petrol-2:#17414f;
+  --ink:#1b2b33;           /* основной текст */
+  --ink-2:#4d616b;         /* вторичный текст */
+  --ink-3:#7b8d96;         /* подписи */
+  --paper:#eef2f3;         /* фон страницы */
+  --surface:#ffffff;
+  --line:#d8e0e3;
+  --line-2:#e8edef;
+  --teal:#0f6f6c;          /* основное действие, ссылки */
+  --teal-soft:#e3f1f0;
+  --red:#c62828;           /* правки и замечания — «красная ручка» */
+  --red-soft:#fdecea;
+  --amber:#a8670f;         /* исправлено, ждёт подтверждения автора */
+  --amber-soft:#fdf3e1;
+  --green:#2e7d32;         /* согласовано / подтверждено */
+  --green-soft:#e7f4e8;
+  --blue:#1f5fa8;          /* текущий этап, ожидает решения */
+  --blue-soft:#e6eff9;
+  --grey:#9aa9b0;          /* не начато */
+  /* Типографика: шкала 12/13/14/16/20/24, меньше 12px не использовать */
+  --font:"Segoe UI","PT Sans",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --doc-font:"Times New Roman",Times,serif;
+  --fs-xs:12px;--fs-s:13px;--fs-m:14px;--fs-l:16px;--fs-xl:20px;--fs-xxl:24px;
+  --r-s:6px;--r-m:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font:var(--fs-m)/1.45 var(--font);color:var(--ink);background:var(--paper)}
+.due,.docs td,.a4 td,.when{font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+
+/* Служебная полоса макета */
+.mock-switch{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 16px;background:#fff7d6;border-bottom:1px solid #ecd98a;font-size:var(--fs-s)}
+.mock-switch b{margin-right:8px}
+.mock-switch button{border:1px solid #d9c46b;background:#fffbea;border-radius:999px;padding:4px 12px}
+.mock-switch button[aria-pressed="true"]{background:#5b4a00;color:#fff;border-color:#5b4a00}
+
+/* Каркас */
+.app{display:grid;grid-template-columns:232px 1fr;min-height:calc(100vh - 41px);background:linear-gradient(to right,var(--petrol) 232px,transparent 232px)}
+.side{background:var(--petrol);color:#dce8ec;position:sticky;top:41px;height:calc(100vh - 41px);display:flex;flex-direction:column;padding:20px 12px}
+.brand{font-weight:700;font-size:var(--fs-xl);letter-spacing:.02em;color:#fff;padding:0 10px 22px}
+.brand small{display:block;font-weight:400;font-size:var(--fs-xs);color:#9fb7c0;letter-spacing:0}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border-radius:var(--r-s);color:#dce8ec;text-decoration:none}
+.nav a:hover{background:var(--petrol-2)}
+.nav a.on{background:#24515f;color:#fff;font-weight:600}
+.nav a span.n{min-width:22px;text-align:center;border-radius:999px;background:#2c5b69;font-size:var(--fs-xs);padding:1px 6px}
+.side .who{margin-top:auto;padding:12px 10px;border-top:1px solid #24495a;font-size:var(--fs-s);color:#b9cdd4}
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:12px;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar h1{margin:0;font-size:var(--fs-xl);font-weight:600}
+.topbar .grow{flex:1}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-s);padding:7px 14px;font-weight:500;white-space:nowrap}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn.danger{background:var(--surface);border-color:var(--red);color:var(--red)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--teal)}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+.icon{width:16px;height:16px;flex:none}
+.screen{display:none}
+.screen.on{display:block}
+
+/* Статусы */
+.status{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:var(--fs-s);font-weight:600;white-space:nowrap}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.s-draft{background:#eef1f2;color:#55666e}
+.s-review{background:var(--blue-soft);color:var(--blue)}
+.s-rework{background:var(--red-soft);color:var(--red)}
+.s-ok{background:var(--green-soft);color:var(--green)}
+.due{font-size:var(--fs-s);color:var(--ink-2)}
+.due.late{color:var(--red);font-weight:600}
+
+/* ===== Маршрут как однолинейная схема ===== */
+.line{display:flex;align-items:center;gap:0;padding:6px 0 2px}
+.node{display:flex;flex-direction:column;align-items:flex-start;min-width:118px}
+.node .pin{display:flex;align-items:center;gap:8px}
+.dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--grey);background:var(--surface);flex:none}
+.done .dot{background:var(--green);border-color:var(--green)}
+.now .dot{background:var(--blue);border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-soft)}
+.back .dot{background:var(--red);border-color:var(--red)}
+.node .role{font-weight:600;font-size:var(--fs-s)}
+.node .person{font-size:var(--fs-xs);color:var(--ink-2);padding-left:22px}
+.node .when{font-size:var(--fs-xs);color:var(--ink-3);padding-left:22px}
+.now .when{color:var(--blue);font-weight:600}
+.wire{height:2px;width:36px;background:var(--grey);margin:0 8px;align-self:flex-start;margin-top:7px}
+.wire.done{background:var(--green)}
+.bus{display:grid;grid-template-columns:18px auto;align-items:stretch}
+.bus .bar{border-left:2px solid var(--grey);margin:7px 0;position:relative}
+.bus .feeders{display:flex;flex-direction:column;gap:4px}
+.feeder{display:flex;align-items:flex-start}
+.feeder::before{content:"";width:18px;height:2px;background:var(--grey);margin-top:7px;margin-left:-18px}
+.feeder.done::before{background:var(--green)}
+.feeder .node{min-width:0}
+.feeder .node .pin{gap:8px}
+.feeder .meta{font-size:var(--fs-xs);color:var(--ink-2);margin-left:10px;margin-top:0}
+
+/* ===== Реестр ===== */
+.page{padding:20px 24px 40px}
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.search{flex:1;min-width:280px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-s);padding:7px 12px}
+.search input{border:0;outline:0;flex:1;background:transparent}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden}
+.seg button{border:0;background:transparent;padding:7px 12px;border-right:1px solid var(--line-2)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--teal-soft);color:var(--teal);font-weight:600}
+.table{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden}
+.thead,.row{display:grid;grid-template-columns:28px minmax(210px,1.2fr) minmax(220px,1.6fr) 170px minmax(260px,1.5fr) 150px;gap:16px;align-items:center;padding:12px 16px}
+.thead{font-size:var(--fs-s);color:var(--ink-3);border-bottom:1px solid var(--line);background:#f7f9fa}
+.row{border-bottom:1px solid var(--line-2)}
+.row:hover{background:#fafcfc}
+.row.open{background:#f6fafa}
+.chev{border:0;background:transparent;width:24px;height:24px;border-radius:4px;color:var(--ink-2)}
+.chev:hover{background:var(--line-2)}
+.cnum{font-weight:700;font-size:var(--fs-l)}
+.cnum small{display:block;font-weight:400;font-size:var(--fs-s);color:var(--ink-2);letter-spacing:0}
+.who-where b{display:block;font-weight:600}
+.who-where span{display:block;font-size:var(--fs-s);color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pkg{display:flex;flex-wrap:wrap;gap:4px}
+.chip{font-size:var(--fs-xs);border-radius:4px;padding:2px 6px;border:1px solid var(--line);color:var(--ink-2);background:var(--surface)}
+.chip.have{border-color:#b9d9d6;background:var(--teal-soft);color:var(--teal);font-weight:600}
+.chip.req.miss{border-color:var(--red);color:var(--red);border-style:dashed}
+.chip.miss{border-style:dashed;color:var(--ink-3)}
+.mini{display:flex;align-items:center;gap:4px;font-size:var(--fs-xs)}
+.mini i{width:10px;height:10px;border-radius:50%;border:2px solid var(--grey);display:inline-block;background:var(--surface)}
+.mini i.d{background:var(--green);border-color:var(--green)}
+.mini i.n{background:var(--blue);border-color:var(--blue)}
+.mini i.r{background:var(--red);border-color:var(--red)}
+.mini em{width:12px;height:2px;background:var(--grey);display:inline-block}
+.mini em.d{background:var(--green)}
+.mini .par{display:inline-flex;flex-direction:column;gap:2px;border-left:2px solid var(--grey);padding-left:4px}
+.mini-cap{font-size:var(--fs-xs);color:var(--ink-2);margin-top:4px}
+.st{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.expand{grid-column:1 / -1;background:#f6fafa;border-bottom:1px solid var(--line);padding:4px 16px 16px 60px}
+.docs{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden}
+.docs th,.docs td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line-2);font-size:var(--fs-s)}
+.docs th{color:var(--ink-3);font-weight:500;background:#fafbfb}
+.docs tr:last-child td{border-bottom:0}
+.docs td.k{font-weight:600}
+.docs .muted{color:var(--ink-3)}
+.link{color:var(--teal);text-decoration:none;font-weight:500}
+.link:hover{text-decoration:underline}
+.expand .foot{display:flex;gap:16px;margin-top:10px;font-size:var(--fs-s);color:var(--ink-2)}
+
+/* ===== Мастер создания ===== */
+.wizard{max-width:1180px}
+.steps{display:flex;gap:0;margin-bottom:18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden}
+.step{flex:1;display:flex;gap:10px;align-items:center;padding:12px 16px;border-right:1px solid var(--line-2);color:var(--ink-3)}
+.step:last-child{border-right:0}
+.step b{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;border:2px solid currentColor;font-size:var(--fs-s)}
+.step.done{color:var(--green)}
+.step.done b{background:var(--green);color:#fff;border-color:var(--green)}
+.step.cur{color:var(--ink);background:var(--teal-soft)}
+.step.cur b{border-color:var(--teal);color:var(--teal)}
+.step span{font-weight:600}
+.step small{display:block;font-weight:400;color:var(--ink-2)}
+.wgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);padding:18px}
+.panel h2{margin:0 0 4px;font-size:var(--fs-l)}
+.panel p.hint{margin:0 0 14px;color:var(--ink-2);font-size:var(--fs-s)}
+.drop{border:2px dashed #b9cdd2;border-radius:var(--r-m);padding:18px;display:flex;gap:14px;align-items:center;background:#fafcfc}
+.drop.filled{border-style:solid;border-color:#b9d9d6;background:var(--teal-soft)}
+.fileic{width:40px;height:48px;border-radius:4px;background:#fff;border:1px solid var(--line);display:grid;place-items:center;font-size:var(--fs-xs);font-weight:700;color:var(--blue)}
+.drop .fn{font-weight:600}
+.drop .fs{font-size:var(--fs-s);color:var(--ink-2)}
+.drop .x{margin-left:auto}
+.field{margin-top:14px}
+.field label{display:block;font-size:var(--fs-s);color:var(--ink-2);margin-bottom:4px}
+.field input{width:100%;border:1px solid var(--line);border-radius:var(--r-s);padding:8px 10px;background:var(--surface)}
+.field input.ok{border-color:#9fcfa2}
+.field input.bad{border-color:var(--red)}
+.field .src{font-size:var(--fs-xs);color:var(--ink-3);margin-top:4px}
+.field .src q{color:var(--ink-2)}
+.field .err{font-size:var(--fs-xs);color:var(--red);margin-top:4px}
+.field .okmsg{font-size:var(--fs-xs);color:var(--green);margin-top:4px}
+.toggle{display:inline-flex;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden;margin-bottom:12px}
+.toggle button{border:0;background:var(--surface);padding:8px 18px}
+.toggle button[aria-pressed="true"]{background:var(--teal);color:#fff;font-weight:600}
+.checks{list-style:none;margin:14px 0 0;padding:0;border:1px solid var(--line-2);border-radius:var(--r-s)}
+.checks li{display:grid;grid-template-columns:20px 1fr auto;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line-2);font-size:var(--fs-s);align-items:start}
+.checks li:last-child{border-bottom:0}
+.checks .v{color:var(--ink-2)}
+.mk{font-weight:700}
+.mk.ok{color:var(--green)}.mk.warn{color:var(--amber)}.mk.bad{color:var(--red)}
+.extra{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px}
+.extra .drop{flex-direction:column;align-items:flex-start;gap:4px;padding:12px}
+.extra .drop b{font-size:var(--fs-s)}
+.extra .drop span{font-size:var(--fs-xs);color:var(--ink-3)}
+.wactions{display:flex;justify-content:space-between;align-items:center;margin-top:18px}
+.note{font-size:var(--fs-s);color:var(--ink-2)}
+.dup{margin-top:14px;padding:10px 12px;border-radius:var(--r-s);background:var(--amber-soft);color:#6b4307;font-size:var(--fs-s)}
+
+/* ===== Рабочее место документа ===== */
+.acthead{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 24px 12px;position:sticky;top:41px;z-index:5}
+.acthead .r1{display:flex;align-items:center;gap:14px}
+.acthead .kind{font-size:var(--fs-l);font-weight:600;color:var(--ink-2)}
+.acthead .num{font-size:var(--fs-xxl);font-weight:700}
+.acthead .r1 .grow{flex:1}
+.acthead .r2{display:flex;gap:24px;margin:4px 0 10px;color:var(--ink-2);font-size:var(--fs-s);flex-wrap:wrap}
+.acthead .r2 b{color:var(--ink);font-weight:600}
+.work{display:grid;grid-template-columns:210px minmax(0,1fr) 360px;gap:0;height:calc(100vh - 41px - 197px);min-height:560px}
+.rail{border-right:1px solid var(--line);background:var(--surface);padding:14px 10px;overflow:auto}
+.rail h3,.side-panel h3{margin:0 0 8px 6px;font-size:var(--fs-s);color:var(--ink-3);font-weight:500}
+.doc-item{display:block;width:100%;text-align:left;border:1px solid transparent;background:transparent;border-radius:var(--r-s);padding:8px 10px;margin-bottom:2px}
+.doc-item:hover{background:var(--paper)}
+.doc-item.on{background:var(--teal-soft);border-color:#b9d9d6}
+.doc-item b{display:block;font-weight:600}
+.doc-item small{display:block;color:var(--ink-2);font-size:var(--fs-xs)}
+.doc-item.add{color:var(--ink-3);border:1px dashed var(--line)}
+.doc-item.add b{font-weight:500;color:var(--ink-2)}
+.rail .sep{height:1px;background:var(--line-2);margin:10px 4px}
+.viewer{display:flex;flex-direction:column;min-width:0;background:#dfe5e8}
+.vtools{display:flex;gap:10px;align-items:center;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.vtools select,.vtools input{border:1px solid var(--line);border-radius:var(--r-s);padding:4px 8px;background:var(--surface)}
+.vtools label{display:flex;align-items:center;gap:6px;font-size:var(--fs-s);color:var(--ink-2)}
+.vtools .grow{flex:1}
+.approx{font-size:var(--fs-xs);color:var(--ink-3);border:1px solid var(--line);border-radius:999px;padding:2px 8px;cursor:help}
+.sheet-scroll{overflow:auto;flex:1;padding:22px}
+.sheet{width:100%;max-width:720px;margin:0 auto;background:#fff;box-shadow:0 1px 3px rgba(16,48,61,.18);padding:48px 64px 56px 56px;font:15px/1.35 var(--doc-font);color:#111;position:relative}
+.sheet p{margin:0 0 8px;text-align:justify}
+.sheet .c{text-align:center;font-weight:700}
+.sheet table{border-collapse:collapse;width:100%;font-size:13px;margin:6px 0 10px}
+.sheet td,.sheet th{border:1px solid #444;padding:4px 6px;vertical-align:top}
+/* Правки в тексте */
+del.fix{color:var(--red);text-decoration:line-through;text-decoration-thickness:1px}
+ins.fix{color:var(--red);text-decoration:underline;text-decoration-color:var(--red)}
+.fix-ok del.fix,.fix-ok ins.fix{color:var(--green);text-decoration-color:var(--green)}
+.fix-wait del.fix,.fix-wait ins.fix{color:var(--amber);text-decoration-color:var(--amber)}
+mark.rem{background:var(--red-soft);color:inherit;border-bottom:2px solid var(--red);padding:0 1px}
+sup.pin{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;background:var(--red);color:#fff;font:700 10px/1 var(--font);vertical-align:super;margin-left:1px;cursor:pointer}
+.fix-ok sup.pin{background:var(--green)}
+.fix-wait sup.pin{background:var(--amber)}
+.margin-dot{position:absolute;right:-52px;display:flex;align-items:center;gap:4px;font:600 11px var(--font);color:#fff}
+.margin-dot span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--red);box-shadow:0 0 0 3px #fff}
+.margin-dot.ok span{background:var(--green)}
+.margin-dot.wait span{background:var(--amber)}
+.sel-pop{position:absolute;z-index:3;background:var(--petrol);color:#fff;border-radius:var(--r-s);padding:6px;display:flex;gap:4px;box-shadow:0 4px 14px rgba(0,0,0,.25);font:var(--fs-s)/1.2 var(--font)}
+.sel-pop button{border:0;background:transparent;color:#fff;padding:6px 10px;border-radius:4px}
+.sel-pop button:hover{background:#24515f}
+.sel-pop::after{content:"";position:absolute;left:24px;bottom:-6px;border:6px solid transparent;border-bottom:0;border-top-color:var(--petrol)}
+::selection{background:#b5d7f3}
+.selected-text{background:#b5d7f3}
+.side-panel{background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:transparent;padding:11px 8px;border-bottom:2px solid transparent;color:var(--ink-2);font-weight:500}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--teal);font-weight:600}
+.tabs .cnt{display:inline-block;min-width:18px;border-radius:999px;background:var(--red);color:#fff;font-size:var(--fs-xs);padding:0 5px;margin-left:4px}
+.panel-body{overflow:auto;padding:12px;flex:1}
+.pfilter{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.pfilter button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:var(--fs-xs)}
+.pfilter button[aria-pressed="true"]{border-color:var(--teal);color:var(--teal);background:var(--teal-soft);font-weight:600}
+.card{border:1px solid var(--line);border-left:4px solid var(--red);border-radius:var(--r-s);padding:10px 12px;margin-bottom:10px;background:var(--surface)}
+.card.ok{border-left-color:var(--green)}
+.card.wait{border-left-color:var(--amber)}
+.card.focus{box-shadow:0 0 0 2px var(--red-soft),0 0 0 3px var(--red)}
+.card .h{display:flex;align-items:center;gap:8px}
+.ava{width:26px;height:26px;border-radius:50%;background:var(--petrol-2);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
+.card .h b{font-size:var(--fs-s)}
+.card .h small{display:block;color:var(--ink-3);font-size:var(--fs-xs)}
+.card .h .no{margin-left:auto}
+.cat{display:inline-block;margin:8px 0 4px;font-size:var(--fs-xs);font-weight:600;border-radius:4px;padding:1px 6px;background:var(--red-soft);color:var(--red)}
+.card.ok .cat{background:var(--green-soft);color:var(--green)}
+.card.wait .cat{background:var(--amber-soft);color:var(--amber)}
+.change{font-family:var(--doc-font);font-size:15px;background:#fafbfb;border-radius:4px;padding:6px 8px;margin:4px 0}
+.card p{margin:4px 0;font-size:var(--fs-s)}
+.trail{margin:8px 0 0;padding:0;list-style:none;border-top:1px dashed var(--line);padding-top:6px}
+.trail li{font-size:var(--fs-xs);color:var(--ink-2);padding:2px 0}
+.trail li b{color:var(--ink)}
+.card .acts{display:flex;gap:6px;margin-top:8px}
+.card .acts .btn{padding:4px 10px;font-size:var(--fs-s)}
+.form{border:1px solid var(--teal);border-radius:var(--r-s);padding:12px;margin-bottom:12px;background:#fbfefe}
+.form h4{margin:0 0 8px;font-size:var(--fs-m)}
+.form label{display:block;font-size:var(--fs-xs);color:var(--ink-2);margin:8px 0 3px}
+.form select,.form textarea,.form input{width:100%;border:1px solid var(--line);border-radius:var(--r-s);padding:6px 8px;background:#fff}
+.form .quote{font-family:var(--doc-font);font-size:15px;background:var(--paper);border-radius:4px;padding:6px 8px}
+.form .row2{display:flex;gap:8px;margin-top:10px}
+
+/* ===== Лист согласования ===== */
+.print-wrap{display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start}
+.a4{width:794px;min-height:1123px;margin:0 auto;background:#fff;box-shadow:0 1px 4px rgba(16,48,61,.2);padding:56px 60px;font:13px/1.35 var(--doc-font);color:#111}
+.a4 h2{font:700 16px var(--doc-font);text-align:center;margin:0 0 4px}
+.a4 .sub{text-align:center;margin:0 0 14px}
+.a4 table{border-collapse:collapse;width:100%;margin:8px 0 16px}
+.a4 th,.a4 td{border:1px solid #333;padding:4px 6px;vertical-align:top;text-align:left}
+.a4 th{background:#f0f0f0;font-weight:700}
+.a4 .tot{margin:4px 0 18px;font-weight:700}
+.a4 .fn{margin-top:20px;font-size:11px;color:#444;border-top:1px solid #999;padding-top:6px}
+.print-side .panel{margin-bottom:12px}
+.print-side ul{margin:8px 0 0;padding-left:18px;font-size:var(--fs-s);color:var(--ink-2)}
+
+@media (max-width:1100px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{min-width:0}
+  .brand{flex:none;padding:0 6px;font-size:var(--fs-l)}
+  .brand small{display:none}
+  .nav{flex-direction:row;overflow:auto;min-width:0;flex:1}
+  .nav a{flex:none;gap:6px}
+  .side{position:static;height:auto;flex-direction:row;align-items:center;gap:12px;padding:10px}
+  .side .who{display:none}
+  .work{grid-template-columns:1fr;height:auto}
+  .rail{display:flex;gap:6px;overflow:auto;border-right:0;border-bottom:1px solid var(--line)}
+  .rail h3,.rail .sep{display:none}
+  .doc-item{flex:none;width:auto}
+  .side-panel{border-left:0}
+  .thead{display:none}
+  .row{grid-template-columns:28px minmax(0,1fr);row-gap:8px}
+  .expand{overflow-x:auto;padding-left:16px}
+  .row > *:nth-child(n+3){grid-column:2}
+  .wgrid,.print-wrap{grid-template-columns:1fr}
+  .extra{grid-template-columns:1fr}
+  .sheet,.a4{width:100%;padding:24px}
+  .a4{overflow-x:auto;min-height:0}
+  .seg{max-width:100%;overflow-x:auto}
+  .seg button{flex:none}
+  .search{min-width:0;width:100%}
+  .topbar{flex-wrap:wrap}
+  .margin-dot{display:none}
+  .acthead{position:static}
+  .acthead .r1{flex-wrap:wrap}
+  .line{flex-direction:column;align-items:flex-start}
+  .wire{width:2px;height:14px;margin:2px 0 2px 6px}
+  .bus{margin-left:6px}
+  .app{background:none}
+  .sel-pop{display:none}
+  .table{overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="mock-switch" role="toolbar" aria-label="Экраны макета">
+  <b>Макет:</b>
+  <button aria-pressed="true" data-s="registry">1. Реестр пакетов</button>
+  <button aria-pressed="false" data-s="wizard">2. Создание пакета</button>
+  <button aria-pressed="false" data-s="act">3. Рабочее место: согласующий</button>
+  <button aria-pressed="false" data-s="print">4. Лист согласования</button>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="i-ret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 4-6 6 6 6"/><path d="M3 10h11a7 7 0 0 1 7 7v3"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 8V3h10v5M7 17H3v-7h18v7h-4"/><path d="M7 14h10v7H7z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12H4m6-6-6 6 6 6"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand">ТП Согласование<small>Сочинские электрические сети</small></div>
+    <nav class="nav" aria-label="Разделы">
+      <a href="#" class="on">Реестр пакетов <span class="n">14</span></a>
+      <a href="#">Черновики <span class="n">2</span></a>
+      <a href="#">На согласовании <span class="n">5</span></a>
+      <a href="#">На доработке <span class="n">1</span></a>
+      <a href="#">Согласованные <span class="n">6</span></a>
+    </nav>
+    <div class="who">Смирнова А. В.<br>Инженер РИРУ, Туапсинский РЭС</div>
+  </aside>
+
+  <div class="main">
+
+<!-- ================= 1. РЕЕСТР ================= -->
+<section class="screen on" id="registry" aria-label="Реестр пакетов">
+  <header class="topbar">
+    <h1>Реестр пакетов</h1>
+    <span class="grow"></span>
+    <button class="btn ghost" aria-label="Уведомления"><svg class="icon"><use href="#i-bell"/></svg>3</button>
+    <button class="btn primary"><svg class="icon"><use href="#i-plus"/></svg>Создать пакет</button>
+  </header>
+  <div class="page">
+    <div class="filters">
+      <label class="search"><svg class="icon"><use href="#i-search"/></svg><input placeholder="Номер договора, заявитель или адрес" value=""></label>
+      <div class="seg" role="group" aria-label="Состояние">
+        <button aria-pressed="true">Все</button><button aria-pressed="false">Черновики</button><button aria-pressed="false">На согласовании</button><button aria-pressed="false">На доработке</button><button aria-pressed="false">Согласованные</button>
+      </div>
+      <button class="btn">Период договора</button>
+    </div>
+
+    <div class="table" role="table" aria-label="Пакеты документов">
+      <div class="thead" role="row">
+        <span></span><span>Договор ТП</span><span>Заявитель и адрес</span><span>Состав пакета</span><span>Маршрут</span><span>Статус и срок</span>
+      </div>
+
+      <!-- Раскрытая строка -->
+      <div class="row open" role="row">
+        <button class="chev" aria-expanded="true" aria-label="Свернуть пакет"><svg class="icon"><use href="#i-down"/></svg></button>
+        <div class="cnum">40205-26-00012345-1<small>АВТУ · договор от 01.09.2026</small></div>
+        <div class="who-where"><b>Иванов Пётр Сергеевич</b><span>Краснодарский край, м.о. Туапсинский, с. Примерное, ул. Береговая, д. 7</span></div>
+        <div class="pkg"><span class="chip have">АВТУ v2</span><span class="chip have">ТУ</span><span class="chip have">ПСУ</span><span class="chip miss">Схема</span><span class="chip miss">Пред. акт</span></div>
+        <div>
+          <div class="mini" aria-label="Инженер и начальник РИРУ согласовали, ожидает начальник РЭС">
+            <i class="d"></i><em class="d"></em><i class="d"></i><em class="d"></em><i class="n"></i><em></em>
+            <span class="par"><i></i><i></i><i></i></span>
+          </div>
+          <div class="mini-cap">Начальник РЭС · Кузнецов К. К.</div>
+        </div>
+        <div class="st"><span class="status s-review">На согласовании</span><span class="due">до 05.11, 18:00</span></div>
+      </div>
+      <div class="expand">
+        <table class="docs">
+          <thead><tr><th>Документ</th><th>Редакция</th><th>Загрузил</th><th>Дата</th><th>Замечания</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="k">АВТУ</td><td>Версия 2 · цикл 2</td><td>Смирнова А. В.</td><td>04.11.2026 10:12</td><td>3 · 1 открыто</td><td><a class="link" href="#">Открыть</a> &nbsp; <a class="link" href="#">Скачать</a></td></tr>
+            <tr><td class="k">ТУ</td><td>Редакция 1 · № 07-05/0001-26 от 01.09.2026</td><td>Смирнова А. В.</td><td>03.11.2026 09:40</td><td class="muted">только просмотр</td><td><a class="link" href="#">Открыть</a> &nbsp; <a class="link" href="#">Скачать</a></td></tr>
+            <tr><td class="k">ПСУ</td><td>PDF, 2 стр.</td><td>Смирнова А. В.</td><td>03.11.2026 09:44</td><td class="muted">только просмотр</td><td><a class="link" href="#">Открыть</a> &nbsp; <a class="link" href="#">Скачать</a></td></tr>
+            <tr><td class="k">Поопорная схема</td><td class="muted">не загружена</td><td></td><td></td><td></td><td><a class="link" href="#">Добавить</a></td></tr>
+            <tr><td class="k">Предыдущий АКТ ТП</td><td class="muted">не загружен</td><td></td><td></td><td></td><td><a class="link" href="#">Добавить</a></td></tr>
+          </tbody>
+        </table>
+        <div class="foot"><span>Сверка с ТУ: 8 совпадает, 1 подтверждено инженером вручную</span><span>Последнее событие: Петров П. П. согласовал, 04.11 15:20</span></div>
+      </div>
+
+      <div class="row" role="row">
+        <button class="chev" aria-expanded="false" aria-label="Раскрыть пакет"><svg class="icon"><use href="#i-chev"/></svg></button>
+        <div class="cnum">40205-26-00012388-1<small>АКТ ТП · договор от 12.08.2026</small></div>
+        <div class="who-where"><b>ООО «Пример-Строй»</b><span>Краснодарский край, г. Туапсе, ул. Новая, д. 12, к/н 23:51:0000000:100</span></div>
+        <div class="pkg"><span class="chip have">АКТ ТП v1</span><span class="chip have">ТУ</span><span class="chip miss">ПСУ</span><span class="chip miss">Схема</span><span class="chip have">Пред. акт</span></div>
+        <div>
+          <div class="mini"><i class="d"></i><em class="d"></em><i class="d"></i><em class="d"></em><i class="d"></i><em class="d"></em><span class="par"><i class="d"></i><i class="n"></i><i class="r"></i></span></div>
+          <div class="mini-cap">СТП согласовала, ТЕХБЛОК вернул, СУЭ проверяет</div>
+        </div>
+        <div class="st"><span class="status s-rework">Сбор замечаний</span><span class="due late">СУЭ просрочено на 1 день</span></div>
+      </div>
+
+      <div class="row" role="row">
+        <button class="chev" aria-expanded="false" aria-label="Раскрыть пакет"><svg class="icon"><use href="#i-chev"/></svg></button>
+        <div class="cnum">40205-26-00012401-1<small>АВТУ · дата договора не указана</small></div>
+        <div class="who-where"><b>Сидорова Мария Ивановна</b><span>Краснодарский край, м.о. Туапсинский, пгт Новомихайловский, ул. Лесная, д. 3</span></div>
+        <div class="pkg"><span class="chip have">АВТУ v1</span><span class="chip req miss">ТУ нужны</span><span class="chip miss">ПСУ</span><span class="chip miss">Схема</span><span class="chip miss">Пред. акт</span></div>
+        <div><div class="mini"><i class="n"></i><em></em><i></i><em></em><i></i><em></em><span class="par"><i></i><i></i><i></i></span></div><div class="mini-cap">Подготовка: не загружены ТУ</div></div>
+        <div class="st"><span class="status s-draft">Черновик</span></div>
+      </div>
+
+      <div class="row" role="row">
+        <button class="chev" aria-expanded="false" aria-label="Раскрыть пакет"><svg class="icon"><use href="#i-chev"/></svg></button>
+        <div class="cnum">40205-26-00011920-1<small>АВТУ · договор от 20.07.2026</small></div>
+        <div class="who-where"><b>Кравец Олег Юрьевич</b><span>Краснодарский край, м.о. Туапсинский, с. Агой, ул. Садовая, д. 21</span></div>
+        <div class="pkg"><span class="chip have">АВТУ v3</span><span class="chip have">ТУ</span><span class="chip have">ПСУ</span><span class="chip have">Схема</span><span class="chip miss">Пред. акт</span></div>
+        <div><div class="mini"><i class="d"></i><em class="d"></em><i class="d"></i><em class="d"></em><i class="d"></i><em class="d"></em><span class="par"><i class="d"></i><i class="d"></i><i class="d"></i></span></div><div class="mini-cap">Согласовано 02.11.2026 · 7 замечаний за 3 цикла</div></div>
+        <div class="st"><span class="status s-ok">Согласовано</span><a class="link" href="#">Печать пакета</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 2. МАСТЕР ================= -->
+<section class="screen" id="wizard" aria-label="Создание пакета">
+  <header class="topbar">
+    <button class="btn ghost"><svg class="icon"><use href="#i-back"/></svg>Реестр</button>
+    <h1>Новый пакет документов</h1>
+    <span class="grow"></span>
+    <span class="note">Черновик сохраняется только после шага 2</span>
+  </header>
+  <div class="page wizard">
+    <div class="steps" aria-label="Шаги">
+      <div class="step done"><b><svg class="icon"><use href="#i-check"/></svg></b><div><span>Технические условия</span><small>реквизиты прочитаны</small></div></div>
+      <div class="step cur"><b>2</b><div><span>АКТ ТП или АВТУ</span><small>загрузка и сверка с ТУ</small></div></div>
+      <div class="step"><b>3</b><div><span>Дополнительные документы</span><small>ПСУ, схема, предыдущий акт</small></div></div>
+    </div>
+
+    <div class="wgrid">
+      <div class="panel">
+        <h2>Реквизиты из ТУ</h2>
+        <p class="hint">Значения прочитаны из файла ТУ. Проверьте их; любое поле можно исправить.</p>
+        <div class="drop filled"><div class="fileic">DOCX</div><div><div class="fn">ТУ 40205-26-00012345-1.docx</div><div class="fs">ТУ № 07-05/0001-26 · 680 КБ · локальный шаблон Word удалён из копии</div></div><button class="btn ghost x">Заменить</button></div>
+        <div class="field"><label for="f1">Номер договора ТП</label><input id="f1" class="ok" value="40205-26-00012345-1"><div class="okmsg">Формат верный: 5 цифр – 2 – 8 – 1</div></div>
+        <div class="field"><label for="f2">Заявитель</label><input id="f2" value="Иванов Пётр Сергеевич"><div class="src">Из ТУ: <q>Заявитель: Иванов Пётр Сергеевич.</q></div></div>
+        <div class="field"><label for="f3">Адрес объекта</label><input id="f3" value="Краснодарский край, м.о. Туапсинский, с. Примерное, ул. Береговая, д. 7, к/н 23:33:0000000:111"><div class="src">Из ТУ, пункт 2: <q>…«Нежилое здание» по адресу: Краснодарский край…</q></div></div>
+        <div class="field"><label for="f4">Дата договора</label><input id="f4" value="01.09.2026"><div class="src">В ТУ даты нет — взята из АВТУ: <q>к договору от 01.09.2026 № 40205-26-00012345-1</q></div></div>
+        <div class="dup">По договору 40205-26-00012345-1 в Туапсинском РЭС уже есть пакет от 20.10.2026 (АКТ ТП, черновик). <a class="link" href="#">Открыть его</a> или продолжить создание нового.</div>
+      </div>
+
+      <div class="panel">
+        <h2>Документ на согласование</h2>
+        <p class="hint">Минимальный пакет — ТУ и один из актов.</p>
+        <div class="toggle" role="group" aria-label="Вид акта"><button aria-pressed="false">АКТ ТП</button><button aria-pressed="true">АВТУ</button></div>
+        <div class="drop filled"><div class="fileic">DOCX</div><div><div class="fn">АВТУ 07-05-0001-26.docx</div><div class="fs">№ 07-05/0001-26 от 28.10.2026 · 210 КБ</div></div><button class="btn ghost x">Заменить</button></div>
+        <ul class="checks" aria-label="Предварительная сверка АВТУ с ТУ">
+          <li><span class="mk ok">✓</span><span>Номер договора<div class="v">40205-26-00012345-1 в обоих документах</div></span><span></span></li>
+          <li><span class="mk ok">✓</span><span>Заявитель<div class="v">Иванов Пётр Сергеевич</div></span><span></span></li>
+          <li><span class="mk ok">✓</span><span>Номер и дата ТУ в АВТУ<div class="v">07-05/0001-26 от 01.09.2026</div></span><span></span></li>
+          <li><span class="mk ok">✓</span><span>Максимальная мощность<div class="v">15 кВт всего, в т. ч. 7 кВт существующая, 8 кВт новая</div></span><span></span></li>
+          <li><span class="mk ok">✓</span><span>Напряжение и питающий центр<div class="v">0,4 кВ · ПС 110/10 кВ «Примерная»</div></span><span></span></li>
+          <li><span class="mk ok">✓</span><span>Пункты ТУ<div class="v">10.1–10.6 и 11.1–11.6 указаны выполненными</div></span><span></span></li>
+          <li><span class="mk warn">?</span><span>Точка присоединения<div class="v">ТУ: «РУ-0,4 кВ ТП-Н100» · АВТУ: «…от РУ-0,4 кВ ТП-Н100 Сетевой организации…». Совпадает ТП, формулировки разные.</div></span><span class="note" style="color:var(--amber)">проверить вручную</span></li>
+          <li><span class="mk warn">?</span><span>Категория надёжности<div class="v">ТУ: III — 8 кВт · АВТУ: III — 15,0 кВт (с учётом существующей)</div></span><span class="note" style="color:var(--amber)">проверить вручную</span></li>
+        </ul>
+        <p class="note" style="margin-top:10px">Это предварительная сверка до сохранения. Пункты со знаком «?» инженер подтвердит с комментарием на вкладке «Сверка с ТУ» перед отправкой; Начальник РИРУ увидит, что они сверены вручную.</p>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px">
+      <h2>Дополнительные документы <span class="note" style="font-weight:400">— необязательно, можно добавить позже</span></h2>
+      <div class="extra">
+        <div class="drop"><b>ПСУ</b><span>PDF, DOCX или скан JPG/PNG</span></div>
+        <div class="drop"><b>Поопорная схема</b><span>PDF или скан JPG/PNG</span></div>
+        <div class="drop"><b>Предыдущий АКТ ТП</b><span>Для увеличения мощности</span></div>
+      </div>
+    </div>
+
+    <div class="wactions">
+      <button class="btn">Назад к ТУ</button>
+      <div style="display:flex;gap:10px;align-items:center"><span class="note">2 пункта нужно будет подтвердить перед отправкой</span><button class="btn primary">Сохранить пакет</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 3. РАБОЧЕЕ МЕСТО ================= -->
+<section class="screen" id="act" aria-label="Рабочее место документа">
+  <div class="acthead">
+    <div class="r1">
+      <button class="btn ghost" aria-label="Назад к реестру"><svg class="icon"><use href="#i-back"/></svg></button>
+      <span class="kind">АВТУ</span>
+      <span class="num">40205-26-00012345-1</span>
+      <span class="status s-review">На согласовании</span>
+      <span class="grow"></span>
+      <span class="due">Ваш срок: до 05.11, 18:00</span>
+      <button class="btn danger"><svg class="icon"><use href="#i-ret"/></svg>Вернуть на доработку</button>
+      <button class="btn primary" disabled title="К этой версии есть ваше открытое замечание"><svg class="icon"><use href="#i-check"/></svg>Согласовать</button>
+    </div>
+    <div class="r2">
+      <span>Заявитель: <b>Иванов Пётр Сергеевич</b></span>
+      <span>Адрес: <b>с. Примерное, ул. Береговая, д. 7</b></span>
+      <span>Договор от <b>01.09.2026</b></span>
+      <span><b>Туапсинский РЭС</b></span>
+      <span>Версия <b>2</b>, цикл <b>2</b></span>
+    </div>
+    <div class="line" aria-label="Маршрут согласования">
+      <div class="node done"><div class="pin"><span class="dot"></span><span class="role">Инженер РИРУ</span></div><div class="person">Смирнова А. В.</div><div class="when">отправила 04.11 10:15</div></div>
+      <span class="wire done"></span>
+      <div class="node done"><div class="pin"><span class="dot"></span><span class="role">Начальник РИРУ</span></div><div class="person">Петров П. П.</div><div class="when">согласовал 04.11 15:20</div></div>
+      <span class="wire done"></span>
+      <div class="node now"><div class="pin"><span class="dot"></span><span class="role">Начальник РЭС</span></div><div class="person">Кузнецов К. К. — вы</div><div class="when">ждёт решения, до 05.11</div></div>
+      <span class="wire"></span>
+      <div class="bus" aria-label="Параллельно">
+        <span class="bar"></span>
+        <div class="feeders">
+          <div class="feeder"><div class="node"><div class="pin"><span class="dot"></span><span class="role">СТП</span></div></div><span class="meta">Орлова Е. Н.</span></div>
+          <div class="feeder"><div class="node"><div class="pin"><span class="dot"></span><span class="role">СУЭ</span></div></div><span class="meta">Волков Д. А.</span></div>
+          <div class="feeder"><div class="node"><div class="pin"><span class="dot"></span><span class="role">ТЕХБЛОК</span></div></div><span class="meta">Соколов И. М.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="work">
+    <nav class="rail" aria-label="Документы пакета">
+      <h3>Пакет документов</h3>
+      <button class="doc-item on"><b>АВТУ</b><small>версия 2 · на согласовании</small></button>
+      <button class="doc-item"><b>ТУ</b><small>№ 07-05/0001-26 · справочно</small></button>
+      <button class="doc-item"><b>ПСУ</b><small>PDF, 2 стр.</small></button>
+      <div class="sep"></div>
+      <button class="doc-item add"><b>+ Поопорная схема</b><small>не загружена</small></button>
+      <button class="doc-item add"><b>+ Предыдущий АКТ ТП</b><small>не загружен</small></button>
+      <div class="sep"></div>
+      <h3>Версии АВТУ</h3>
+      <button class="doc-item on"><b>Версия 2</b><small>04.11 · Смирнова А. В.</small></button>
+      <button class="doc-item"><b>Версия 1</b><small>03.11 · возвращена с 3 замечаниями</small></button>
+    </nav>
+
+    <div class="viewer">
+      <div class="vtools">
+        <label>Масштаб <select><option>100%</option></select></label>
+        <label>Стр. <select><option>1 из 2</option></select></label>
+        <label><input type="checkbox" checked> Показать правки и замечания</label>
+        <label>Сравнить с <select><option>версией 1</option><option>—</option></select></label>
+        <span class="grow"></span>
+        <input type="search" placeholder="Поиск в документе" style="width:170px">
+        <span class="approx" title="Просмотр приблизительный: переносы строк и разрывы страниц могут отличаться от Word. Для печати используется исходный DOCX.">Просмотр приблизительный</span>
+      </div>
+      <div class="sheet-scroll">
+        <article class="sheet" aria-label="АВТУ, версия 2">
+          <p class="c">АКТ</p>
+          <p class="c">О ВЫПОЛНЕНИИ ТЕХНИЧЕСКИХ УСЛОВИЙ</p>
+          <p class="c" style="font-weight:400">№ 07-05/0001-26 от 28 октября 2026 г.</p>
+          <p style="position:relative">Публичным акционерным обществом «Россети Юг», именуемым в дальнейшем Сетевой организацией, в лице Начальника Туапсинского района электрических сетей Кузнецова К. К., действующего на основании <mark class="rem">доверенности от 01.12.2025 г.</mark><sup class="pin" title="Замечание 3">3</sup>, с одной стороны и Иванов Пётр Сергеевич, именуемый в дальнейшем Заявитель, с другой стороны, составили настоящий акт о нижеследующем:
+            <span class="margin-dot" style="top:44px"><span>КК</span></span></p>
+          <p>1. Характеристики присоединения по техническим условиям от 01.09.2026 № 07-05/0001-26 к договору от 01.09.2026 № 40205-26-00012345-1 об осуществлении технологического присоединения к электрическим сетям энергопринимающих устройств: «ЭПУ нежилого здания», Краснодарский край, м.о. Туапсинский, с. Примерное, ул. Береговая, д. 7.</p>
+          <p>2. В ходе проверки рассмотрено выполнение ТУ от 01.09.2026 № 07-05/0001-26: Сетевая организация осуществляет: пункты 10.1–10.6 — выполнены. Заявитель осуществляет: пункты 11.1–11.6 — выполнены.</p>
+          <p class="fix-ok" style="position:relative">3. Максимальная мощность (всего) 15,0 (пятнадцать) кВт, в том числе: ранее <del class="fix">присоедененная</del><ins class="fix">присоединённая</ins><sup class="pin" title="Правка 1: подтверждена автором">1</sup> максимальная мощность 7,0 кВт; максимальная мощность без учёта ранее присоединённой 8,0 кВт.
+            <span class="margin-dot ok" style="top:0"><span>ПП</span></span></p>
+          <p>Категория надёжности электроснабжения: I — 0,0 кВт; II — 0,0 кВт; III — 15,0 кВт.</p>
+          <p>Перечень точек присоединения:</p>
+          <table>
+            <tr><th>N</th><th>Источник питания</th><th>Описание точки присоединения</th><th>Уровень напряжения (кВ)</th><th>Максимальная мощность (кВт)</th></tr>
+            <tr><td>1</td><td>ПС 110/10 кВ «Примерная»</td><td class="fix-wait" style="position:relative">Контакты присоединения СИП 4х16 кВ Заявителя от РУ-0,4 кВ <del class="fix">ТП-Н010</del><ins class="fix">ТП-Н100</ins><sup class="pin" title="Правка 2: исправлено, ждёт подтверждения автора">2</sup> Сетевой организации в сторону ВПУ-0,4 кВ Заявителя</td><td>0,4</td><td>15,0</td></tr>
+          </table>
+          <span class="margin-dot wait" style="top:520px"><span>ПП</span></span>
+          <p>4. В ходе проверки произведено рассмотрение следующих документов: паспорт прибора учёта.</p>
+          <p>5. Проведён осмотр электроустановок заявителя ВПУ-0,4 кВ, расположенных по адресу: Краснодарский край, м.о. Туапсинский, с. Примерное, ул. Береговая, д. 7, сетевой организацией в лице <span class="selected-text">электромонтёра ТУУЭиРУ</span> в присутствии заявителя.</p>
+          <div class="sel-pop" style="left:150px;top:742px" role="menu" aria-label="Действия с выделенным текстом"><button>Замечание</button><button>Предложить исправление</button></div>
+          <p style="margin-top:22px">6. По результатам проверки установлено, что мероприятия, предусмотренные техническими условиями, выполнены.</p>
+          <p>7. Прочие отметки: нет.</p>
+        </article>
+      </div>
+    </div>
+
+    <aside class="side-panel">
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true">Замечания<span class="cnt">1</span></button>
+        <button role="tab" aria-selected="false">Сверка с ТУ</button>
+        <button role="tab" aria-selected="false">История</button>
+      </div>
+      <div class="panel-body">
+        <div class="pfilter" role="group" aria-label="Фильтр замечаний">
+          <button aria-pressed="true">Все 3</button><button aria-pressed="false">Открытые 1</button><button aria-pressed="false">Ждут проверки 1</button><button aria-pressed="false">Мои</button>
+        </div>
+
+        <div class="form" aria-label="Новое исправление">
+          <h4>Предложить исправление</h4>
+          <div class="quote">электромонтёра ТУУЭиРУ</div>
+          <label>Вид ошибки</label>
+          <select><option>Ошибка оформления</option><option>Орфографическая</option><option>Пунктуационная</option><option>Техническая</option><option>Несоответствие ТУ</option></select>
+          <label>Правильный текст</label>
+          <input value="электромонтёра ТУУЭиРУ Морозова А. А.">
+          <label>Комментарий</label>
+          <textarea rows="2">Не указана фамилия электромонтёра, проводившего осмотр.</textarea>
+          <div class="row2"><button class="btn primary">Сохранить исправление</button><button class="btn">Отмена</button></div>
+        </div>
+
+        <article class="card focus">
+          <div class="h"><span class="ava">КК</span><div><b>Кузнецов К. К.</b><small>Начальник РЭС · цикл 2 · 05.11 09:40</small></div><span class="status s-rework no">Открыто</span></div>
+          <span class="cat">Ошибка оформления</span>
+          <div class="change"><mark class="rem">доверенности от 01.12.2025 г.</mark></div>
+          <p>Не указан номер доверенности. Нужно «№ 119/37-ПРИМЕР».</p>
+        </article>
+
+        <article class="card wait">
+          <div class="h"><span class="ava">ПП</span><div><b>Петров П. П.</b><small>Начальник РИРУ · цикл 1 · 03.11 16:05</small></div><span class="status no" style="background:var(--amber-soft);color:var(--amber)">Ждёт проверки</span></div>
+          <span class="cat">Ошибка в точке присоединения</span>
+          <div class="change"><del class="fix">ТП-Н010</del> → <ins class="fix">ТП-Н100</ins></div>
+          <p>Перепутаны цифры в номере ТП, по ТУ — ТП-Н100.</p>
+          <ul class="trail">
+            <li><b>Смирнова А. В.</b> исправила в версии 2, 04.11 10:12: «Номер ТП исправлен по ТУ»</li>
+          </ul>
+          <div class="acts"><span class="note">Подтвердит автор — Петров П. П.</span></div>
+        </article>
+
+        <article class="card ok">
+          <div class="h"><span class="ava">ПП</span><div><b>Петров П. П.</b><small>Начальник РИРУ · цикл 1 · 03.11 15:58</small></div><span class="status s-ok no">Устранено</span></div>
+          <span class="cat">Орфографическая</span>
+          <div class="change"><del class="fix">присоедененная</del> → <ins class="fix">присоединённая</ins></div>
+          <ul class="trail">
+            <li><b>Смирнова А. В.</b> применила правку в версии 2, 04.11 10:12</li>
+            <li><b>Петров П. П.</b> подтвердил устранение, 04.11 15:18</li>
+          </ul>
+        </article>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ================= 4. ЛИСТ СОГЛАСОВАНИЯ ================= -->
+<section class="screen" id="print" aria-label="Печать пакета">
+  <header class="topbar">
+    <button class="btn ghost"><svg class="icon"><use href="#i-back"/></svg>К документу</button>
+    <h1>Печать пакета 40205-26-00011920-1</h1>
+    <span class="grow"></span>
+    <button class="btn"><svg class="icon"><use href="#i-dl"/></svg>Скачать DOCX: АВТУ + листы</button>
+    <button class="btn primary"><svg class="icon"><use href="#i-print"/></svg>Печать листов</button>
+  </header>
+  <div class="page print-wrap">
+    <div class="a4" aria-label="Лист согласования">
+      <h2>ЛИСТ СОГЛАСОВАНИЯ</h2>
+      <p class="sub">АВТУ № 07-05/0007-26 к договору ТП № 40205-26-00011920-1 от 20.07.2026<br>Заявитель: Кравец Олег Юрьевич · Туапсинский РЭС · утверждённая версия 3, цикл 3</p>
+      <table>
+        <thead><tr><th>№</th><th>Этап</th><th>ФИО</th><th>Решение</th><th>Дата и время</th><th>Замечаний за все циклы</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Инженер РИРУ (подготовил)</td><td>Смирнова А. В.</td><td>Отправлено</td><td>01.11.2026 09:10</td><td>—</td></tr>
+          <tr><td>2</td><td>Начальник РИРУ</td><td>Петров П. П.</td><td>Согласовано</td><td>01.11.2026 11:42</td><td>3</td></tr>
+          <tr><td>3</td><td>Начальник РЭС</td><td>Кузнецов К. К.</td><td>Согласовано</td><td>01.11.2026 16:05</td><td>1</td></tr>
+          <tr><td>4</td><td>СТП</td><td>Орлова Е. Н.</td><td>Согласовано</td><td>02.11.2026 10:20</td><td>2</td></tr>
+          <tr><td>5</td><td>СУЭ</td><td>Волков Д. А.</td><td>Согласовано</td><td>02.11.2026 12:31</td><td>0</td></tr>
+          <tr><td>6</td><td>ТЕХБЛОК</td><td>Соколов И. М.</td><td>Согласовано</td><td>02.11.2026 14:02</td><td>1</td></tr>
+        </tbody>
+      </table>
+      <p class="tot">Итог: согласовано 02.11.2026 14:02. Циклов согласования: 3. Замечаний: 7, все устранены.</p>
+
+      <h2>ЛИСТ ЗАМЕЧАНИЙ</h2>
+      <p class="sub">Все замечания, которые выставлялись к документу во всех циклах</p>
+      <table>
+        <thead><tr><th>№</th><th>Цикл / версия</th><th>Автор</th><th>Вид ошибки</th><th>Было → стало</th><th>Устранено</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>1 / v1</td><td>Петров П. П., Нач. РИРУ</td><td>Орфографическая</td><td>«присоедененная» → «присоединённая»</td><td>v2, подтвердил автор 01.11</td></tr>
+          <tr><td>2</td><td>1 / v1</td><td>Петров П. П., Нач. РИРУ</td><td>Ошибка в точке присоединения</td><td>«ТП-Н010» → «ТП-Н100»</td><td>v2, подтвердил автор 01.11</td></tr>
+          <tr><td>3</td><td>1 / v1</td><td>Петров П. П., Нач. РИРУ</td><td>Пунктуационная</td><td>лишняя запятая в п. 5</td><td>v2, подтвердил автор 01.11</td></tr>
+          <tr><td>4</td><td>2 / v2</td><td>Кузнецов К. К., Нач. РЭС</td><td>Ошибка оформления</td><td>не указан № доверенности</td><td>v3, подтвердил автор 01.11</td></tr>
+          <tr><td>5</td><td>2 / v2</td><td>Орлова Е. Н., СТП</td><td>Несоответствие ТУ</td><td>пункты 11.1–11.5 → 11.1–11.6</td><td>v3, подтвердила автор 02.11</td></tr>
+          <tr><td>6</td><td>2 / v2</td><td>Орлова Е. Н., СТП</td><td>Ошибка в мощности</td><td>«8,5 кВт» → «8,0 кВт»</td><td>v3, подтвердила автор 02.11</td></tr>
+          <tr><td>7</td><td>2 / v2</td><td>Соколов И. М., ТЕХБЛОК</td><td>Техническая</td><td>не указан тип автомата</td><td>v3, подтвердил автор 02.11</td></tr>
+        </tbody>
+      </table>
+      <p class="fn">Сформировано системой ТП Согласование 03.11.2026 12:00 по утверждённой версии 3 (SHA-256 4f1c…9a2e). Электронное согласование не является электронной подписью.</p>
+    </div>
+    <div class="print-side">
+      <div class="panel"><h2>Что войдёт в DOCX</h2>
+        <ul><li>Утверждённый АВТУ, версия 3 — без изменений</li><li>Разрыв страницы</li><li>Лист согласования</li><li>Лист замечаний (7)</li></ul>
+      </div>
+      <div class="panel"><h2>Отдельные файлы</h2>
+        <ul><li><a class="link" href="#">40205-26-00011920-1 АВТУ.docx</a> — оригинал</li><li><a class="link" href="#">40205-26-00011920-1 Лист согласования.docx</a></li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.mock-switch button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.mock-switch button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===b.dataset.s));
+  window.scrollTo(0,0);
+}));
+const start=new URLSearchParams(location.search).get('screen');
+if(start)document.querySelector(`.mock-switch button[data-s="${start}"]`)?.click();
+</script>
+</body>
+</html>

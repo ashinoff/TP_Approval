@@ -4,8 +4,8 @@ import {randomUUID} from 'node:crypto';
 import type pg from 'pg';
 import {transaction} from '../apps/api/src/db.js';
 import {zip,docxParts} from './zip.js';
-export function checkedDocx(power='15',contract='SYNTH-TU-0001',voltage='0,4',type='ACT'){
- const lines=[type==='TU'?'Технические условия — синтетический пример':'Акт ТП — синтетический пример',`Приложение к договору № ${contract}`,`Максимальная мощность: ${power} кВт, в том числе существующая мощность 7 кВт.`,...(voltage?[`Класс напряжения: ${voltage} кВ.`]:[]),'Адрес объекта: Учебный адрес, д. 15/31', 'Точка присоединения: РУ-0,4 кВ ТП-У001.'];
+export function checkedDocx(power='15',contract='SYNTH-TU-0001',voltage='0,4',type='ACT',point='РУ-0,4 кВ ТП-У001'){
+ const lines=[type==='TU'?'Технические условия — синтетический пример':'Акт ТП — синтетический пример',`Приложение к договору № ${contract}`,`Максимальная мощность: ${power} кВт, в том числе существующая мощность 7 кВт.`,...(voltage?[`Класс напряжения: ${voltage} кВ.`]:[]),'Адрес объекта: Учебный адрес, д. 15/31', `Точка присоединения: ${point}.`];
  return zip({...docxParts,'word/document.xml':'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+lines.map(s=>`<w:p><w:r><w:t>${s}</w:t></w:r></w:p>`).join('')+'</w:body></w:document>'});
 }
 export async function runEngineerChecks({app,owner,runtime,tokens,users,area}:{app:any;owner:pg.Pool;runtime:pg.Pool;tokens:Record<string,string>;users:Record<string,string>;area:string}){
@@ -34,5 +34,47 @@ export async function runEngineerChecks({app,owner,runtime,tokens,users,area}:{a
  d=await card();for(const c of d.comments)ok(await post('riru',`/api/v1/comments/${c.id}/events`,{versionId:v3.id,type:'REPORTED_FIXED',explanation:'Учебное исправление'}));ok(await submit(v3));d=await card();for(const c of d.comments)ok(await post('riru-head',`/api/v1/comments/${c.id}/events`,{versionId:v3.id,type:'VERIFIED',explanation:'Автор проверил'}));
  for(const [u,role]of [['riru-head','RIRU_HEAD'],['chief','RES_HEAD'],['sue','SUE'],['stp','STP'],['gi','GI']]){d=await card();task=d.tasks.find((t:any)=>t.role===role&&t.status==='OPEN');ok(await post(u,`/api/v1/tasks/${task.id}/decision`,{decision:'APPROVE',versionId:v3.id}));}d=await card();assert.equal(d.state,'APPROVED');assert.ok(ok(await get('riru','/api/v1/registry?view=approved')).items.some((x:any)=>x.id===a.id));ok(await post('riru',path+'/revise',{reason:'Учебный пересмотр',expectedRevision:d.revision}));assert.ok(ok(await get('riru','/api/v1/registry?view=approved')).items.some((x:any)=>x.id===a.id));assert.ok(ok(await get('riru','/api/v1/registry?view=corrections')).items.some((x:any)=>x.id===a.id));pass('Full repeated route still requires author verification; approved publication survives revision and appears in correction work');
  const b=ok(await create('SYNTH-UNKNOWN')),bp=`/api/v1/acts/${b.id}`;const f=await upload(bp,'ACT_TP',checkedDocx('15','SYNTH-TU-0001',''));let bd=ok(await get('riru',bp));const bv=ok(await post('riru',bp+'/versions',{fileId:f.id,expectedRevision:bd.revision}));bd=ok(await get('riru',bp));ok(await post('riru',bp+'/technical-conditions/select',{technicalConditionsId:tu.technicalConditions.id,expectedRevision:bd.revision}));bd=ok(await get('riru',bp));const unknown=ok(await post('riru',bp+'/check-tu',{versionId:bv.id,expectedRevision:bd.revision}));assert.equal(unknown.status,'BLOCKED');assert.equal(unknown.findings.find((x:any)=>x.field==='voltage').status,'UNKNOWN');assert.equal((await post('riru',bp+'/submit',{versionId:bv.id,expectedRevision:bd.revision})).status,409);await assert.rejects(transaction(runtime,users.riru,db=>db.query("UPDATE app.tu_checks SET status='PASS' WHERE id=$1",[unknown.id])));assert.equal((await transaction(runtime,users.other,db=>db.query('SELECT id FROM app.tu_checks WHERE act_id=$1',[b.id]))).rowCount,0);assert.ok(changed.technicalConditions.id);pass('Unknown values are blocked, not marked correct; reports are immutable and isolated by real RLS');
+
+ // Р4: the engineer confirms MANUAL_REVIEW / UNKNOWN findings with a comment; a DIFFERENCE cannot be confirmed.
+ {
+  const c=ok(await create('SYNTH-CONFIRM')),cp=`/api/v1/acts/${c.id}`;const cardC=()=>get('riru',cp).then(ok);
+  const point='Контакты кабеля от РУ-0,4 кВ ТП-У001';
+  const versionC=async(power:string)=>{const f=await upload(cp,'ACT_TP',checkedDocx(power,'SYNTH-TU-0001','0,4','ACT',point));return ok(await post('riru',cp+'/versions',{fileId:f.id,expectedRevision:(await cardC()).revision}));};
+  const vA=await versionC('150');
+  ok(await post('riru',cp+'/technical-conditions/select',{technicalConditionsId:tu.technicalConditions.id,expectedRevision:(await cardC()).revision}));
+  const checkC=async(v:any)=>ok(await post('riru',cp+'/check-tu',{versionId:v.id,expectedRevision:(await cardC()).revision}));
+  const confirm=async(u:string,checkId:string,field:string,comment='Сверено вручную по исходным ТУ')=>post(u,`${cp}/check-tu/${checkId}/confirm`,{field,comment,expectedRevision:(await cardC()).revision});
+  const submitC=async(v:any)=>post('riru',cp+'/submit',{versionId:v.id,expectedRevision:(await cardC()).revision});
+  const reportA=await checkC(vA);
+  assert.equal(reportA.status,'BLOCKED');
+  assert.equal(reportA.findings.find((f:any)=>f.field==='point').status,'MANUAL_REVIEW');
+  assert.equal(reportA.findings.find((f:any)=>f.field==='power').status,'DIFFERENCE');
+  assert.equal((await confirm('riru',reportA.id,'power')).body.error.code,'TU_FINDING_NOT_CONFIRMABLE');
+  assert.equal((await confirm('riru-head',reportA.id,'point')).status,403);
+  assert.equal((await confirm('other',reportA.id,'point')).status,404);
+  assert.notEqual((await confirm('riru',reportA.id,'point','коротко')).status,200);
+  ok(await confirm('riru',reportA.id,'point'));
+  assert.equal((await submitC(vA)).body.error.code,'TU_CHECK_REQUIRED');
+  pass('A confirmed MANUAL_REVIEW does not unblock a remaining DIFFERENCE; head and other RES cannot confirm; a comment is required');
+  const vB=await versionC('15');
+  const reportB=await checkC(vB);
+  assert.equal(reportB.status,'BLOCKED');
+  assert.equal((await submitC(vB)).body.error.code,'TU_CHECK_REQUIRED');
+  assert.equal((await confirm('riru',reportA.id,'point')).body.error.code,'TU_CHECK_STALE');
+  const first=ok(await confirm('riru',reportB.id,'point'));
+  const again=ok(await confirm('riru',reportB.id,'point','Повторное подтверждение тем же инженером'));
+  assert.equal(again.id,first.id);
+  ok(await submitC(vB));
+  const done=await cardC();
+  assert.equal(done.state,'RIRU_REVIEW');
+  const stored=done.checks.find((x:any)=>x.id===reportB.id);
+  assert.equal(stored.confirmations.length,1);
+  assert.equal(stored.confirmations[0].field,'point');
+  assert.ok(stored.confirmations[0].actorName);
+  assert.equal(ok(await get('riru-head',cp)).checks.find((x:any)=>x.id===reportB.id).confirmations.length,1);
+  await assert.rejects(transaction(runtime,users.riru,db=>db.query("UPDATE app.tu_check_confirmations SET comment='Изменено задним числом' WHERE check_id=$1",[reportB.id])));
+  assert.equal((await transaction(runtime,users.other,db=>db.query('SELECT id FROM app.tu_check_confirmations WHERE act_id=$1',[c.id]))).rowCount,0);
+  pass('Confirmations do not carry over to a new version, are idempotent, visible to the head, immutable and isolated by RLS; submit proceeds');
+ }
  console.log(`PASS: ${n} engineer preflight integration groups`);
 }

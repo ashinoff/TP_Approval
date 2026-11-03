@@ -7,12 +7,57 @@ import {z} from 'zod';
 import {validateDocx} from './files.js';
 import {HttpError,requireValue,type DB} from './db.js';
 import {audit,lockAct,role} from './workflow.js';
-export type Block={id:string;part:string;text:string;sha256:string};
+/** Position of a paragraph inside a Word table: table index within the part, row and cell. */
+export type TableCell={table:number;row:number;cell:number};
+/**
+ * One Word paragraph. `id` is `<part>:p:<index>` and must stay stable: saved remark anchors refer to it.
+ * `table` and `numbering` are optional reading aids for the requisite rules and never affect the id.
+ */
+export type Block={id:string;part:string;text:string;sha256:string;table?:TableCell;numbering?:{level:number}};
 const hash=(s:string|Buffer)=>createHash('sha256').update(s).digest('hex');
+type XmlNode=Record<string,any>;
+const childNodes=(nodes:XmlNode[],name:string)=>nodes.filter(n=>Array.isArray(n[name])).map(n=>n[name] as XmlNode[]);
+/** Word list level (w:pPr/w:numPr/w:ilvl) of a paragraph, if the paragraph is numbered directly. */
+function numberingLevel(paragraph:XmlNode[]):number|undefined{
+ for(const properties of childNodes(paragraph,'w:pPr')){
+  for(const numbering of childNodes(properties,'w:numPr')){
+   const level=numbering.find(n=>Array.isArray(n['w:ilvl']));
+   const value=Number(level?.[':@']?.['@_w:val']??0);
+   return Number.isInteger(value)&&value>=0?value:0;
+  }
+ }
+ return undefined;
+}
 export function xmlBlocks(xml:string,part:string):Block[]{
  const tree=new XMLParser({preserveOrder:true,ignoreAttributes:false,trimValues:false,parseTagValue:false}).parse(xml);const blocks:Block[]=[];
  const content=(nodes:any[]):string=>nodes.map(n=>n['w:t']?content(n['w:t']):n['#text']!==undefined?String(n['#text']):n['w:tab']?'\t':n['w:br']||n['w:cr']?'\n':Object.entries(n).filter(([k])=>![':@','w:pPr','w:rPr','w:instrText','w:del','w:delText'].includes(k)).map(([,v])=>Array.isArray(v)?content(v):'').join('')).join('');
- const walk=(nodes:any[])=>{for(const n of nodes)for(const [key,value]of Object.entries(n)){if(key==='w:p'){const text=content(value as any[]);blocks.push({id:`${part}:p:${blocks.length}`,part,text,sha256:hash(text)});}else if(key!=='w:del'&&Array.isArray(value))walk(value);}};walk(tree);return blocks;
+ // The traversal order is the same as before table metadata existed, so block ids do not change.
+ let tables=0;
+ type TablePosition={table:number;row:number;cell:number};
+ const walk=(nodes:any[],position?:TablePosition)=>{
+  for(const n of nodes){
+   for(const [key,value]of Object.entries(n)){
+    if(!Array.isArray(value)||key==='w:del')continue;
+    if(key==='w:p'){
+     const text=content(value);
+     const block:Block={id:`${part}:p:${blocks.length}`,part,text,sha256:hash(text)};
+     if(position&&position.row>=0&&position.cell>=0)block.table={...position};
+     const level=numberingLevel(value);
+     if(level!==undefined)block.numbering={level};
+     blocks.push(block);
+    }else if(key==='w:tbl'){
+     walk(value,{table:tables++,row:-1,cell:-1});
+    }else if(key==='w:tr'&&position){
+     position.row++;position.cell=-1;walk(value,position);
+    }else if(key==='w:tc'&&position){
+     position.cell++;
+     // A nested table inside a cell gets its own position; the outer cell continues afterwards.
+     walk(value,position);
+    }else walk(value,position);
+   }
+  }
+ };
+ walk(tree);return blocks;
 }
 export async function documentModel(bytes:Buffer){const parts=await validateDocx(bytes);const blocks:Block[]=[];for(const [part,xml]of parts)if(/^word\/(document|header\d+|footer\d+)\.xml$/.test(part))blocks.push(...xmlBlocks(xml.toString('utf8'),part));return {sha256:hash(bytes),blocks};}
 export const anchorSchema=z.object({kind:z.literal('OOXML_PARAGRAPH_V1'),part:z.string().max(100),blockId:z.string().max(150),blockHash:z.string().regex(/^[a-f0-9]{64}$/),fileHash:z.string().regex(/^[a-f0-9]{64}$/),start:z.number().int().min(0),end:z.number().int().min(1),quote:z.string().min(1).max(5000)}).strict();
