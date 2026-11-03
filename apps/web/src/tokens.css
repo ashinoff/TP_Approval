@@ -1,0 +1,41 @@
+/*
+ * Design tokens of TP_Approval. Loaded first; other stylesheets use these variables.
+ * Reference: docs/design/target-ui.html. Minimum font size in the interface is 12px.
+ */
+:root{
+  /* Palette */
+  --petrol:#10303d;        /* sidebar, dark surfaces */
+  --petrol-2:#17414f;
+  --ink:#1b2b33;           /* main text */
+  --ink-2:#4d616b;         /* secondary text */
+  --muted:#6d7f88;         /* captions */
+  --paper:#eef2f3;         /* page background */
+  --bg:var(--paper);
+  --surface:#ffffff;
+  --line:#d8e0e3;
+  --line-2:#e8edef;
+  --teal:#0f6f6c;          /* primary action, links */
+  --teal-soft:#e3f1f0;
+  --blue:#0f6f6c;          /* legacy name used by older styles */
+  --red:#c62828;           /* remarks, corrections, discrepancies */
+  --red-soft:#fdecea;
+  --amber:#a8670f;         /* fixed, waiting for the author / confirmed manually */
+  --amber-soft:#fdf3e1;
+  --green:#2e7d32;         /* approved, verified, match */
+  --green-soft:#e7f4e8;
+  --current:#1f5fa8;       /* current stage, waiting for a decision */
+  --current-soft:#e6eff9;
+  --grey:#9aa9b0;          /* not started */
+  /* Typography: 12 / 13 / 14 / 16 / 20 / 24 */
+  --font:"Segoe UI","PT Sans",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --fs-xs:12px;--fs-s:13px;--fs-m:14px;--fs-l:16px;--fs-xl:20px;--fs-xxl:24px;
+  --r-s:6px;--r-m:10px;
+  font-family:var(--font);
+  font-size:var(--fs-m);
+  color:var(--ink);
+  background:var(--paper);
+  font-synthesis:none;
+}
+body{background:var(--paper);color:var(--ink)}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

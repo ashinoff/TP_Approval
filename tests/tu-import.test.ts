@@ -16,3 +16,8 @@ test('TU import: split runs and table cell paragraphs are readable; download nam
  const b=xmlBlocks('<w:document xmlns:w="w"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Приложение к договору № </w:t></w:r><w:r><w:t>00001-1</w:t></w:r></w:p><w:p><w:r><w:t>Заявитель: Учебный заявитель</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>','word/document.xml');
  assert.equal(extractTuMetadata(b).fields.contractNumber.value,'00001-1');assert.equal(documentFilename('AVTU_DOCX','00001-1',1),'00001-1 АВТУ.docx');assert.equal(documentFilename('TU_DOCX','00001-1',2),'00001-1 ТУ — редакция 2.docx');
 });
+
+test('TU import: the applicant name loses the sentence-final dot of the template',()=>{
+ const r=extractTuMetadata(blocks(['Приложение к договору № 00000-26-00000001-1','Заявитель: Учебный Пётр Сергеевич.']));
+ assert.equal(r.fields.applicant.value,'Учебный Пётр Сергеевич');
+});

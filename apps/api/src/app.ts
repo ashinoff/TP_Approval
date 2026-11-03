@@ -17,7 +17,7 @@ import {registry,registryAct,registryCounts} from './registry.js';
 import {timeline} from './timeline.js';
 import {preview,createRemark,compareVersions} from './documents.js';
 import {documentKinds,documentFilename,contractDocuments,registerDocument,selectTechnicalConditions,tuPreview} from './contract-documents.js';
-import {checkTechnicalConditions,enforceTechnicalConditions} from './tu-validation.js';
+import {checkTechnicalConditions,confirmTuFinding,enforceTechnicalConditions} from './tu-validation.js';
 import {RULES_VERSION} from './tu-rules.js';
 import {extractTuMetadata} from './tu-import.js';
 import {documentModel} from './documents.js';
@@ -125,7 +125,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify=verifier(config
     const tasks=(await db.query('SELECT t.*,app.task_role(t.role,t.cycle_id) AS role,d.decision,d.reason,d.actor_name FROM app.tasks t LEFT JOIN app.decisions d ON d.task_id=t.id WHERE t.act_id=$1 ORDER BY t.received_at',[act.id])).rows;
     const comments=(await db.query('SELECT c.*,coalesce(c.author_snapshot->>\'name\',(SELECT actor_name FROM app.decisions WHERE task_id=c.task_id)) AS author_name,(SELECT role FROM app.tasks WHERE id=c.task_id) AS author_role,coalesce((SELECT jsonb_agg(e ORDER BY e.created_at,e.id) FROM app.comment_events e WHERE e.comment_id=c.id),\'[]\'::jsonb) AS events FROM app.comments c WHERE c.act_id=$1 ORDER BY c.created_at,c.id',[act.id])).rows;
     const releases=(await db.query('SELECT * FROM app.releases WHERE act_id=$1 ORDER BY published_at',[act.id])).rows;
-    const checks=(await db.query('SELECT * FROM app.tu_checks WHERE act_id=$1 ORDER BY created_at DESC,id DESC LIMIT 100',[act.id])).rows;
+    const checks=(await db.query("SELECT c.*,coalesce((SELECT jsonb_agg(jsonb_build_object('id',x.id,'field',x.field,'comment',x.comment,'actorId',x.actor_id,'actorName',x.actor_name,'createdAt',x.created_at) ORDER BY x.created_at) FROM app.tu_check_confirmations x WHERE x.check_id=c.id),'[]'::jsonb) AS confirmations FROM app.tu_checks c WHERE c.act_id=$1 ORDER BY c.created_at DESC,c.id DESC LIMIT 100",[act.id])).rows;
     return {...act,checks,checkRulesVersion:RULES_VERSION,contractDocuments:await contractDocuments(db,act),versions,cycles,tasks,comments,releases,presentation:await registryAct(db,act.id),timeline:await timeline(db,act.id)};
   },true);
   const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:config.maxFileBytes,files:1,fields:4}});
@@ -171,6 +171,10 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify=verifier(config
     await db.query('UPDATE app.acts SET revision=revision+1 WHERE id=$1',[a.id]);await audit(db,a.id,'VERSION_CREATED',{versionId:v.id});return v;
   });
   post('/api/v1/acts/:id/check-tu',async(db,req)=>{const b=z.object({versionId:id,expectedRevision:expected}).strict().parse(req.body);return checkTechnicalConditions(db,config.storagePath,id.parse(req.params.id),b.versionId,b.expectedRevision);});
+  post('/api/v1/acts/:id/check-tu/:checkId/confirm',async(db,req)=>{
+    const b=z.object({field:z.string().trim().min(1).max(50),comment:z.string().trim().min(10).max(2000),expectedRevision:expected}).strict().parse(req.body);
+    return confirmTuFinding(db,config.storagePath,id.parse(req.params.id),id.parse(req.params.checkId),b.field,b.comment,b.expectedRevision);
+  });
   post('/api/v1/acts/:id/submit',async(db,req)=>{const b=z.object({versionId:id,expectedRevision:expected}).strict().parse(req.body);const actId=id.parse(req.params.id);const checkId=await enforceTechnicalConditions(db,config.storagePath,actId,b.versionId,b.expectedRevision);return submit(db,actId,b.versionId,b.expectedRevision,checkId);});
   post('/api/v1/tasks/:id/decision',async(db,req)=>{const b=z.object({decision:z.enum(['APPROVE','RETURN']),reason:z.string().trim().max(10000).default(''),versionId:id.optional()}).strict().parse(req.body);return decide(db,id.parse(req.params.id),b.decision,b.reason,b.versionId);});
   post('/api/v1/acts/:id/close-collection',async(db,req)=>{const b=z.object({reason:text}).strict().parse(req.body);return closeCollection(db,id.parse(req.params.id),b.reason);});

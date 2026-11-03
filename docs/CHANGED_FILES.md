@@ -1,5 +1,12 @@
 # Файлы этапа минимального ядра — 31.10.2026
 
+## 04.11.2026 — Рабочее место документа и сверка V4
+- API: tu-rules.ts (DOCX_CONTEXT_V4), tu-validation.ts (подтверждения, openBlockers), documents.ts (table/numbering у блоков), tu-import.ts (ФИО без точки), app.ts (маршрут confirm, подтверждения в карточке).
+- БД: db/migrations/014_tu_check_confirmations.sql.
+- Web: новые ActHeader.tsx, RouteLine.tsx, tokens.css, workspace.css; переписаны WordWorkspace.tsx, ActDocument.tsx (PreparationControls, SendButton), ContractDocuments.tsx (PackagePanel), TuPreflight.tsx; изменены App.tsx, DocumentViewer.tsx, main.tsx; размеры шрифтов в style/registry/practical/engineer/word.css.
+- Тесты: tu-rules.test.ts (переписан, синтетический шаблон «Россети Юг»), tu-import.test.ts, engineer.integration.ts (группа подтверждения), engineer.browser.ts (кнопки ТУ).
+- Документы: docs/codex/CODEX_PROMPTS.md, docs/design/target-ui.html и снимки, PROGRESS, DECISIONS, ENGINEER_WORKSPACE, IMPLEMENTATION_PLAN, AGENTS.md.
+
 ## 03.11.2026 — Исправление 415 и упрощение создания
 Новые prepare-tu.ts, prepare-tu.test.ts, миграция 013, SOFTWARE_SUMMARY.md; изменены files.ts (строгий по умолчанию валидатор и специальный режим подготовки), app.ts (подготовка ТУ/nullable date), EngineerUpload/App/Ui (одна кнопка/копия/необязательные реквизиты), package/lock (jszip), engineer integration/browser, README и контекст. Проверки: build, 26 unit, 73 integration, engineer browser7, реальный ТУ в Chrome без сохранения. Пользователь разрешил GitHub push исходников/контекста; реальные документы/секреты исключены.
 
