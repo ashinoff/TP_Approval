@@ -12,7 +12,8 @@ const statuses:Record<string,{icon:string;text:string;css:string}>={
   APPROVED:{icon:'✓',text:'Согласовано',css:'approved'},RETURNED:{icon:'✕',text:'Отклонено с замечаниями',css:'returned'},
   PENDING:{icon:'◷',text:'Ожидает решения',css:'pending'},NOT_STARTED:{icon:'○',text:'Этап не начался',css:'not-started'},
   NO_DECISION:{icon:'⊘',text:'Без решения · сбор закрыт',css:'not-started'},
-  IN_REVIEW:{icon:'◷',text:'На согласовании',css:'pending'},REQUIRES_REWORK:{icon:'✕',text:'Требует доработки',css:'returned'},
+  IN_REVIEW:{icon:'◷',text:'На согласовании',css:'pending'},REQUIRES_REWORK:{icon:'✕',text:'На доработке',css:'returned'},
+  COLLECTING:{icon:'◷',text:'Сбор замечаний',css:'pending'},DRAFT:{icon:'○',text:'Черновик',css:'not-started'},
   OVERDUE:{icon:'⏰',text:'Просрочено',css:'overdue'},REVOKED:{icon:'⊘',text:'Отозвано',css:'not-started'}
 };
 function indicator(status:string){const s=statuses[status];return <span className={`matrix-status matrix-${s.css}`}><span aria-hidden="true">{s.icon}</span> <span>{s.text}</span></span>;}
@@ -58,7 +59,7 @@ export default function ApprovalMatrix({actId,api}:{actId:string;api:(path:strin
       {data.publicationStatus==='UNDER_REVISION'&&<p>Утверждённая версия находится на пересмотре. Её завершённое согласование сохранено; новая версия проходит отдельный полный цикл.</p>}
       {data.latestVersionNumber!==data.version?.number&&<p>В карточке уже есть новая версия Word: {data.latestVersionNumber}. Здесь показана версия выбранного цикла.</p>}
       <div className="matrix-scroll" tabIndex={0} aria-label="Таблица согласующих, горизонтальная прокрутка"><table className="matrix-table">
-        <caption>Сначала Начальник РЭС, затем СУЭ, СТП и ГИ параллельно. Даты и время — МСК.</caption>
+        <caption>Маршрут выбранного цикла. В новых циклах: Начальник РИРУ → Начальник РЭС → СТП, СУЭ и ТЕХБЛОК параллельно. Даты и время — МСК.</caption>
         <thead><tr><th scope="col">Подразделение</th><th scope="col">ФИО</th><th scope="col">Статус</th><th scope="col">Поступление</th><th scope="col">Нормативный срок</th><th scope="col">Решение</th><th scope="col">Продолжительность</th><th scope="col">Замечания</th></tr></thead>
         <tbody>{data.rows.map(r=><tr key={r.role} data-testid={`matrix-row-${r.role}`}>
           <th scope="row">{r.department}</th>

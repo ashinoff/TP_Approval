@@ -1,5 +1,38 @@
 # Файлы этапа минимального ядра — 31.10.2026
 
+## 03.11.2026 — Исправление 415 и упрощение создания
+Новые prepare-tu.ts, prepare-tu.test.ts, миграция 013, SOFTWARE_SUMMARY.md; изменены files.ts (строгий по умолчанию валидатор и специальный режим подготовки), app.ts (подготовка ТУ/nullable date), EngineerUpload/App/Ui (одна кнопка/копия/необязательные реквизиты), package/lock (jszip), engineer integration/browser, README и контекст. Проверки: build, 26 unit, 73 integration, engineer browser7, реальный ТУ в Chrome без сохранения. Пользователь разрешил GitHub push исходников/контекста; реальные документы/секреты исключены.
+
+## 03.11.2026 — Создание документа из ТУ
+- API: новый apps/api/src/tu-import.ts; apps/api/src/app.ts — защищённое извлечение; contract-documents.ts — имена выгрузки по договору.
+- Web: EngineerUpload.tsx — единая форма/автозаполнение; App.tsx — удаление второй формы и понятная ошибка внешних связей; Registry.tsx — название действия; ContractDocuments.tsx и WordWorkspace.tsx — выбор документа пакета, ТУ без решений/замечаний.
+- Проверки: новый tests/tu-import.test.ts; engineer.integration.ts и engineer.browser.ts; contract-documents.integration.ts/browser.ts; browser.e2e.ts и matrix.browser.ts — прежние минимальные legacy-fixtures готовятся API, новый пользовательский импорт проверяется engineer.browser без исключения gate; scripts/create-engineer-fixtures.py — синтетический заявитель. Проверки бизнес-правил не удалялись.
+- Контекст: AGENTS.md, PROJECT_CONTEXT, PROGRESS, IMPLEMENTATION_PLAN, DECISIONS, REGISTRY_UI, DOCX_PROTOTYPE, API_CONTRACTS; новый docs/TU_IMPORT.md.
+- Локальные диагностические скрипты/копия ТУ/отчёты только в игнорируемой .local; не включать в Git. Прежние незакоммиченные изменения сохранены.
+
+## 03.11.2026 — Меню инженера и проверка ТУ
+Новые: db/migrations/012_engineer_preflight.sql; apps/api/src/tu-rules.ts, tu-validation.ts; apps/web/src/EngineerUpload.tsx, document-upload.ts, TuPreflight.tsx, engineer.css; scripts/create-engineer-fixtures.py; tests/tu-rules.test.ts, engineer.integration.ts, engineer.browser.ts, engineer-persistence.ts; docs/ENGINEER_WORKSPACE.md.
+Изменены в этом этапе: apps/api/src/app.ts, registry.ts, workflow.ts; apps/web/src/App.tsx, workplace.ts, ActDocument.tsx, WordWorkspace.tsx, main.tsx; package.json; tests/workplace.test.ts, workplace.ui.ts, riru-review.fixture.ts, core.integration.ts, matrix.integration.ts, registry.integration.ts, documents.integration.ts, navigation.integration.ts, contract-documents.integration.ts, riru-review.integration.ts, browser.e2e.ts, matrix.browser.ts, documents.browser.ts, workplace.browser.ts, contract-documents.browser.ts, riru-review.browser.ts; AGENTS.md, PROJECT_CONTEXT, PROGRESS, IMPLEMENTATION_PLAN и связанная документация. Прежние изменения сохранены; миграции 001–011 не изменялись. Фактические проверки и ограничения — начало PROGRESS.md.
+
+## 02.11.2026 — Инженер РИРУ, первый руководитель РИРУ, ТЕХБЛОК
+Новые: db/migrations/010_riru_engineer_review.sql, 011_freeze_cycle_route.sql; tests/riru-review.fixture.ts, riru-review.integration.ts, riru-review.browser.ts, riru-review-persistence.ts; docs/ROLES_WORKFLOW.md.
+Изменены в этом этапе: apps/api/src/app.ts, workflow.ts, registry.ts, matrix.ts, documents.ts, contract-documents.ts, timeline.ts; apps/web/src/App.tsx, WordWorkspace.tsx, workplace.ts, Ui.tsx, Registry.tsx, ApprovalMatrix.tsx; scripts/demo-users.ts; package.json; tests/core.integration.ts, matrix.integration.ts, registry.integration.ts, documents.integration.ts, navigation.integration.ts, contract-documents.integration.ts, workplace.test.ts, matrix.test.ts, workplace.ui.ts, browser.e2e.ts, browser-persistence.ts, matrix.browser.ts, registry.browser.ts, documents.browser.ts, workplace.browser.ts, contract-documents.browser.ts; AGENTS.md и docs/PROJECT_CONTEXT.md, PROGRESS.md, IMPLEMENTATION_PLAN.md, DECISIONS.md, API_CONTRACTS.md, APPROVAL_MATRIX.md, REGISTRY_UI.md, DOCX_PROTOTYPE.md, LOCAL_BROWSER_GUIDE.md, CONTRACT_DOCUMENTS.md, CORE_STATUS.md, CHANGED_FILES.md.
+Прежние незакоммиченные изменения сохранены, миграции 001–009 не менялись. Результаты текущих проверок — начало PROGRESS.md. Исходные документы, опубликованные версии, SUE_system, удалённый Git и инфраструктура не изменялись.
+
+## 02.11.2026 — Типизированная загрузка ТУ / акт ТП / АВТУ
+Новые: db/migrations/009_contract_documents.sql; apps/api/src/contract-documents.ts; apps/web/src/ContractDocuments.tsx; tests/contract-documents.integration.ts, contract-documents.browser.ts, contract-documents-persistence.ts.
+Изменены в этом этапе: apps/api/src/app.ts, registry.ts; apps/web/src/ActDocument.tsx, App.tsx, Registry.tsx, WordWorkspace.tsx, practical.css; scripts/create-document-fixtures.py; tests/matrix.integration.ts; package.json; AGENTS.md; docs/PROJECT_CONTEXT.md, PROGRESS.md, IMPLEMENTATION_PLAN.md, DECISIONS.md, CONTRACT_DOCUMENTS.md, API_CONTRACTS.md, DOCX_PROTOTYPE.md, REGISTRY_UI.md, CHANGED_FILES.md, LOCAL_BROWSER_GUIDE.md.
+Этот перечень отделён от уже существовавшего большого незакоммиченного изменения рабочего места. Миграции 001–008 не редактировались. Реальные примеры/ПДн не переносились в Git или синтетическую БД.
+Также обновлён docs/CORE_STATUS.md с указанием реализованной модели документов и сохранённых ограничений.
+
+## 02.11.2026 — Исследование ТУ и АВТУ
+Добавлен `docs/CONTRACT_DOCUMENTS.md`; обновлены `.gitignore`, PROJECT_CONTEXT/PROGRESS/IMPLEMENTATION_PLAN/DECISIONS/CHANGED_FILES. В `.local` созданы только локальные исследовательские скрипты и отчёт с исходными фрагментами, они не публикуются. Реальные документы не изменялись и не добавлялись в Git. Исследовательское сравнение не интегрировано в рабочий API/UI, DDL/workflow прежние.
+
+## Упрощение эксплуатации — 01.11.2026
+Новые: `apps/web/src/workplace.ts`, `practical.css`; `tests/workplace.test.ts`, `workplace.ui.ts`, `workplace.browser.ts`, `navigation.integration.ts`.
+
+Изменены: `apps/web/src/App.tsx`, `Registry.tsx`, `ActDocument.tsx`, `WordWorkspace.tsx`, `DocumentViewer.tsx`, `DecisionDialog.tsx`, `ApprovalMatrix.tsx`, `Ui.tsx`, `main.tsx`; `apps/api/src/registry.ts`, `app.ts`, `workflow.ts`, `matrix.ts`; `tests/browser.e2e.ts`, `browser-persistence.ts`, `documents.browser.ts`, `documents-persistence.ts`, `documents.integration.ts`, `matrix.browser.ts`, `matrix.integration.ts`, `matrix.test.ts`, `registry.browser.ts`, `registry.integration.ts`; `package.json` (test:workplace:browser). Обновлены AGENTS/README/PROJECT_CONTEXT/PROGRESS/REGISTRY_UI/DOCX_PROTOTYPE/DECISIONS/IMPLEMENTATION_PLAN/CORE_STATUS/API_CONTRACTS/LOCAL_BROWSER_GUIDE/CHANGED_FILES. Применённые миграции не менялись, новых DDL-миграций нет. Точные исходные якоря сохранены; WordWorkspace стабилизирует записи, чтобы polling не перерисовывал неизменившийся документ. DocumentViewer дополнен повторным запросом фокуса того же маркера; ссылка из истории выбирает исходную версию замечания. Push/коммит/деплой и изменения SUE_system не выполняются.
+
 ## DOCX-прототип — 01.11.2026
 Новые: `db/migrations/007_document_remarks.sql`, `008_category_admin.sql`; `apps/api/src/documents.ts`; `apps/web/src/DocumentViewer.tsx`, `WordWorkspace.tsx`, `word.css`; `scripts/create-document-fixtures.py`; `tests/documents.test.ts`, `documents.integration.ts`, `documents.browser.ts`, `documents-persistence.ts`; `docs/DOCX_PROTOTYPE.md`.
 

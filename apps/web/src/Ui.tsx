@@ -1,5 +1,6 @@
 import type {ReactNode} from 'react';
 const symbols:Record<string,ReactNode>={
+  bell:<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></>,more:<><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
   open:<><path d="M14 3h7v7M21 3l-9 9"/><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/></>,
   matrix:<><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 3v18M9 15h12"/></>,
   check:<path d="m5 12 4 4L19 6"/>,return:<><path d="m9 4-6 6 6 6"/><path d="M3 10h11a7 7 0 0 1 7 7v3"/></>,
@@ -15,10 +16,10 @@ const symbols:Record<string,ReactNode>={
   branch:<><path d="M5 12h5m0 0V5h9m-9 7h9m-9 0v7h9"/><circle cx="4" cy="12" r="1"/></>,logout:<><path d="M9 3H3v18h6M9 12h12m-5-5 5 5-5 5"/></>,
 };
 export function Icon({name,size=18}:{name:string;size?:number}){return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{symbols[name]??symbols.file}</svg>;}
-export const roleNames:Record<string,string>={RIRU:'РИРУ',RIRU_HEAD:'Начальник РИРУ',RES_HEAD:'Начальник РЭС',SUE:'СУЭ',STP:'СТП',GI:'ГИ',PROCESS_ADMIN:'Администратор процесса',TECH_ADMIN:'Технический администратор',PARALLEL:'СУЭ / СТП / ГИ',COMPLETED:'Завершено'};
-export const statusNames:Record<string,string>={DRAFT:'Черновик',IN_REVIEW:'На согласовании',REWORK:'На доработке',APPROVED:'Согласовано',OVERDUE:'Просрочено',REVOKED:'Отозвано'};
+export const roleNames:Record<string,string>={RIRU:'РИРУ',RIRU_ENGINEER:'Инженер РИРУ',RIRU_HEAD:'Начальник РИРУ',RES_HEAD:'Начальник РЭС',SUE:'СУЭ',STP:'СТП',GI:'ТЕХБЛОК',PROCESS_ADMIN:'Администратор процесса',TECH_ADMIN:'Технический администратор',PARALLEL:'СУЭ / СТП / ТЕХБЛОК',COMPLETED:'Завершено'};
+export const statusNames:Record<string,string>={DRAFT:'Черновик',IN_REVIEW:'На согласовании',COLLECTING:'Сбор замечаний',REVISING:'Пересмотр',REWORK:'На доработке',APPROVED:'Согласовано',OVERDUE:'Просрочено',REVOKED:'Отозвано'};
 export const dateTime=(value:string|null|undefined)=>value?new Date(value).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—';
-export const shortDate=(value:string)=>new Date(value).toLocaleDateString('ru-RU',{timeZone:'Europe/Moscow'});
+export const shortDate=(value:string|null)=>value?new Date(value).toLocaleDateString('ru-RU',{timeZone:'Europe/Moscow'}):'Не указана';
 export function StatusBadge({status}:{status:string}){return <span className={`status-badge badge-${status.toLowerCase()}`}><Icon name={status==='APPROVED'?'check':status==='REWORK'?'return':status==='OVERDUE'?'alert':status==='REVOKED'?'x':status==='DRAFT'?'file':'clock'} size={14}/>{statusNames[status]??status}</span>;}
 export function IconButton({icon,label,onClick,disabled=false,reason}:{icon:string;label:string;onClick:()=>void;disabled?:boolean;reason?:string}){
   const tooltip=disabled&&reason?`${label}: ${reason}`:label;

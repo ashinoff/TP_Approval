@@ -9,7 +9,7 @@ export function timelineEvents(data:Row){
   for(const v of data.versions){const e=audit('VERSION_CREATED',e=>e.details.versionId===v.id);push(`version:${v.id}`,'VERSION_CREATED',v.created_at,person(e,v.creator),'РИРУ',`Загружена версия Word ${v.number}`,'Исходный DOCX сохранён без изменения байтов',{versionId:v.id,versionNumber:v.number},10);}
   for(const c of data.cycles){
     const e=audit('SUBMITTED',e=>e.details.cycleId===c.id);
-    push(`cycle:${c.id}`,'SUBMITTED',c.started_at,person(e,data.author),'РИРУ',c.number===1?'Отправлено на согласование':`Запущен новый цикл ${c.number}`,'Документ направлен Начальнику соответствующего РЭС',{cycleId:c.id,cycleNumber:c.number,versionId:c.version_id,versionNumber:c.version_number},20);
+    push(`cycle:${c.id}`,'SUBMITTED',c.started_at,person(e,data.author),'РИРУ',c.number===1?'Отправлено на согласование':`Запущен новый цикл ${c.number}`,c.workflow_version===2?'Документ направлен Начальнику РИРУ соответствующего РЭС':'Документ направлен Начальнику соответствующего РЭС',{cycleId:c.id,cycleNumber:c.number,versionId:c.version_id,versionNumber:c.version_number},20);
     if(c.state==='RETURNED')push(`return:${c.id}`,'RETURNED',c.closed_at,null,'Маршрут согласования','Возврат на доработку','Цикл закрыт, создана задача устранения замечаний для РИРУ',{cycleId:c.id,cycleNumber:c.number,versionId:c.version_id,versionNumber:c.version_number},50);
   }
   for(const t of data.tasks){if(!t.decision)continue;const c=data.cycles.find((c:Row)=>c.id===t.cycle_id);
@@ -21,7 +21,7 @@ export function timelineEvents(data:Row){
   }
   for(const ev of data.comment_events){const comment=data.comments.find((c:Row)=>c.id===ev.comment_id);const t=data.tasks.find((t:Row)=>t.id===comment?.task_id);const v=data.versions.find((v:Row)=>v.id===ev.version_id);const e=audit('COMMENT_EVENT',a=>a.details.commentId===ev.comment_id&&a.details.type===ev.type&&a.actor_id===ev.actor_id&&a.created_at===ev.created_at);
     const titles:Record<string,string>={REPORTED_FIXED:'Заявлено исправление замечания',VERIFIED:'Автор подтвердил устранение',REOPENED:'Замечание открыто повторно'};
-    push(`comment-event:${ev.id}`,ev.type,ev.created_at,person(e,ev.actor),ev.type==='REPORTED_FIXED'?'RIRU_HEAD':t?.role??'Согласующий',titles[ev.type],ev.explanation,{commentId:ev.comment_id,versionId:ev.version_id,versionNumber:v?.number},45);
+    push(`comment-event:${ev.id}`,ev.type,ev.created_at,person(e,ev.actor),ev.type==='REPORTED_FIXED'?'RIRU_ENGINEER':t?.role??'Согласующий',titles[ev.type],ev.explanation,{commentId:ev.comment_id,versionId:ev.version_id,versionNumber:v?.number},45);
   }
   for(const r of data.releases){const c=data.cycles.find((c:Row)=>c.id===r.cycle_id);push(`release:${r.id}`,'APPROVED',r.published_at,null,'Маршрут согласования','Согласование завершено','Создана утверждённая публикация после четырёх положительных решений',{cycleId:r.cycle_id,cycleNumber:c?.number,versionId:r.version_id,versionNumber:c?.version_number,releaseId:r.id},60);}
   for(const e of data.audit){

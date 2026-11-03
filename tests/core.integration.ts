@@ -1,3 +1,4 @@
+import {completeRiruReview} from './riru-review.fixture.js';
 import assert from 'node:assert/strict';
 import pg from 'pg';
 import request from 'supertest';
@@ -19,13 +20,13 @@ export async function runIntegration(ownerUrl:string,runtimeUrl:string,root:stri
   try {
     const res=(await owner.query('SELECT * FROM app.res_units ORDER BY code')).rows;
     const area=res[0].id;const other=res[1].id;
-    for(const [name,role,scope] of [['riru','RIRU_HEAD',area],['chief','RES_HEAD',area],['sue','SUE',null],['stp','STP',null],['gi','GI',null],['other','RIRU_HEAD',other],['tech','TECH_ADMIN',null],['process','PROCESS_ADMIN',null]]) {
+    for(const [name,role,scope] of [['riru','RIRU_ENGINEER',area],['riru-head','RIRU_HEAD',area],['chief','RES_HEAD',area],['sue','SUE',null],['stp','STP',null],['gi','GI',null],['other','RIRU_ENGINEER',other],['tech','TECH_ADMIN',null],['process','PROCESS_ADMIN',null]]) {
       users[name]=(await owner.query('INSERT INTO app.users(issuer,subject,name) VALUES($1,$2,$2) RETURNING id',[config.issuer,name])).rows[0].id;
       await owner.query('INSERT INTO app.roles(user_id,role,res_id) VALUES($1,$2,$3)',[users[name],role,scope]);
       tokens[name]=await new SignJWT({realm_access:{roles:['tp-approval-user']}}).setProtectedHeader({alg:'RS256',kid:'integration'}).setIssuer(config.issuer).setSubject(name).setAudience(config.audience).setIssuedAt().setExpirationTime('1h').sign(key.privateKey);
     }
     const get=(user:string,path:string)=>request(app).get(path).set('Authorization',`Bearer ${tokens[user]}`);
-    const post=(user:string,path:string,body:object,k=randomUUID())=>request(app).post(path).set('Authorization',`Bearer ${tokens[user]}`).set('Idempotency-Key',k).send(body);
+    const post=(user:string,path:string,body:object,k=randomUUID())=>completeRiruReview(request(app).post(path).set('Authorization',`Bearer ${tokens[user]}`).set('Idempotency-Key',k).send(body),app,tokens,owner);
     assert.equal((await request(app).get('/api/v1/acts')).status,401);pass('API rejects unauthenticated access');
     await owner.query("INSERT INTO app.calendar_days SELECT d::date,extract(isodow FROM d)<6,'SYNTHETIC TEST CALENDAR',1 FROM generate_series(current_date-1,current_date+450,'1 day') d");
     const body={resId:area,contractNumber:'0001/ТП',contractDate:'2026-01-01',actNumber:'TEST-1',applicant:'Синтетический заявитель',address:'Тестовый адрес'};

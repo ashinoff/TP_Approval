@@ -44,4 +44,10 @@ for version, power in [(1, '150'), (2, '15')]:
     doc.add_paragraph('Контрольная фраза на второй странице для проверки поиска и навигации.')
     doc.add_paragraph(f'Учебная редакция документа: {version}.')
     doc.save(out / f'complex-v{version}.docx')
-print('Созданы синтетические complex-v1.docx / complex-v2.docx с таблицей, объединениями, колонтитулами, полем PAGE и разрывом страницы.')
+for kind, title in [('tu', 'ТЕХНИЧЕСКИЕ УСЛОВИЯ'), ('avtu', 'АКТ ВЫПОЛНЕНИЯ ТЕХНИЧЕСКИХ УСЛОВИЙ')]:
+    doc = Document(out / 'complex-v1.docx')
+    for paragraph in doc.paragraphs:
+        for run in paragraph.runs:
+            run.text = run.text.replace('АКТ ТП', title)
+    doc.save(out / f'{kind}-v1.docx')
+print('Созданы синтетические complex-v1/v2, tu-v1, avtu-v1 DOCX с таблицей, объединениями, колонтитулами, полем PAGE и разрывом страницы.')

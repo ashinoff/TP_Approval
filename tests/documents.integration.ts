@@ -1,13 +1,15 @@
+import {completeRiruReview} from './riru-review.fixture.js';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import {randomUUID} from 'node:crypto';
 import type pg from 'pg';
 import {zip,docxParts} from './zip.js';
 import {transaction} from '../apps/api/src/db.js';
+import {runNavigationChecks} from './navigation.integration.js';
 export async function runDocumentChecks(ctx:{app:any;owner:pg.Pool;runtime:pg.Pool;tokens:Record<string,string>;users:Record<string,string>;area:string}){
  const {app,owner,runtime,tokens,users,area}=ctx;let n=0;const pass=(s:string)=>console.log(`DOCUMENT OK ${++n}: ${s}`);
  await owner.query("UPDATE app.substitutions SET ends_at=greatest(starts_at+interval '1 millisecond',now()-interval '1 second') WHERE ends_at>now()");
- const get=(user:string,path:string)=>request(app).get(path).set('Authorization',`Bearer ${tokens[user]}`);const post=(user:string,path:string,body:object,key=randomUUID())=>request(app).post(path).set('Authorization',`Bearer ${tokens[user]}`).set('Idempotency-Key',key).send(body);const ok=(r:request.Response)=>{assert.equal(r.status,200,JSON.stringify(r.body));return r.body;};
+ const get=(user:string,path:string)=>request(app).get(path).set('Authorization',`Bearer ${tokens[user]}`);const post=(user:string,path:string,body:object,key=randomUUID())=>completeRiruReview(request(app).post(path).set('Authorization',`Bearer ${tokens[user]}`).set('Idempotency-Key',key).send(body),app,tokens,owner);const ok=(r:request.Response)=>{assert.equal(r.status,200,JSON.stringify(r.body));return r.body;};
  const a=ok(await post('riru','/api/v1/acts',{resId:area,contractNumber:'DOC-TEST',contractDate:'2026-10-31',actNumber:'DOC-TEST',applicant:'Учебный заявитель',address:'Условный адрес'}));const path=`/api/v1/acts/${a.id}`;
  async function version(text:string){const parts={...docxParts,'word/document.xml':docxParts['word/document.xml'].replace('Синтетический тестовый акт',text)};const r=await request(app).post(path+'/files').set('Authorization',`Bearer ${tokens.riru}`).attach('file',zip(parts),'doc.docx');assert.equal(r.status,201);const act=ok(await get('riru',path));return ok(await post('riru',path+'/versions',{fileId:r.body.id,expectedRevision:act.revision}));}
  async function submit(v:any){const act=ok(await get('riru',path));return ok(await post('riru',path+'/submit',{versionId:v.id,expectedRevision:act.revision}));}
@@ -25,4 +27,5 @@ export async function runDocumentChecks(ctx:{app:any;owner:pg.Pool;runtime:pg.Po
  for(const note of allNotes.filter((x:any)=>x.id!==c.id))ok(await post(note.author_role==='STP'?'stp':'sue',`/api/v1/comments/${note.id}/events`,{versionId:v2.id,type:'VERIFIED',explanation:'Проверено автором замечания'}));
  await decide('sue');await decide('stp');await decide('gi');assert.equal(ok(await get('riru',path)).state,'APPROVED');assert.equal((await post('sue',path+'/comments',{...body,versionId:v2.id})).status,403);const audit=(await owner.query("SELECT action FROM app.audit_events WHERE act_id=$1 AND action IN ('DOCUMENT_VIEWED','DOCUMENT_DOWNLOADED','DOCUMENT_COMPARED','COMMENT_ADDED')",[a.id])).rows;assert.ok(audit.some((e:any)=>e.action==='DOCUMENT_VIEWED'));assert.ok(audit.some((e:any)=>e.action==='DOCUMENT_COMPARED'));pass('Approval remains protected and audited; approved DOCX has no editor write path');
  console.log(`PASS: ${n} document integration groups`);
+ await runNavigationChecks(ctx,a.id);
 }

@@ -25,7 +25,7 @@ export async function preview(db:DB,storage:string,actId:string,versionId:string
 export const remarkSchema=z.object({versionId:z.string().uuid(),taskId:z.string().uuid(),categoryId:z.string().uuid(),text:z.string().trim().min(1).max(10000),suggestedValue:z.string().max(5000).default(''),discussion:z.string().max(2000).default(''),anchor:anchorSchema}).strict();
 export async function createRemark(db:DB,storage:string,actId:string,input:unknown){
  const b=remarkSchema.parse(input);const act=await lockAct(db,actId);
- const task=requireValue((await db.query("SELECT t.*,cy.version_id,cy.closed_at FROM app.tasks t JOIN app.cycles cy ON cy.id=t.cycle_id WHERE t.id=$1 AND t.act_id=$2 AND t.status='OPEN' AND t.role<>'RIRU_HEAD' AND app.task_user(t.assignment_id,t.assignee_id)=app.uid()",[b.taskId,actId])).rows[0],403,'ACTIVE_REVIEW_REQUIRED');
+ const task=requireValue((await db.query("SELECT t.*,cy.version_id,cy.closed_at FROM app.tasks t JOIN app.cycles cy ON cy.id=t.cycle_id WHERE t.id=$1 AND t.act_id=$2 AND t.status='OPEN' AND app.task_role(t.role,t.cycle_id)<>'RIRU_ENGINEER' AND app.task_user(t.assignment_id,t.assignee_id)=app.uid()",[b.taskId,actId])).rows[0],403,'ACTIVE_REVIEW_REQUIRED');
  await role(db,task.role,act.res_id);if(task.closed_at||task.version_id!==b.versionId)throw new HttpError(409,'ACTIVE_VERSION_REQUIRED');
  const uid=(await db.query('SELECT app.uid() AS id')).rows[0].id;const source=await versionSource(db,storage,actId,b.versionId);
  if([act.author_id,source.version.created_by].includes(uid))throw new HttpError(403,'SELF_APPROVAL');

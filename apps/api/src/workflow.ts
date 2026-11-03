@@ -16,7 +16,8 @@ export async function notify(db:DB,actId:string,userId:string,type:string) {
 }
 export async function assigned(db:DB,wanted:string,area:string,excluded:string[]) {
   const found=await db.query('SELECT id FROM app.candidates($1,$2) WHERE NOT(id=ANY($3::uuid[]))',[wanted,area,excluded]);
-  if(found.rowCount!==1) throw new HttpError(409,'ASSIGNEE_CONFIGURATION',`Для ${wanted} требуется один доступный согласующий без конфликта ролей`);
+  const label:Record<string,string>={RIRU_ENGINEER:'Инженера РИРУ',RIRU_HEAD:'Начальника РИРУ',RES_HEAD:'Начальника РЭС',SUE:'СУЭ',STP:'СТП',GI:'ТЕХБЛОКА'};
+  if(found.rowCount!==1) throw new HttpError(409,'ASSIGNEE_CONFIGURATION',`Для ${label[wanted]??wanted} требуется один доступный исполнитель без конфликта ролей`);
   return found.rows[0].id as string;
 }
 export async function task(db:DB,actId:string,cycleId:string,wanted:string,assignee:string) {
@@ -34,7 +35,7 @@ export async function task(db:DB,actId:string,cycleId:string,wanted:string,assig
   }
   if(!due) throw new HttpError(409,'CALENDAR_MISSING','Загрузите полный производственный календарь');
   const result=await db.query("INSERT INTO app.tasks(act_id,cycle_id,role,assignee_id,policy_id,calendar_snapshot,due_at,assignment_id) VALUES($1,$2,$3,$4,$5,$6,($7::date + (now() AT TIME ZONE 'Europe/Moscow')::time) AT TIME ZONE 'Europe/Moscow',app.assignment_for($3,(SELECT res_id FROM app.acts WHERE id=$1),$4)) RETURNING *",[actId,cycleId,wanted,assignee,policy.id,JSON.stringify(snapshot),due]);
-  await notify(db,actId,assignee,wanted==='RIRU_HEAD'?'RETURNED':'TASK_ASSIGNED');
+  await notify(db,actId,assignee,wanted==='RIRU_ENGINEER'?'RETURNED':'TASK_ASSIGNED');
   return result.rows[0];
 }
 export async function command(db:DB,path:string,key:string|undefined,body:unknown,fn:()=>Promise<unknown>) {
@@ -55,34 +56,35 @@ async function move(db:DB,actId:string,cycleId:string,state:string,closed=false)
 }
 async function returned(db:DB,act:Record<string,any>,cycleId:string) {
   await move(db,act.id,cycleId,'RETURNED',true);
-  const author=await assigned(db,'RIRU_HEAD',act.res_id,[]);
-  await task(db,act.id,cycleId,'RIRU_HEAD',author);
+  const author=await assigned(db,'RIRU_ENGINEER',act.res_id,[]);
+  await task(db,act.id,cycleId,'RIRU_ENGINEER',author);
 }
-export async function submit(db:DB,actId:string,versionId:string,expected:number) {
-  const act=await lockAct(db,actId); revision(act,expected); await role(db,'RIRU_HEAD',act.res_id);
+export async function submit(db:DB,actId:string,versionId:string,expected:number,checkId?:string) {
+  const act=await lockAct(db,actId); revision(act,expected); await role(db,'RIRU_ENGINEER',act.res_id);
   if(!['DRAFT','RETURNED','REVISING'].includes(act.state)) throw new HttpError(409,'INVALID_STATE');
   const version=requireValue((await db.query('SELECT * FROM app.versions WHERE id=$1 AND act_id=$2',[versionId,actId])).rows[0]);
   if((await db.query('SELECT 1 FROM app.cycles WHERE version_id=$1',[versionId])).rowCount)throw new HttpError(409,'NEW_VERSION_REQUIRED');
   const latest=(await db.query('SELECT max(number) AS n FROM app.versions WHERE act_id=$1',[actId])).rows[0].n;
   if(version.number!==latest) throw new HttpError(409,'LATEST_VERSION_REQUIRED');
-  const assignee=await assigned(db,'RES_HEAD',act.res_id,[act.author_id,version.created_by]);
+  const assignee=await assigned(db,'RIRU_HEAD',act.res_id,[act.author_id,version.created_by]);
   const n=(await db.query('SELECT coalesce(max(number),0)+1 AS n FROM app.cycles WHERE act_id=$1',[actId])).rows[0].n;
-  const cycle=(await db.query("INSERT INTO app.cycles(act_id,version_id,number,state) VALUES($1,$2,$3,'RES_REVIEW') RETURNING *",[actId,versionId,n])).rows[0];
-  await db.query("UPDATE app.tasks SET status='DONE',completed_at=now() WHERE act_id=$1 AND role='RIRU_HEAD' AND status='OPEN'",[actId]);
-  await task(db,actId,cycle.id,'RES_HEAD',assignee);
-  await db.query("UPDATE app.acts SET state='RES_REVIEW',revision=revision+1 WHERE id=$1",[actId]);
-  await audit(db,actId,'SUBMITTED',{cycleId:cycle.id,versionId}); return cycle;
+  const cycle=(await db.query("INSERT INTO app.cycles(act_id,version_id,number,state) VALUES($1,$2,$3,'RIRU_REVIEW') RETURNING *",[actId,versionId,n])).rows[0];
+  await db.query("UPDATE app.tasks SET status='DONE',completed_at=now() WHERE act_id=$1 AND app.task_role(role,cycle_id)='RIRU_ENGINEER' AND status='OPEN'",[actId]);
+  await task(db,actId,cycle.id,'RIRU_HEAD',assignee);
+  await db.query("UPDATE app.acts SET state='RIRU_REVIEW',workflow_version=2,revision=revision+1 WHERE id=$1",[actId]);
+  await audit(db,actId,'SUBMITTED',{cycleId:cycle.id,versionId,checkId}); return cycle;
 }
-export async function decide(db:DB,taskId:string,decision:string,reason:string) {
+export async function decide(db:DB,taskId:string,decision:string,reason:string,viewedVersionId?:string) {
   const initial=requireValue((await db.query('SELECT act_id FROM app.tasks WHERE id=$1',[taskId])).rows[0]);
   const act=await lockAct(db,initial.act_id);
-  const t=requireValue((await db.query('SELECT * FROM app.tasks WHERE id=$1 FOR UPDATE',[taskId])).rows[0]);
+  const t=requireValue((await db.query('SELECT t.*,app.task_role(t.role,t.cycle_id) AS role FROM app.tasks t WHERE id=$1 FOR UPDATE',[taskId])).rows[0]);
   const user=(await db.query('SELECT app.uid() AS id, app.my_profile() AS profile')).rows[0];
   const effective=(await db.query('SELECT app.task_user($1,$2) AS id',[t.assignment_id,t.assignee_id])).rows[0].id;
   if(effective!==user.id) throw new HttpError(403,'NOT_ASSIGNEE');
   await role(db,t.role,act.res_id);
-  if(t.status!=='OPEN'||t.role==='RIRU_HEAD') throw new HttpError(409,'TASK_NOT_OPEN');
+  if(t.status!=='OPEN'||t.role==='RIRU_ENGINEER') throw new HttpError(409,'TASK_NOT_OPEN');
   const cycle=requireValue((await db.query('SELECT * FROM app.cycles WHERE id=$1 AND closed_at IS NULL FOR UPDATE',[t.cycle_id])).rows[0],409,'CYCLE_CLOSED');
+  if(viewedVersionId&&viewedVersionId!==cycle.version_id)throw new HttpError(409,'VERSION_MISMATCH','Вы просматриваете другую версию. Откройте версию действующей задачи.');
   const v=(await db.query('SELECT * FROM app.versions WHERE id=$1',[cycle.version_id])).rows[0];
   if([act.author_id,v.created_by].includes(user.id)) throw new HttpError(403,'SELF_APPROVAL');
   const previous=await db.query('SELECT 1 FROM app.decisions d JOIN app.tasks t ON t.id=d.task_id WHERE t.act_id=$1 AND d.actor_id=app.uid() AND (t.role<>$2 OR t.cycle_id=$3)',[act.id,t.role,cycle.id]);
@@ -96,10 +98,14 @@ export async function decide(db:DB,taskId:string,decision:string,reason:string) 
   await db.query('INSERT INTO app.decisions(task_id,actor_id,actor_name,decision,reason) VALUES($1,app.uid(),$2,$3,$4)',[taskId,user.profile.name,decision,reason]);
   if(decision==='RETURN') await db.query('INSERT INTO app.comments(act_id,version_id,task_id,author_id,text) VALUES($1,$2,$3,app.uid(),$4)',[act.id,cycle.version_id,taskId,reason]);
   await db.query("UPDATE app.tasks SET status='DONE',completed_at=now() WHERE id=$1",[taskId]);
-  if(t.role==='RES_HEAD') {
+  if(t.role==='RIRU_HEAD') {
+    if(decision==='RETURN')await returned(db,act,cycle.id);
+    else {const who=await assigned(db,'RES_HEAD',act.res_id,[act.author_id,v.created_by,user.id]);await task(db,act.id,cycle.id,'RES_HEAD',who);await move(db,act.id,cycle.id,'RES_REVIEW');}
+  } else if(t.role==='RES_HEAD') {
     if(decision==='RETURN') await returned(db,act,cycle.id);
     else {
-      const excluded=[act.author_id,v.created_by,user.id];
+      const actors=(await db.query('SELECT actor_id FROM app.decisions d JOIN app.tasks t ON t.id=d.task_id WHERE t.cycle_id=$1',[cycle.id])).rows.map(r=>r.actor_id);
+      const excluded=[act.author_id,v.created_by,user.id,...actors];
       for(const central of ['SUE','STP','GI']) {const who=await assigned(db,central,act.res_id,excluded); excluded.push(who); await task(db,act.id,cycle.id,central,who);}
       await move(db,act.id,cycle.id,'CENTRAL_REVIEW');
     }

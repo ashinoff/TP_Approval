@@ -1,0 +1,12 @@
+import {chromium} from 'playwright';
+import {readFile,writeFile} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+import './workplace.ui.js';
+const source=JSON.parse(await readFile('.local/riru-review-report/result.json','utf8'));assert.equal(source.checks.length,6);const origin='http://127.0.0.1:5173';
+const auth=await fetch('http://127.0.0.1:4100/token',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({subject:'riru-head-adler'})});const {token}=await auth.json();
+const get=async(path:string)=>{const r=await fetch('http://127.0.0.1:3000'+path,{headers:{Authorization:'Bearer '+token}});assert.equal(r.status,200);return r.json();};
+const path='/api/v1/acts/'+source.actId,d=await get(path);assert.equal(d.state,'APPROVED');assert.equal(d.cycles.length,2);assert.equal(d.tasks.filter((t:any)=>t.decision).length,6);assert.equal(d.cycles[0].state,'RETURNED');assert.equal(d.cycles[1].workflow_version,2);assert.ok(d.comments.every((c:any)=>c.events.at(-1).type==='VERIFIED'));
+const current=await get(path+'/approval-matrix');assert.equal(current.rows.length,5);assert.ok(current.rows.every((r:any)=>r.status==='APPROVED'));
+const historical=await get(path+'/approval-matrix?cycleId='+d.cycles[0].id);assert.equal(historical.rows[0].role,'RIRU_HEAD');assert.equal(historical.rows[0].status,'RETURNED');assert.ok(historical.rows.slice(1).every((r:any)=>r.status==='NOT_STARTED'));
+const browser=await chromium.launch({headless:true,executablePath:process.env.TP_BROWSER_EXECUTABLE??'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'});
+try{const p=await browser.newPage();await p.goto(origin+`/#/acts/${d.id}?section=approved&panel=matrix`);await p.getByLabel('Демонстрационный пользователь').selectOption('riru-head-adler');await p.getByRole('button',{name:'Войти в тестовый стенд'}).click();await p.getByTestId('matrix-row-RIRU_HEAD').getByText('Согласовано',{exact:true}).waitFor();await p.getByLabel('Цикл согласования').selectOption(d.cycles[0].id);await p.getByTestId('matrix-row-RIRU_HEAD').getByText('Отклонено с замечаниями',{exact:true}).waitFor();await p.screenshot({path:'.local/riru-review-report/after-restart.png',fullPage:true});await writeFile('.local/riru-review-report/persistence.json',JSON.stringify({actId:d.id,cycles:2,decisions:6,currentApproved:true,historicalReturn:true,browserOpened:true},null,2));console.log('PASS: RIRU first-stage return, author verification, five approvals and publication survive full restart');}finally{await browser.close();}

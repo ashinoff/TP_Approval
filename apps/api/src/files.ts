@@ -3,7 +3,7 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { connect } from 'node:net';
 import { HttpError } from './db.js';
 
-export async function validateDocx(buffer:Buffer) {
+export async function validateDocx(buffer:Buffer,options:{prepareLocalTemplate?:boolean}={}) {
   const entries=new Map<string,Buffer>(); let total=0;let entryCount=0;
   await new Promise<void>((resolve,reject)=>yauzl.fromBuffer(buffer,{lazyEntries:true,validateEntrySizes:true},(error,zip)=>{
     if(error||!zip) {reject(new HttpError(415,'INVALID_DOCX'));return;}
@@ -29,7 +29,10 @@ export async function validateDocx(buffer:Buffer) {
     if(name.endsWith('.rels')) {
       const parsed=new XMLParser({ignoreAttributes:false}).parse(xml);
       const relations=parsed.Relationships?.Relationship??[];
-      for(const rel of Array.isArray(relations)?relations:[relations]) if(rel['@_TargetMode']==='External') throw new HttpError(415,'EXTERNAL_RELATIONSHIP');
+      for(const rel of Array.isArray(relations)?relations:[relations]) if(rel['@_TargetMode']==='External') {
+        const preparable=options.prepareLocalTemplate&&name==='word/_rels/settings.xml.rels'&&rel['@_Type']==='http://schemas.openxmlformats.org/officeDocument/2006/relationships/attachedTemplate'&&typeof rel['@_Id']==='string'&&typeof rel['@_Target']==='string'&&/^file:/i.test(rel['@_Target']);
+        if(!preparable)throw new HttpError(415,'EXTERNAL_RELATIONSHIP');
+      }
     }
   }
   const types=entries.get('[Content_Types].xml')!.toString('utf8');

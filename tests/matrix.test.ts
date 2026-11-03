@@ -2,13 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {deriveMatrix} from '../apps/api/src/matrix.js';
 const base=()=>({id:'act',state:'DRAFT',res_name:'Учебный РЭС',as_of:'2026-10-31T12:00:00Z',cycles:[],versions:[],tasks:[],comments:[],releases:[]});
+test('Matrix: new route has five reviewers, legacy cycle still has its original four',()=>{
+ const data:any={...base(),workflow_version:2};assert.equal(deriveMatrix(data).rows.length,5);
+ data.cycles=[{id:'old',number:1,workflow_version:1,state:'RETURNED'},{id:'new',number:2,workflow_version:2,state:'RIRU_REVIEW'}];
+ assert.equal(deriveMatrix(data,'old').rows.length,4);const current=deriveMatrix(data,'new');assert.equal(current.rows.length,5);assert.equal(current.rows[0].role,'RIRU_HEAD');assert.equal(current.rows.at(-1)?.department,'ТЕХБЛОК');
+});
 test('Matrix: draft has four unstarted rows, not fictional assignees/decisions',()=>{
   const matrix=deriveMatrix(base());assert.equal(matrix.rows.length,4);assert.equal(matrix.cycle,null);
   for(const row of matrix.rows){assert.equal(row.status,'NOT_STARTED');assert.equal(row.person,null);assert.equal(row.decidedAt,null);assert.equal(row.elapsedSeconds,null);}
 });
+test('Matrix: collecting and rework retain their main status when overdue',()=>{
+ const data:any={...base(),state:'CENTRAL_COLLECTING',cycles:[{id:'c',number:1,version_id:'v',state:'CENTRAL_COLLECTING'}],versions:[{id:'v',number:1}],tasks:[{id:'t',cycle_id:'c',role:'GI',status:'OPEN',received_at:'2026-10-31T09:00:00Z',due_at:'2026-10-31T10:00:00Z'}]};
+ assert.equal(deriveMatrix(data).overall,'COLLECTING');assert.equal(deriveMatrix(data).overdue,true);data.cycles[0].state='RETURNED';data.cycles[0].closed_at='2026-10-31T11:00:00Z';data.tasks=[{...data.tasks[0],role:'RIRU_HEAD'}];assert.equal(deriveMatrix(data).overall,'REQUIRES_REWORK');assert.equal(deriveMatrix(data).overdue,true);
+});
 test('Matrix: expired pending task is overdue; completed duration freezes at decision',()=>{
   const data:any={...base(),state:'RES_REVIEW',cycles:[{id:'c',number:1,version_id:'v',state:'RES_REVIEW',closed_at:null}],versions:[{id:'v',number:1}],tasks:[{id:'t',cycle_id:'c',role:'RES_HEAD',status:'OPEN',received_at:'2026-10-31T09:00:00Z',due_at:'2026-10-31T10:00:00Z'}]};
-  const pending=deriveMatrix(data);assert.equal(pending.overall,'OVERDUE');assert.equal(pending.rows[0].elapsedSeconds,10800);assert.equal(pending.rows[0].overdue,true);assert.equal(pending.rows[0].decidedAt,null);
+  const pending=deriveMatrix(data);assert.equal(pending.overall,'IN_REVIEW');assert.equal(pending.overdue,true);assert.equal(pending.rows[0].elapsedSeconds,10800);assert.equal(pending.rows[0].overdue,true);assert.equal(pending.rows[0].decidedAt,null);
   data.tasks[0]={...data.tasks[0],status:'DONE',decision:'APPROVE',decided_at:'2026-10-31T11:00:00Z',actor_name:'Учебный согласующий'};
   const completed=deriveMatrix(data);assert.equal(completed.rows[0].elapsedSeconds,7200);assert.equal(completed.rows[0].overdue,false);assert.equal(completed.rows[0].wasOverdue,true);
 });
