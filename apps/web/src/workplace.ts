@@ -24,6 +24,11 @@ export function remarkBlockReason(detail:Row,tasks:Row[],profile:Row,versionId:s
  if(detail.author_id===profile.id||version.created_by===profile.id)return 'Вы автор этого документа: замечания оставляют согласующие. Исправления вносятся новой версией.';
  if(mine.length){const other=detail.versions.find((v:Row)=>detail.cycles.some((c:Row)=>c.id===mine[0].cycle_id&&c.version_id===v.id));return `Ваша задача относится к версии ${other?.number??'другой'} — выберите её в списке версий.`;}
  if(['DRAFT','RETURNED','REVISING'].includes(detail.state))return 'Документ не на согласовании: замечания оставляют согласующие после отправки.';
- const route=detail.presentation?.route;const active=[route?.head,route?.res,...(route?.parallel??[])].filter((s:Row|null)=>s?.status==='active').map((s:Row)=>s.label);
- return `Замечания оставляет согласующий текущего этапа${active.length?` (${active.join(', ')})`:''}. У вас нет открытой задачи по этой версии документа.`;
+ const route=detail.presentation?.route;const stages=[route?.head,route?.res,...(route?.parallel??[])].filter((s:Row|null)=>s?.status==='active') as Row[];
+ const who=(p:Row|string|null)=>typeof p==='string'?p:p?.name??'';
+ // Задача этапа назначена этой учётке, но в списке её задач нет — значит, роль для РЭС документа сейчас не действует.
+ const own=stages.find(s=>typeof s.person==='object'&&s.person?.id===profile.id);
+ if(own)return `Задача «${own.label}» назначена вам, но роль «${own.label}» для РЭС этого документа у вашей учётки сейчас не действует. Попросите администратора проверить роли в разделе «Пользователи».`;
+ const active=stages.map(s=>who(s.person)?`${s.label} — ${who(s.person)}`:s.label);
+ return `Замечания оставляет согласующий текущего этапа${active.length?` (${active.join('; ')})`:''}. Вы вошли как ${profile.name}: у вас нет задачи по этой версии документа.`;
 }
