@@ -30,7 +30,10 @@
     "test:riru:browser": "tsx tests/riru-review.browser.ts",
     "test:riru:persistence": "tsx tests/riru-review-persistence.ts",
     "test:engineer:browser": "tsx tests/engineer.browser.ts",
-    "test:engineer:persistence": "tsx tests/engineer-persistence.ts"
+    "test:engineer:persistence": "tsx tests/engineer-persistence.ts",
+    "db:setup-local": "node --env-file=.env --import tsx scripts/setup-standalone.ts",
+    "build:setup": "tsc -p tsconfig.setup.json",
+    "test:standalone:browser": "node --import tsx scripts/integration.ts --standalone-browser"
   },
   "dependencies": {
     "cors": "^2.8.6",

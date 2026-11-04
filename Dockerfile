@@ -5,16 +5,21 @@ COPY package*.json ./
 RUN npm ci
 COPY tsconfig*.json ./
 COPY apps ./apps
+COPY scripts/setup-standalone.ts scripts/migrate.ts ./scripts/
 RUN npm run build
+RUN npx tsc -p tsconfig.setup.json
 RUN npm prune --omit=dev
 
 FROM node:22-bookworm-slim
-ENV NODE_ENV=production HOST=0.0.0.0 WEB_PATH=/app/dist/web STORAGE_PATH=/app/storage
+ENV NODE_ENV=production AUTH_MODE=local HOST=0.0.0.0 PORT=3000 WEB_PATH=/app/dist/web STORAGE_PATH=/data/storage TRUST_PROXY_HOPS=1
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends gosu ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-RUN mkdir /app/storage && chown node:node /app/storage
-USER node
+COPY db/migrations ./db/migrations
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod 755 /app/docker-entrypoint.sh
 EXPOSE 3000
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["node","dist/api/server.js"]

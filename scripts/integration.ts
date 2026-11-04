@@ -1,4 +1,4 @@
-import { mkdtemp, cp,writeFile } from 'node:fs/promises';
+import { mkdtemp, cp,writeFile,readFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
@@ -9,6 +9,11 @@ import { migrate } from './migrate.js';
 import { runIntegration } from '../tests/core.integration.js';
 import pg from 'pg';
 import {runMatrixIntegration} from '../tests/matrix.integration.js';
+import {runLocalAuthIntegration} from '../tests/local-auth.integration.js';
+import {runStandaloneBrowser} from '../tests/standalone.browser.js';
+import {bootstrapLocalAdmin} from './setup-standalone.js';
+import {createApp} from '../apps/api/src/app.js';
+import {createServer as httpsServer} from 'node:https';
 
 // Real native PostgreSQL, isolated cluster; no production connection is accepted here.
 const root=await mkdtemp(resolve(tmpdir(),'tp-approval-test-'));
@@ -37,4 +42,27 @@ try {
   const matrixUrl=`postgres://postgres:${password}@127.0.0.1:${port}/matrix_tests`;
   await migrate(matrixUrl,runtimePassword);
   await runMatrixIntegration(matrixUrl,`postgres://tp_runtime:${runtimePassword}@127.0.0.1:${port}/matrix_tests`,root);
+  const localDb=new pg.Client({connectionString:url});await localDb.connect();try{await localDb.query('CREATE DATABASE local_auth_tests');}finally{await localDb.end();}
+  const localUrl=`postgres://postgres:${password}@127.0.0.1:${port}/local_auth_tests`;
+  await migrate(localUrl,runtimePassword);
+  await runLocalAuthIntegration(localUrl,`postgres://tp_runtime:${runtimePassword}@127.0.0.1:${port}/local_auth_tests`,root);
+  if(process.argv.includes('--standalone-browser')){
+    const setup=new pg.Client({connectionString:url});await setup.connect();try{await setup.query('CREATE DATABASE standalone_browser');}finally{await setup.end();}
+    const browserOwner=`postgres://postgres:${password}@127.0.0.1:${port}/standalone_browser`,browserRuntime=`postgres://tp_runtime:${runtimePassword}@127.0.0.1:${port}/standalone_browser`;
+    await migrate(browserOwner,runtimePassword);
+    const initialPassword=randomBytes(24).toString('hex');await bootstrapLocalAdmin(browserOwner,initialPassword);
+    await run('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',resolve(root,'tls.key'),'-out',resolve(root,'tls.crt'),'-days','1','-subj','/CN=localhost']);
+    const tls={key:await readFile(resolve(root,'tls.key')),cert:await readFile(resolve(root,'tls.crt'))};
+    let browserPool=new pg.Pool({connectionString:browserRuntime});
+    const appConfig={authMode:'local' as const,production:true,storagePath:resolve(root,'browser-files'),maxFileBytes:20*1024*1024,webPath:resolve('dist/web')};
+    let server=httpsServer(tls,createApp(browserPool,appConfig));
+    await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));
+    const browserPort=(server.address() as {port:number}).port;
+    try{await runStandaloneBrowser({url:`https://127.0.0.1:${browserPort}`,initialPassword,output:resolve('.local/standalone-browser-report'),restart:async()=>{
+      await new Promise<void>((ok,fail)=>server.close(e=>e?fail(e):ok()));await browserPool.end();
+      await control(['-D',data,'-m','fast','-w','stop']);await control(['-D',data,'-l',resolve(root,'postgres.log'),'-o',`-h 127.0.0.1 -p ${port}`,'-w','start']);
+      browserPool=new pg.Pool({connectionString:browserRuntime});server=httpsServer(tls,createApp(browserPool,appConfig));
+      await new Promise<void>(r=>server.listen(browserPort,'127.0.0.1',r));
+    }});}finally{await new Promise<void>(r=>server.close(()=>r()));await browserPool.end();}
+  }
 }finally{if(started)await control(['-D',data,'-m','fast','-w','stop']);}

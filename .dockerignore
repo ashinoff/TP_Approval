@@ -6,6 +6,11 @@ storage
 backups
 .npm-cache
 .test-data*
+.local
+upload
+review
+tests
+docs
 dist
 *.docx
 *.pdf
