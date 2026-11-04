@@ -8,6 +8,7 @@ import {resolve,dirname,sep} from 'node:path';
 import {tmpdir} from 'node:os';
 import {randomUUID} from 'node:crypto';
 import pg from 'pg';
+import {synthContract} from './synthetic-contract.js';
 
 const origin='http://127.0.0.1:5173';const issuer='http://127.0.0.1:4100';
 const readyDeadline=Date.now()+20000;
@@ -36,7 +37,7 @@ let result:Record<string,unknown>={};
 try{
   for(const user of ['riru-adler','chief-adler','sue','stp','gi','chief-hosta']){const c=await browser.newContext({viewport:{width:1500,height:1000},locale:'ru-RU',timezoneId:'Europe/Moscow'});contexts.push(c);const p=await c.newPage();p.on('pageerror',e=>errors.push(e.message));pages[user]=p;await login(p,user);}
   const p=pages['riru-adler'];const chief=pages['chief-adler'];const stamp=Date.now();const number=`МАТРИЦА-${stamp}`;
-  async function create(number:string){const profile=(await api('riru-adler','/api/v1/me')).body;const response=await api('riru-adler','/api/v1/acts',{resId:profile.roles.find((r:any)=>r.role==='RIRU_ENGINEER').resId,contractNumber:`ДЕМО-${number}`,contractDate:'2026-10-31',actNumber:number,applicant:'Учебная матрица',address:'Синтетический объект матрицы'});assert.equal(response.status,200);const act=response.body;await prepareLegacyAct(act.id);await p.evaluate(id=>{location.hash=`#/acts/${id}?section=upload`;},act.id);await p.getByRole('heading',{name:`Акт ${number}`,exact:true}).waitFor();await idle(p);return act;}
+  async function create(number:string){const profile=(await api('riru-adler','/api/v1/me')).body;const response=await api('riru-adler','/api/v1/acts',{resId:profile.roles.find((r:any)=>r.role==='RIRU_ENGINEER').resId,contractNumber:synthContract(`ДЕМО-${number}`),contractDate:'2026-10-31',actNumber:number,applicant:'Учебная матрица',address:'Синтетический объект матрицы'});assert.equal(response.status,200);const act=response.body;await prepareLegacyAct(act.id);await p.evaluate(id=>{location.hash=`#/acts/${id}?section=upload`;},act.id);await p.getByRole('heading',{name:`Акт ${number}`,exact:true}).waitFor();await idle(p);return act;}
   async function uploadAndSubmit(v:number){await documentTab(p);await p.getByLabel('Новая версия DOCX').setInputFiles(resolve(`.local/demo-documents/act-v${v}.docx`));await p.getByRole('button',{name:'Отправить на согласование'}).waitFor();await p.getByRole('button',{name:'Отправить на согласование'}).click();await idle(p);await passRiruReview(p.url().split('/acts/')[1].split('?')[0]);}
   const act=await create(number);await matrix(p);assert.equal(await p.locator('.matrix-not-started').filter({hasText:'Этап не начался'}).count(),5);await screen(p,'01-draft');pass('Отдельная вкладка, 5 серых неначавшихся этапа, черновик без фиктивных ФИО');
   await uploadAndSubmit(1);await matrix(p);await stage(p,'RES_HEAD','Ожидает решения');assert.equal(await p.getByTestId('matrix-row-RES_HEAD').locator('.matrix-status').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 242, 199)');await screen(p,'02-res-pending');

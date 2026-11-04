@@ -14,6 +14,7 @@ import {runDocumentChecks} from './documents.integration.js';
 import {runContractDocumentChecks} from './contract-documents.integration.js';
 import {runRiruChecks} from './riru-review.integration.js';
 import {runEngineerChecks} from './engineer.integration.js';
+import {synthContract} from './synthetic-contract.js';
 
 export async function runMatrixIntegration(ownerUrl:string,runtimeUrl:string,root:string){
   const owner=new pg.Pool({connectionString:ownerUrl});const runtime=new pg.Pool({connectionString:runtimeUrl});
@@ -34,7 +35,7 @@ export async function runMatrixIntegration(ownerUrl:string,runtimeUrl:string,roo
     const get=(user:string,path:string)=>request(app).get(path).set('Authorization',`Bearer ${tokens[user]}`);
     const post=(user:string,path:string,body:object)=>completeRiruReview(request(app).post(path).set('Authorization',`Bearer ${tokens[user]}`).set('Idempotency-Key',randomUUID()).send(body),app,tokens,owner);
     const ensure=(response:request.Response)=>{assert.equal(response.status,200,JSON.stringify(response.body));return response.body;};
-    const create=async(number:string)=>ensure(await post('riru','/api/v1/acts',{resId:area,contractNumber:`MATRIX-${number}`,contractDate:'2026-10-31',actNumber:number,applicant:'Синтетический заявитель',address:'Учебный адрес'}));
+    const create=async(number:string)=>ensure(await post('riru','/api/v1/acts',{resId:area,contractNumber:synthContract(`MATRIX-${number}`),contractDate:'2026-10-31',actNumber:number,applicant:'Синтетический заявитель',address:'Учебный адрес'}));
     const a=await create('MATRIX-1');const path=`/api/v1/acts/${a.id}/approval-matrix`;
     const matrix=async(cycleId?:string)=>ensure(await get('riru',`${path}${cycleId?`?cycleId=${cycleId}`:''}`));
     const blank=await matrix();assert.equal(blank.rows.length,5);assert.ok(blank.rows.every((r:any)=>r.status==='NOT_STARTED'));assert.equal(blank.version,null);

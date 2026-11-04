@@ -53,7 +53,7 @@ export async function runLocalAuthIntegration(ownerUrl:string,runtimeUrl:string,
     for(const table of ['local_credentials','local_sessions'])await assert.rejects(runtime.query('SELECT * FROM app.'+table),{code:'42501'});
     pass('User provisioning and admin boundaries; raw credentials and sessions are inaccessible to runtime');
 
-    const body={resId:area,contractNumber:'SYNTHETIC-LOCAL',contractDate:'2026-11-04',actNumber:'SYNTHETIC-LOCAL',applicant:'Учебный заявитель',address:'Учебный адрес'};
+    const body={resId:area,contractNumber:'00001-26-00000006-1',contractDate:'2026-11-04',actNumber:'SYNTHETIC-LOCAL',applicant:'Учебный заявитель',address:'Учебный адрес'};
     const missingCsrf=await request(app).post('/api/v1/acts').set('Host','app.test').set('Origin','https://app.test').set('Cookie',engineer.cookie).send(body);
     assert.equal(missingCsrf.status,403);
     assert.equal((await request(app).post('/api/v1/acts').set('Host','app.test').set('Origin','https://evil.test').set('Cookie',engineer.cookie).set('X-CSRF-Token',engineer.csrf).send(body)).status,403);
@@ -151,7 +151,7 @@ export async function runLocalAuthIntegration(ownerUrl:string,runtimeUrl:string,
     pass('Atomic duplicate rejection, concurrent edit conflict and self-admin protection');
 
     const liveAssignment=(await owner.query('SELECT id FROM app.roles WHERE user_id=$1 AND revoked_at IS NULL',[engineerId])).rows[0].id;
-    const pendingAct=await post(editedSession,'/api/v1/acts',{...body,resId:other,contractNumber:'SYNTHETIC-PENDING',actNumber:'SYNTHETIC-PENDING'});
+    const pendingAct=await post(editedSession,'/api/v1/acts',{...body,resId:other,contractNumber:'00001-26-00000007-1',actNumber:'SYNTHETIC-PENDING'});
     assert.equal(pendingAct.status,200,JSON.stringify(pendingAct.body));
     const pendingId=pendingAct.body.id,pendingFile=randomUUID(),pendingVersion=randomUUID(),pendingCycle=randomUUID(),liveTask=randomUUID();
     await owner.query("INSERT INTO app.files(id,act_id,sha256,size,kind,scan_status,created_by) VALUES($1,$2,$3,1,'ACT_DOCX','READY',$4)",[pendingFile,pendingId,'b'.repeat(64),engineerId]);

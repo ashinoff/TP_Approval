@@ -11,15 +11,15 @@ export async function runContractDocumentChecks({app,owner,runtime,tokens,users,
  const get=(u:string,p:string)=>request(app).get(p).set('Authorization','Bearer '+tokens[u]);
  const post=(u:string,p:string,b:object)=>completeRiruReview(request(app).post(p).set('Authorization','Bearer '+tokens[u]).set('Idempotency-Key',randomUUID()).send(b),app,tokens,owner);
  const ok=(r:request.Response)=>{assert.equal(r.status,200,JSON.stringify(r.body));return r.body;};
- const create=(actNumber:string,contractNumber='00001-26-SYNTH-1')=>post('riru','/api/v1/acts',{resId:area,contractNumber,contractDate:'2026-11-02',actNumber,applicant:'Синтетический комплект',address:'Учебный адрес'});
- const a=ok(await create('SYNTH-AVTU')),b=ok(await create('SYNTH-TP','00001–26-SYNTH-1'));
- assert.equal(a.contract_id,b.contract_id);assert.notEqual(a.id,b.id);assert.equal(a.contract_number,'00001-26-SYNTH-1');
+ const create=(actNumber:string,contractNumber='00001-26-00000001-1')=>post('riru','/api/v1/acts',{resId:area,contractNumber,contractDate:'2026-11-02',actNumber,applicant:'Синтетический комплект',address:'Учебный адрес'});
+ const a=ok(await create('SYNTH-AVTU')),b=ok(await create('SYNTH-TP','00001–26-00000001-1'));
+ assert.equal(a.contract_id,b.contract_id);assert.notEqual(a.id,b.id);assert.equal(a.contract_number,'00001-26-00000001-1');
  const path=`/api/v1/acts/${a.id}`;const card=()=>get('riru',path).then(ok);
  const upload=(p:string,type:string,u='riru')=>request(app).post(p+'/files').set('Authorization','Bearer '+tokens[u]).field('documentType',type).field('documentNumber','TU-OWN-001').attach('file',zip(docxParts),'synthetic.docx');
  const uploaded=(r:request.Response)=>{assert.equal(r.status,201,JSON.stringify(r.body));return r.body;};
  pass('Contract key preserves leading zeroes and suffix; normalized dashes group separate act IDs');
  const tu=uploaded(await upload(path,'TU'));assert.equal(tu.kind,'TU_DOCX');assert.ok(tu.technicalConditions.id);
- let d=await card();assert.equal(d.versions.length,0);assert.equal(d.tasks.length,0);assert.equal(d.contractDocuments.technicalConditions[0].document_number,'TU-OWN-001');assert.equal(d.contract_number,'00001-26-SYNTH-1');
+ let d=await card();assert.equal(d.versions.length,0);assert.equal(d.tasks.length,0);assert.equal(d.contractDocuments.technicalConditions[0].document_number,'TU-OWN-001');assert.equal(d.contract_number,'00001-26-00000001-1');
  assert.equal((await post('riru',path+'/versions',{fileId:tu.id,expectedRevision:d.revision})).status,422);
  await assert.rejects(transaction(runtime,users.riru,db=>db.query("INSERT INTO app.versions(act_id,number,file_id,snapshot,created_by) VALUES($1,1,$2,'{}',app.uid())",[a.id,tu.id])));
  pass('TU stored separately, not an act version, no approval task; API and database reject TU as act');
@@ -30,14 +30,14 @@ export async function runContractDocumentChecks({app,owner,runtime,tokens,users,
  pass('AVTU is a real alternative act type; type cannot change after first immutable version');
  const dp=`/api/v1/acts/${b.id}`;let second=ok(await get('riru',dp));ok(await post('riru',dp+'/technical-conditions/select',{technicalConditionsId:tu.technicalConditions.id,expectedRevision:second.revision}));
  second=ok(await get('riru',dp));assert.equal(second.technical_conditions_id,tu.technicalConditions.id);assert.equal(second.contractDocuments.acts.length,2);
- const stranger=ok(await create('OTHER-CONTRACT','00002-SYNTH'));assert.equal((await post('riru',`/api/v1/acts/${stranger.id}/technical-conditions/select`,{technicalConditionsId:tu.technicalConditions.id,expectedRevision:stranger.revision})).status,404);
+ const stranger=ok(await create('OTHER-CONTRACT','00002-26-00000001-1'));assert.equal((await post('riru',`/api/v1/acts/${stranger.id}/technical-conditions/select`,{technicalConditionsId:tu.technicalConditions.id,expectedRevision:stranger.revision})).status,404);
  pass('One contract shares TU across distinct act cards; another contract cannot select it');
  const preview=path+`/technical-conditions/${tu.technicalConditions.id}/preview`;assert.ok(ok(await get('chief',preview)).blocks.length);
  for(const user of ['other','tech']){assert.equal((await get(user,path)).status,404);assert.equal((await get(user,preview)).status,404);assert.equal((await get(user,`/api/v1/files/${tu.id}/download`)).status,404);}
  assert.equal((await upload(path,'TU','chief')).status,403);
  const dbScope=await transaction(runtime,users.other,db=>db.query('SELECT id FROM app.technical_conditions WHERE id=$1',[tu.technicalConditions.id]));assert.equal(dbScope.rowCount,0);
  pass('Private TU preview/download and real RLS reject other RES and technical admin; reviewer cannot upload');
- const download=await get('chief',`/api/v1/files/${avtu.id}/download`);assert.equal(download.status,200);assert.ok(decodeURIComponent(download.headers['content-disposition']).includes('00001-26-SYNTH-1 АВТУ'));
+ const download=await get('chief',`/api/v1/files/${avtu.id}/download`);assert.equal(download.status,200);assert.ok(decodeURIComponent(download.headers['content-disposition']).includes('00001-26-00000001-1 АВТУ'));
  assert.equal((await upload(path,'INVALID')).status,422);
  d=await card();ok(await post('riru',path+'/submit',{versionId:v.id,expectedRevision:d.revision}));d=await card();const cycle=d.cycles[0];assert.equal(cycle.technical_conditions_id,tu.technicalConditions.id);
  const tasks=(u:string)=>get(u,'/api/v1/tasks/mine').then(ok);const decision=async(u:string,choice='APPROVE',reason='')=>{const task=(await tasks(u)).find((t:any)=>t.act_id===a.id);assert.ok(task);return ok(await post(u,`/api/v1/tasks/${task.id}/decision`,{decision:choice,reason,versionId:(await card()).cycles.at(-1).version_id}));};

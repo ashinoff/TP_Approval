@@ -9,6 +9,7 @@ import {tmpdir} from 'node:os';
 import {randomUUID,createHash} from 'node:crypto';
 import pg from 'pg';
 import {demoUsers} from '../scripts/demo-users.js';
+import {synthContract} from './synthetic-contract.js';
 
 const origin='http://127.0.0.1:5173';const issuer='http://127.0.0.1:4100';const apiOrigin='http://127.0.0.1:3000';
 const readyDeadline=Date.now()+20000;while(true){try{if((await fetch(origin)).ok&&(await fetch(apiOrigin+'/ready')).ok)break;}catch{}if(Date.now()>readyDeadline)throw new Error('Локальный тестовый стенд не готов');await new Promise(r=>setTimeout(r,200));}
@@ -42,7 +43,7 @@ try{
   const stamp=Date.now();const number=`БРАУЗЕР-${stamp}`;
   // Legacy downstream fixture: new TU-first creation is covered by engineer.browser.ts.
   const engineer=(await request('riru-adler','/api/v1/me')).data;const area=engineer.roles.find((r:any)=>r.role==='RIRU_ENGINEER').resId;
-  const created=await request('riru-adler','/api/v1/acts',{resId:area,contractNumber:`ДЕМО-${stamp}/ТП`,contractDate:'2026-10-31',actNumber:number,applicant:'Учебный заявитель',address:'Условный учебный адрес'});assert.equal(created.status,200);const act=created.data;await prepareLegacyAct(act.id);await riru.evaluate(id=>{location.hash=`#/acts/${id}?section=upload`;},act.id);
+  const created=await request('riru-adler','/api/v1/acts',{resId:area,contractNumber:synthContract(`ДЕМО-${stamp}/ТП`),contractDate:'2026-10-31',actNumber:number,applicant:'Учебный заявитель',address:'Условный учебный адрес'});assert.equal(created.status,200);const act=created.data;await prepareLegacyAct(act.id);await riru.evaluate(id=>{location.hash=`#/acts/${id}?section=upload`;},act.id);
   await riru.getByRole('heading',{name:`Акт ${number}`,exact:true}).waitFor();await idle(riru);check('Legacy-карточка подготовлена через API и открыта в браузере',{actId:act.id,actNumber:number});
   await riru.getByLabel('Новая версия DOCX').setInputFiles({name:'invalid.docx',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:Buffer.from('invalid DOCX')});
   await riru.getByRole('alert').filter({hasText:'DOCX'}).waitFor();await idle(riru);await screen(riru,'01-upload-validation');check('Неверный DOCX отклонён, сообщение об ошибке видно в браузере');
@@ -101,7 +102,7 @@ try{
   assert.equal((await request('riru-hosta',`/api/v1/notifications/${notes[0].id}/read`,{})).status,404);
   await riru.getByRole('button',{name:/^Уведомления/}).click();await riru.getByText(/Согласование завершено/).first().waitFor();await screen(riru,'07-notifications');await riru.getByRole('button',{name:'Закрыть уведомления',exact:true}).click();check('Badge проверен для всех 11 ролей/пользователей; уведомления персональны, чужое сообщение недоступно');
   // A dedicated extra task proves overdue rendering without touching the approved act.
-  const overdueNumber=`СРОК-${stamp}`;const overdueCreated=await request('riru-adler','/api/v1/acts',{resId:area,contractNumber:`УЧЕБНЫЙ-СРОК-${stamp}`,contractDate:'2026-10-31',actNumber:overdueNumber,applicant:'Учебный срок',address:'Условный объект для проверки срока'});assert.equal(overdueCreated.status,200);const overdueAct=overdueCreated.data;await prepareLegacyAct(overdueAct.id);await riru.evaluate(id=>{location.hash=`#/acts/${id}?section=upload`;},overdueAct.id);await riru.getByRole('heading',{name:`Акт ${overdueNumber}`,exact:true}).waitFor();await idle(riru);
+  const overdueNumber=`СРОК-${stamp}`;const overdueCreated=await request('riru-adler','/api/v1/acts',{resId:area,contractNumber:synthContract(`УЧЕБНЫЙ-СРОК-${stamp}`),contractDate:'2026-10-31',actNumber:overdueNumber,applicant:'Учебный срок',address:'Условный объект для проверки срока'});assert.equal(overdueCreated.status,200);const overdueAct=overdueCreated.data;await prepareLegacyAct(overdueAct.id);await riru.evaluate(id=>{location.hash=`#/acts/${id}?section=upload`;},overdueAct.id);await riru.getByRole('heading',{name:`Акт ${overdueNumber}`,exact:true}).waitFor();await idle(riru);
   await riru.getByLabel('Новая версия DOCX').setInputFiles(resolve('.local/demo-documents/act-v1.docx'));await riru.getByRole('button',{name:'Отправить на согласование'}).waitFor();await riru.getByRole('button',{name:'Отправить на согласование'}).click();await idle(riru);await passRiruReview(overdueAct.id);await riru.locator('.act-detail .status').filter({hasText:'Начальник РЭС'}).waitFor();
   const state=JSON.parse(await readFile('.local/demo.json','utf8'));const root=resolve(state.root);assert.equal(dirname(root),resolve(tmpdir()));assert.ok(root.split(sep).at(-1)!.startsWith('tp-approval-demo-'));
   const db=new pg.Client({host:'127.0.0.1',port:55432,database:'tp_approval_demo',user:'postgres',password:state.ownerPassword});await db.connect();

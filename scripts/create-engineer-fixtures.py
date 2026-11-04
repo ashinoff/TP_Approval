@@ -13,7 +13,7 @@ for name, power, title in [
     doc.core_properties.author = 'TP_Approval synthetic tests'
     doc.add_heading(title, 0)
     for line in [
-        'Приложение к договору № SYNTH-TU-0001',
+        'Приложение к договору № 00001-26-00000004-1',
         'Заявитель: Учебный заявитель',
         f'Максимальная мощность: {power} кВт, в том числе существующая мощность 7 кВт.',
         'Класс напряжения: 0,4 кВ.',

@@ -20,6 +20,7 @@ import {documentKinds,documentFilename,contractDocuments,registerDocument,select
 import {checkTechnicalConditions,confirmTuFinding,enforceTechnicalConditions} from './tu-validation.js';
 import {RULES_VERSION} from './tu-rules.js';
 import {extractTuMetadata} from './tu-import.js';
+import {requireContractNumber} from './contract-number.js';
 import {documentModel} from './documents.js';
 import {prepareTu} from './prepare-tu.js';
 import {localAuth,listLocalUsers,createLocalUser,updateLocalAccess,addLocalRole,updateLocalProfile,deleteLocalUser} from './local-auth.js';
@@ -138,7 +139,8 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   });
   post('/api/v1/acts',async(db,req)=>{
     const b=createAct.parse(req.body);await role(db,'RIRU_ENGINEER',b.resId);
-    const act=(await db.query('INSERT INTO app.acts(res_id,author_id,contract_number,contract_date,act_number,applicant,address,act_type) VALUES($1,app.uid(),$2,$3,$4,$5,$6,$7) RETURNING *',[b.resId,b.contractNumber,b.contractDate,b.actNumber,b.applicant,b.address,b.actType])).rows[0];
+    const contractNumber=requireContractNumber(b.contractNumber),actNumber=b.actNumber===b.contractNumber?contractNumber:b.actNumber;
+    const act=(await db.query('INSERT INTO app.acts(res_id,author_id,contract_number,contract_date,act_number,applicant,address,act_type) VALUES($1,app.uid(),$2,$3,$4,$5,$6,$7) RETURNING *',[b.resId,contractNumber,b.contractDate,actNumber,b.applicant,b.address,b.actType])).rows[0];
     await audit(db,act.id,'CREATED');return act;
   });
   get('/api/v1/acts/:id/approval-matrix',async(db,req)=>approvalMatrix(db,id.parse(req.params.id),req.query.cycleId===undefined?undefined:id.parse(req.query.cycleId)));
