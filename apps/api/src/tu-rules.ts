@@ -179,6 +179,38 @@ function voltage(blocks:Block[]):Extracted{
  return {values,found};
 }
 
+/** Rational «n/d» in base units (Вт, В) → decimal string in kilo-units with a dot: 15000/1 → «15», 400/1 → «0.4». */
+function kiloDecimal(value:string){
+ const [n,d]=value.split('/').map(BigInt);const den=d*1000n;
+ const whole=n/den;let rest=n%den,digits='';
+ for(let i=0;i<6&&rest;i++){rest*=10n;digits+=String(rest/den);rest%=den;}
+ return digits?`${whole}.${digits}`:String(whole);
+}
+type Suggestion={value:string;status:'FOUND'|'AMBIGUOUS'|'NOT_FOUND'|'DERIVED';quote?:string};
+const single=(values:Value[],convert:(v:string)=>string):Suggestion=>{
+ const usable=values.filter(v=>v.value);const distinct=[...new Set(usable.map(v=>convert(v.value)))];
+ return distinct.length===1?{value:distinct[0],status:'FOUND',quote:usable[0].quote}:{value:'',status:distinct.length||values.length?'AMBIGUOUS':'NOT_FOUND'};
+};
+/**
+ * Технические данные для карточки документа: максимальная мощность (кВт), уровень напряжения (кВ), фазность.
+ * Только предложения для инженера. Фазность берётся из явных слов ТУ; если их нет — выводится по напряжению
+ * (0,23 кВ → 1ф, 0,4 кВ → 3ф) со статусом DERIVED, «3фтт» — при упоминании трансформаторов тока у трёхфазного ввода.
+ */
+export function tuCardFacts(blocks:Block[]):Record<'power_kw'|'voltage_kv'|'phases',Suggestion>{
+ const power_kw=single(totalPower(blocks).values,kiloDecimal);
+ const voltage_kv=single(voltage(blocks).values,kiloDecimal);
+ const text=textBlocks(blocks).map(b=>b.text).join('\n').toLowerCase().replace(/ё/g,'е');
+ const one=/однофазн/u.test(text),three=/трехфазн/u.test(text),tt=/трансформатор\p{L}*\s+тока/u.test(text);
+ let phases:Suggestion;
+ if(one&&!three)phases={value:'1ф',status:'FOUND'};
+ else if(three&&!one)phases={value:tt?'3фтт':'3ф',status:'FOUND'};
+ else if(one&&three)phases={value:'',status:'AMBIGUOUS'};
+ else if(voltage_kv.status==='FOUND'&&voltage_kv.value==='0.23')phases={value:'1ф',status:'DERIVED'};
+ else if(voltage_kv.status==='FOUND'&&voltage_kv.value==='0.4')phases={value:tt?'3фтт':'3ф',status:'DERIVED'};
+ else phases={value:'',status:'NOT_FOUND'};
+ return {power_kw,voltage_kv,phases};
+}
+
 const CONTRACT=/(?:к\s+договору|договор(?:а|у)?)\s*[^№\n]{0,100}№\s*([\p{L}\d][\p{L}\d\/–—‑-]*)/iu;
 function contract(blocks:Block[]):Extracted{
  const values:Value[]=[];

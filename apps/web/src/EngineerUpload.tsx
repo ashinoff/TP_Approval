@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {uploadDocument} from './document-upload.js';
 import {Icon} from './Ui.js';
 import {CONTRACT_NUMBER_PATTERN,normalizeContractNumber} from './workplace.js';
+import {CardInputs,type CardField,type CardDraft} from './DocumentCard.js';
 type Row=Record<string,any>;
 const labels:Record<string,string>={ACT_TP:'АКТ ТП',AVTU:'АВТУ',TU:'ТУ'};
 const kinds=[['ACT_TP','Акт ТП'],['AVTU','АВТУ'],['TU','ТУ к существующему документу']] as const;
@@ -22,13 +23,15 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
  const [resId,setResId]=useState(areas[0]?.id??''),[type,setType]=useState('ACT_TP'),[file,setFile]=useState<File>(),[tu,setTu]=useState<File>(),[query,setQuery]=useState(''),[targets,setTargets]=useState<Row[]>([]),[target,setTarget]=useState(''),[error,setError]=useState(''),[created,setCreated]=useState<string>(),[extracting,setExtracting]=useState(false),[report,setReport]=useState<Row>();
  const [values,setValues]=useState({contractNumber:'',contractDate:'',applicant:'',address:''});
  const [inputKey,setInputKey]=useState(0);
+ const [fields,setFields]=useState<CardField[]>([]),[cardDraft,setCardDraft]=useState<CardDraft>({});
+ useEffect(()=>{let active=true;api('/api/v1/card-fields').then(f=>{if(active)setFields(f);}).catch(()=>{});return()=>{active=false;};},[api]);
  const request=useRef(0),saved=useRef({tu:undefined as File|undefined,act:undefined as File|undefined});
  useEffect(()=>()=>{request.current++;},[]);
  useEffect(()=>{if(type!=='TU')return;let active=true;const timer=setTimeout(()=>{api('/api/v1/registry?view=preparation&limit=100&q='+encodeURIComponent(query)).then(r=>{if(active)setTargets(r.items.filter((a:Row)=>['DRAFT','RETURNED','REVISING'].includes(a.state)));}).catch(e=>{if(active)setError(e.message);});},200);return()=>{active=false;clearTimeout(timer);};},[type,query,api]);
  const readTu=async(selected:File|undefined)=>{
   setTu(selected);setReport(undefined);setError('');const seq=++request.current;onDirty(true);
   if(!selected){setExtracting(false);return;}setExtracting(true);
-  try{const data=new FormData();data.append('resId',resId);data.append('file',selected);const result=await api('/api/v1/documents/extract-tu',data);if(seq!==request.current)return;if(result.preparedFile){const decoded=Uint8Array.from(atob(result.preparedFile.base64),(c:string)=>c.charCodeAt(0));setTu(new File([decoded],selected.name,{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));}setReport(result);setValues({contractNumber:result.fields.contractNumber.value,contractDate:result.fields.contractDate.value,applicant:result.fields.applicant.value,address:result.fields.address.value});}
+  try{const data=new FormData();data.append('resId',resId);data.append('file',selected);const result=await api('/api/v1/documents/extract-tu',data);if(seq!==request.current)return;if(result.preparedFile){const decoded=Uint8Array.from(atob(result.preparedFile.base64),(c:string)=>c.charCodeAt(0));setTu(new File([decoded],selected.name,{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));}setReport(result);setCardDraft(d=>{const next={...d};for(const f of fields)if(f.tu_source){const sug=result.card?.[f.tu_source];if(sug?.value)next[f.code]={value:sug.value,origin:'TU'};else if(next[f.code]?.origin==='TU')delete next[f.code];}return next;});setValues({contractNumber:result.fields.contractNumber.value,contractDate:result.fields.contractDate.value,applicant:result.fields.applicant.value,address:result.fields.address.value});}
   catch(e){if(seq===request.current)setError(e instanceof Error?e.message:String(e));}
   finally{if(seq===request.current)setExtracting(false);}
  };
@@ -50,6 +53,8 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
    let actId=created;if(!actId){const a=await api('/api/v1/acts',{resId,...values,contractNumber,contractDate:values.contractDate||null,actNumber:contractNumber,actType:type});actId=a.id;setCreated(actId);}
    if(saved.current.tu!==tu){await uploadDocument(api,actId!,tu,'TU');saved.current.tu=tu;}
    if(saved.current.act!==file){await uploadDocument(api,actId!,file,type);saved.current.act=file;}
+   const card=Object.entries(cardDraft).filter(([,v])=>v.value.trim()).map(([code,v])=>({code,value:v.value,origin:v.origin}));
+   if(card.length)await api(`/api/v1/acts/${actId}/card`,{values:card});
    onDirty(false);onCreated(actId!);
   });}}>
    {areas.length>1&&<label className="res-field">РЭС<select name="resId" value={resId} disabled={locked||!!created} onChange={e=>{setResId(e.target.value);setReport(undefined);setTu(undefined);setInputKey(k=>k+1);}}>{areas.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label>}
@@ -69,6 +74,11 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
        {badNumber?<small className="field-error">Формат: ххххх-хх-хххххххх-х, например 00123-26-00004567-1.</small>:report&&status!=='FOUND'&&<small>Не определено однозначно — проверьте по ТУ.</small>}</label>;
      })}
     </div>
+    {fields.length>0&&<section className="upload-card" aria-label="Технические данные">
+     <h3>Технические данные</h3>
+     <p className="helper-text">Мощность, напряжение и фазность заполняются из ТУ. Планируемую дату исполнения укажите вручную. Обязательные поля (*) нужны для отправки на согласование.</p>
+     <CardInputs fields={fields} draft={cardDraft} onChange={d=>{setCardDraft(d);onDirty(true);}} disabled={locked} suggestions={report?.card}/>
+    </section>}
    </>}
    {type!=='TU'&&numberValid&&<p className="helper-text">Пакет договора: <strong>{contractNumber}</strong> · {contractNumber} {labels[type]} · {contractNumber} ТУ</p>}
    {created&&<p role="status">Документ сохранён. Повторная попытка продолжит загрузку в тот же документ. <button type="button" onClick={()=>{onDirty(false);onCreated(created);}}>Открыть сохранённый документ</button></p>}

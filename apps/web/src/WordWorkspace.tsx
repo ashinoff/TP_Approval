@@ -4,6 +4,7 @@ import {Icon,dateTime,roleNames} from './Ui.js';
 import PreparationControls,{SendButton,checkFor,isPreparing,openBlockers} from './ActDocument.js';
 import PackagePanel from './ContractDocuments.js';
 import TuPreflight from './TuPreflight.js';
+import DocumentCardPanel from './DocumentCard.js';
 import DecisionDialog from './DecisionDialog.js';
 import {initialVersion,assignedVersion,type Section} from './workplace.js';
 
@@ -139,6 +140,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
 
   <div className="act-workspace">
    <PackagePanel detail={detail} cycle={cycle} openTu={openTu} onOpenTu={id=>setOpenTu(id)} action={action} busy={busy} api={api} onDownload={onDownload}>
+    <DocumentCardPanel detail={detail} cycle={cycle} api={api} action={action} busy={busy}/>
     {onLatest&&<PreparationControls detail={detail} api={api} action={action} busy={busy} onVersion={id=>changeVersion(id)}/>}
    </PackagePanel>
    <div className="act-main">

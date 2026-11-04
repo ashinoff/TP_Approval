@@ -42,7 +42,7 @@ export async function runIntegration(ownerUrl:string,runtimeUrl:string,root:stri
     const upload=()=>request(app).post(`/api/v1/acts/${actId}/files`).set('Authorization',`Bearer ${tokens.riru}`).attach('file',zip(docxParts),'synthetic.docx');
     const file=await upload();assert.equal(file.status,201,JSON.stringify(file.body));
     assert.equal((await get('other',`/api/v1/files/${file.body.id}/download`)).status,404);assert.equal((await get('riru',`/api/v1/files/${file.body.id}/download`)).status,200);pass('Private DOCX upload and protected download');
-    const makeVersion=async()=>{const a=(await get('riru',`/api/v1/acts/${actId}`)).body;const v=await post('riru',`/api/v1/acts/${actId}/versions`,{fileId:file.body.id,expectedRevision:a.revision});assert.equal(v.status,200,JSON.stringify(v.body));return v.body;};
+    const makeVersion=async()=>{const ar=await get('riru',`/api/v1/acts/${actId}`);assert.equal(ar.status,200,JSON.stringify(ar.body));const a=ar.body;const v=await post('riru',`/api/v1/acts/${actId}/versions`,{fileId:file.body.id,expectedRevision:a.revision});assert.equal(v.status,200,JSON.stringify(v.body));return v.body;};
     const v1=await makeVersion();
     assert.equal((await post('riru',`/api/v1/acts/${actId}/versions`,{fileId:file.body.id,expectedRevision:0})).status,412);pass('Stale revisions cannot overwrite newer work');
     await assert.rejects(runtime.query('UPDATE app.versions SET number=99 WHERE id=$1',[v1.id]));pass('Submitted versions cannot be overwritten by runtime');

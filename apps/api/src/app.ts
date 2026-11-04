@@ -21,6 +21,7 @@ import {checkTechnicalConditions,confirmTuFinding,enforceTechnicalConditions} fr
 import {RULES_VERSION} from './tu-rules.js';
 import {extractTuMetadata} from './tu-import.js';
 import {requireContractNumber} from './contract-number.js';
+import {cardFields,cardValues,saveCard,cardFromTu,createCardField,updateCardField} from './card.js';
 import {documentModel} from './documents.js';
 import {prepareTu} from './prepare-tu.js';
 import {localAuth,listLocalUsers,createLocalUser,updateLocalAccess,addLocalRole,updateLocalProfile,deleteLocalUser} from './local-auth.js';
@@ -106,6 +107,11 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
     return (await db.query('SELECT app.admin_substitute($1,$2,$3,$4) AS id',[b.roleId,b.substituteId,b.startsAt,b.endsAt])).rows[0];
   });
   const calendarAdmin=async(db:DB)=>{if(!(await db.query("SELECT app.has_role('PROCESS_ADMIN') OR app.has_role('TECH_ADMIN') AS yes")).rows[0].yes)throw new HttpError(403,'ROLE_REQUIRED');};
+  get('/api/v1/card-fields',async(db,req)=>{const all=req.query.all==='1';if(all)await calendarAdmin(db);return cardFields(db,all);});
+  post('/api/v1/admin/card-fields',async(db,req)=>{await calendarAdmin(db);return createCardField(db,req.body);});
+  post('/api/v1/admin/card-fields/:code',async(db,req)=>{await calendarAdmin(db);return updateCardField(db,z.string().max(41).parse(req.params.code),req.body);});
+  post('/api/v1/acts/:id/card',async(db,req)=>saveCard(db,id.parse(req.params.id),req.body));
+  post('/api/v1/acts/:id/card/from-tu',async(db,req)=>cardFromTu(db,config.storagePath,id.parse(req.params.id)));
   get('/api/v1/admin/calendar',async(db,req)=>{
     await calendarAdmin(db);const year=z.coerce.number().int().min(2000).max(2100).parse(req.query.year);
     return (await db.query("SELECT day::text,working,source,revision FROM app.calendar_days WHERE day>=make_date($1,1,1) AND day<make_date($1+1,1,1) ORDER BY day",[year])).rows;
@@ -157,7 +163,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
     const comments=(await db.query('SELECT c.*,coalesce(c.author_snapshot->>\'name\',(SELECT actor_name FROM app.decisions WHERE task_id=c.task_id)) AS author_name,(SELECT role FROM app.tasks WHERE id=c.task_id) AS author_role,coalesce((SELECT jsonb_agg(e ORDER BY e.created_at,e.id) FROM app.comment_events e WHERE e.comment_id=c.id),\'[]\'::jsonb) AS events FROM app.comments c WHERE c.act_id=$1 ORDER BY c.created_at,c.id',[act.id])).rows;
     const releases=(await db.query('SELECT * FROM app.releases WHERE act_id=$1 ORDER BY published_at',[act.id])).rows;
     const checks=(await db.query("SELECT c.*,coalesce((SELECT jsonb_agg(jsonb_build_object('id',x.id,'field',x.field,'comment',x.comment,'actorId',x.actor_id,'actorName',x.actor_name,'createdAt',x.created_at) ORDER BY x.created_at) FROM app.tu_check_confirmations x WHERE x.check_id=c.id),'[]'::jsonb) AS confirmations FROM app.tu_checks c WHERE c.act_id=$1 ORDER BY c.created_at DESC,c.id DESC LIMIT 100",[act.id])).rows;
-    return {...act,checks,checkRulesVersion:RULES_VERSION,contractDocuments:await contractDocuments(db,act),versions,cycles,tasks,comments,releases,presentation:await registryAct(db,act.id),timeline:await timeline(db,act.id)};
+    return {...act,checks,checkRulesVersion:RULES_VERSION,card:await cardValues(db,act.id),contractDocuments:await contractDocuments(db,act),versions,cycles,tasks,comments,releases,presentation:await registryAct(db,act.id),timeline:await timeline(db,act.id)};
   },true);
   const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:config.maxFileBytes,files:1,fields:4}});
   app.post('/api/v1/documents/extract-tu',upload.single('file'),async(req,res)=>{

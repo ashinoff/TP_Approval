@@ -1,3 +1,4 @@
+import {requireCompleteCard,cardSnapshotSql} from './card.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { type DB, HttpError, requireValue } from './db.js';
 
@@ -68,9 +69,11 @@ export async function submit(db:DB,actId:string,versionId:string,expected:number
   if((await db.query('SELECT 1 FROM app.cycles WHERE version_id=$1',[versionId])).rowCount)throw new HttpError(409,'NEW_VERSION_REQUIRED');
   const latest=(await db.query('SELECT max(number) AS n FROM app.versions WHERE act_id=$1',[actId])).rows[0].n;
   if(version.number!==latest) throw new HttpError(409,'LATEST_VERSION_REQUIRED');
+  await requireCompleteCard(db,act);
   const assignee=await assigned(db,'RIRU_HEAD',act.res_id,[act.author_id,version.created_by]);
   const n=(await db.query('SELECT coalesce(max(number),0)+1 AS n FROM app.cycles WHERE act_id=$1',[actId])).rows[0].n;
-  const cycle=(await db.query("INSERT INTO app.cycles(act_id,version_id,number,state) VALUES($1,$2,$3,'RIRU_REVIEW') RETURNING *",[actId,versionId,n])).rows[0];
+  // Карточка фиксируется вместе с циклом: согласуется и синхронизируется именно этот снимок.
+  const cycle=(await db.query(`INSERT INTO app.cycles(act_id,version_id,number,state,card_snapshot) VALUES($1,$2,$3,'RIRU_REVIEW',${cardSnapshotSql}) RETURNING *`,[actId,versionId,n])).rows[0];
   await db.query("UPDATE app.tasks SET status='DONE',completed_at=now() WHERE act_id=$1 AND app.task_role(role,cycle_id)='RIRU_ENGINEER' AND status='OPEN'",[actId]);
   await task(db,actId,cycle.id,'RIRU_HEAD',assignee);
   await db.query("UPDATE app.acts SET state='RIRU_REVIEW',workflow_version=2,revision=revision+1 WHERE id=$1",[actId]);

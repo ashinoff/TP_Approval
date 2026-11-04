@@ -71,7 +71,9 @@ export async function runStandaloneBrowser(options:{url:string;initialPassword:s
     await options.restart();await page.reload();await page.getByRole('heading',{name:'Загрузка документа',exact:true}).waitFor();
     pass('Employee opens the existing workspace; sessions and account survive service restart');
     await page.setViewportSize({width:390,height:844});
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    // На ошибке перечисляем элементы, выходящие за ширину экрана, чтобы сразу было видно виновника.
+    const overflow=await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth?[]:[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1).slice(0,8).map(e=>`${e.tagName.toLowerCase()}.${(e as HTMLElement).className} → ${Math.round(e.getBoundingClientRect().right)}px`));
+    assert.deepEqual(overflow,[],'Mobile overflow');
     await page.screenshot({path:options.output+'/mobile.png',fullPage:true});
     await page.getByRole('button',{name:'Выйти',exact:true}).click();await page.reload();
     await page.getByRole('heading',{name:'Вход в ТП Согласование'}).waitFor();

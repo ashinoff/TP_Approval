@@ -1,5 +1,6 @@
 import type {Block} from './documents.js';
 import {isContractNumber,normalizeContractNumber} from './contract-number.js';
+import {tuCardFacts} from './tu-rules.js';
 
 // Import suggestions only. Never infer a value when the source is ambiguous.
 export function extractTuMetadata(blocks:Block[]){
@@ -13,5 +14,5 @@ export function extractTuMetadata(blocks:Block[]){
  const result=Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,{value:v.length===1?v[0]:'',status:v.length===1?'FOUND':v.length?'AMBIGUOUS':'NOT_FOUND'}])) as Record<string,{value:string;status:string}>;
  // Номер в ТУ найден, но не в формате ххххх-хх-хххххххх-х: показываем как есть, сохранить без исправления нельзя.
  if(result.contractNumber.status==='FOUND'&&!isContractNumber(result.contractNumber.value))result.contractNumber.status='INVALID_FORMAT';
- return {fields:result,source:'TU_DOCX',limitations:'Извлечённые реквизиты нужно проверить. Неоднозначные и отсутствующие значения не подставляются.'};
+ return {fields:result,card:tuCardFacts(blocks.filter(b=>b.part==='word/document.xml')),source:'TU_DOCX',limitations:'Извлечённые реквизиты нужно проверить. Неоднозначные и отсутствующие значения не подставляются.'};
 }
