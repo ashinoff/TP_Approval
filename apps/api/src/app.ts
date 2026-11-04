@@ -105,9 +105,14 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
     const b=z.object({roleId:id,substituteId:id,startsAt:z.iso.datetime(),endsAt:z.iso.datetime()}).strict().parse(req.body);
     return (await db.query('SELECT app.admin_substitute($1,$2,$3,$4) AS id',[b.roleId,b.substituteId,b.startsAt,b.endsAt])).rows[0];
   });
+  const calendarAdmin=async(db:DB)=>{if(!(await db.query("SELECT app.has_role('PROCESS_ADMIN') OR app.has_role('TECH_ADMIN') AS yes")).rows[0].yes)throw new HttpError(403,'ROLE_REQUIRED');};
+  get('/api/v1/admin/calendar',async(db,req)=>{
+    await calendarAdmin(db);const year=z.coerce.number().int().min(2000).max(2100).parse(req.query.year);
+    return (await db.query("SELECT day::text,working,source,revision FROM app.calendar_days WHERE day>=make_date($1,1,1) AND day<make_date($1+1,1,1) ORDER BY day",[year])).rows;
+  });
   post('/api/v1/admin/calendar',async(db,req)=>{
     const b=z.object({days:z.array(z.object({day:z.iso.date(),working:z.boolean(),source:text}).strict()).min(1).max(800)}).strict().parse(req.body);
-    await role(db,'PROCESS_ADMIN');await db.query('SELECT app.admin_calendar($1)',[JSON.stringify(b.days)]);return {updated:b.days.length};
+    await calendarAdmin(db);await db.query('SELECT app.admin_calendar($1)',[JSON.stringify(b.days)]);return {updated:b.days.length};
   });
   post('/api/v1/admin/deadline-policies',async(db,req)=>{
     const b=z.object({role:z.enum(['RIRU_HEAD','RES_HEAD','SUE','STP','GI','RIRU_ENGINEER']),workingDays:z.number().int().min(1).max(90)}).strict().parse(req.body);

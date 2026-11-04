@@ -203,5 +203,11 @@ export async function runLocalAuthIntegration(ownerUrl:string,runtimeUrl:string,
     assert.equal(resetLogin.status,200,JSON.stringify(resetLogin.body));assert.equal(resetLogin.body.mustChangePassword,false);
     assert.equal((await owner.query("SELECT count(*) FROM app.audit_events WHERE action='LOCAL_ADMIN_PASSWORD_RESET'")).rows[0].count,'1');
     pass('ADMIN_RESET_PASSWORD restores admin login with a 4-digit password, unlocks the account and is audited');
+    const adminClient=take(resetLogin);
+    const before=(await get(adminClient,'/api/v1/admin/calendar?year=2026')).body;assert.equal(before.filter((d:any)=>d.working).length,247);
+    const saved=await post(adminClient,'/api/v1/admin/calendar',{days:[{day:'2026-12-30',working:false,source:'Синтетический приказ № 1'}]});assert.equal(saved.status,200,JSON.stringify(saved.body));
+    const after=(await get(adminClient,'/api/v1/admin/calendar?year=2026')).body.find((d:any)=>d.day==='2026-12-30');assert.equal(after.working,false);assert.equal(after.source,'Синтетический приказ № 1');assert.equal(after.revision,2);
+    assert.equal((await request(app).get('/api/v1/admin/calendar?year=2026')).status,401);
+    pass('TECH_ADMIN edits the production calendar with a recorded reason; seeded 2026 calendar has 247 working days');
   }finally{await runtime.end();await owner.end();}
 }
