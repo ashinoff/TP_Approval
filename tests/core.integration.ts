@@ -28,7 +28,7 @@ export async function runIntegration(ownerUrl:string,runtimeUrl:string,root:stri
     const get=(user:string,path:string)=>request(app).get(path).set('Authorization',`Bearer ${tokens[user]}`);
     const post=(user:string,path:string,body:object,k=randomUUID())=>completeRiruReview(request(app).post(path).set('Authorization',`Bearer ${tokens[user]}`).set('Idempotency-Key',k).send(body),app,tokens,owner);
     assert.equal((await request(app).get('/api/v1/acts')).status,401);pass('API rejects unauthenticated access');
-    await owner.query("INSERT INTO app.calendar_days SELECT d::date,extract(isodow FROM d)<6,'SYNTHETIC TEST CALENDAR',1 FROM generate_series(current_date-1,current_date+450,'1 day') d");
+    await owner.query('DELETE FROM app.calendar_days');await owner.query("INSERT INTO app.calendar_days SELECT d::date,extract(isodow FROM d)<6,'SYNTHETIC TEST CALENDAR',1 FROM generate_series(current_date-1,current_date+450,'1 day') d");
     const body={resId:area,contractNumber:'00001-26-00000002-1',contractDate:'2026-01-01',actNumber:'TEST-1',applicant:'Синтетический заявитель',address:'Тестовый адрес'};
     const badNumber=await post('riru','/api/v1/acts',{...body,contractNumber:'0001/ТП',actNumber:'0001/ТП'});assert.equal(badNumber.status,422);assert.equal(badNumber.body.error.code,'CONTRACT_NUMBER_FORMAT');
     const created=await post('riru','/api/v1/acts',body);assert.equal(created.status,200,JSON.stringify(created.body));const actId=created.body.id;

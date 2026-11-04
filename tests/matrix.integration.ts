@@ -31,7 +31,7 @@ export async function runMatrixIntegration(ownerUrl:string,runtimeUrl:string,roo
       if(role)await owner.query('INSERT INTO app.roles(user_id,role,res_id) VALUES($1,$2,$3)',[users[subject!],role,scope]);
       tokens[subject!]=await new SignJWT({realm_access:{roles:['tp-approval-user']}}).setProtectedHeader({alg:'RS256',kid:'matrix'}).setIssuer(config.issuer).setAudience(config.audience).setSubject(subject!).setIssuedAt().setExpirationTime('1h').sign(keys.privateKey);
     }
-    await owner.query("INSERT INTO app.calendar_days SELECT d::date,extract(isodow FROM d)<6,'SYNTHETIC MATRIX CALENDAR',1 FROM generate_series(current_date-1,current_date+450,'1 day') d");
+    await owner.query('DELETE FROM app.calendar_days');await owner.query("INSERT INTO app.calendar_days SELECT d::date,extract(isodow FROM d)<6,'SYNTHETIC MATRIX CALENDAR',1 FROM generate_series(current_date-1,current_date+450,'1 day') d");
     const get=(user:string,path:string)=>request(app).get(path).set('Authorization',`Bearer ${tokens[user]}`);
     const post=(user:string,path:string,body:object)=>completeRiruReview(request(app).post(path).set('Authorization',`Bearer ${tokens[user]}`).set('Idempotency-Key',randomUUID()).send(body),app,tokens,owner);
     const ensure=(response:request.Response)=>{assert.equal(response.status,200,JSON.stringify(response.body));return response.body;};
