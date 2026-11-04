@@ -6,6 +6,7 @@ import TuPreflight from './TuPreflight.js';
 import DecisionDialog from './DecisionDialog.js';
 import {SendButton,checkFor,isPreparing,openBlockers} from './ActDocument.js';
 import {initialVersion,type Section} from './workplace.js';
+import {checkMarks,changedMarks,pairedBlock} from './review-marks.js';
 import './review.css';
 
 type Row=Record<string,any>;
@@ -59,18 +60,27 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  const rightDoc=usePreview(source,fetchSource);
  useEffect(()=>{api('/api/v1/error-categories').then(setCategories).catch(()=>{});},[api]);
 
- // Подсветка расхождений автосверки в обоих окнах, если справа открыты те же ТУ.
+ // Цветная разметка: со сверкой ТУ — зелёный/красный/жёлтый в обоих окнах; с другой версией акта — синие изменённые абзацы.
  const rightTuId=source?.startsWith('tu:')?source.slice(3):undefined;
+ const rightVersion=source?.startsWith('v:')?detail.versions.find((v:Row)=>v.id===source.slice(2)):undefined;
+ const pairedTu=!!check&&rightTuId===check.technical_conditions_id;
+ const [showMarks,setShowMarks]=useState(true);
  const flagged=useMemo(()=>(check?.findings??[]).filter((f:Row)=>BLOCKING.includes(f.status)&&!check?.confirmations?.some((c:Row)=>c.field===f.field)),[check]);
- useEffect(()=>{left.current?.highlightBlocks(flagged.flatMap((f:Row)=>f.act.map((v:Row)=>v.blockId)));},[flagged,leftDoc.data]);
- useEffect(()=>{right.current?.highlightBlocks(rightTuId&&rightTuId===check?.technical_conditions_id?flagged.flatMap((f:Row)=>f.tu.map((v:Row)=>v.blockId)):[]);},[flagged,rightDoc.data,rightTuId,check]);
+ const leftMarks=useMemo(()=>!showMarks?[]:rightVersion?changedMarks(leftDoc.data?.model,rightDoc.data?.model,`версии ${rightVersion.number}`):checkMarks(check,'act'),[showMarks,rightVersion,leftDoc.data,rightDoc.data,check]);
+ const rightMarks=useMemo(()=>!showMarks?[]:rightVersion?changedMarks(rightDoc.data?.model,leftDoc.data?.model,`версии ${version?.number}`):pairedTu?checkMarks(check,'tu'):[],[showMarks,rightVersion,leftDoc.data,rightDoc.data,check,pairedTu,version]);
+ const [nav,setNav]=useState(-1);
+ const goFlag=(step:number)=>{if(!flagged.length)return;const i=(nav+step+flagged.length)%flagged.length;setNav(i);const f=flagged[i];if(f.act?.[0]?.blockId)left.current?.scrollToBlock(f.act[0].blockId);if(pairedTu&&f.tu?.[0]?.blockId)right.current?.scrollToBlock(f.tu[0].blockId);};
+ const addRemark=()=>{if(selection){setForm(selection);setPanel(true);setTab('remarks');}else setError('Выделите текст внутри одного абзаца, затем нажмите «＋ Замечание».');};
 
  const notes:Row[]=detail.comments;
  const statusOf=(c:Row)=>c.events.filter((e:Row)=>e.version_id===versionId).at(-1)?.type??c.events.at(-1)?.type??'OPEN';
  const openNotes=notes.filter(c=>statusOf(c)!=='VERIFIED'),resolvedNotes=notes.filter(c=>statusOf(c)==='VERIFIED');
  const versionNotes=useMemo(()=>notes.filter(c=>c.version_id===versionId),[notes,versionId]);
  const goToNote=(c:Row)=>{if(c.version_id!==versionId){setVersionId(c.version_id);}setFocused(c.id);setFocusRequest(n=>n+1);};
- const jump=(blockId:string,side:'act'|'tu')=>{if(side==='act')left.current?.scrollToBlock(blockId);else if(rightTuId===check?.technical_conditions_id)right.current?.scrollToBlock(blockId);};
+ const jump=(blockId:string,side:'act'|'tu')=>{if(side==='act')left.current?.scrollToBlock(blockId);else if(pairedTu)right.current?.scrollToBlock(blockId);};
+ // Клик по отмеченному реквизиту прокручивает второе окно к парному пункту.
+ const pairFromLeft=(blockId:string)=>{const b=pairedTu&&pairedBlock(check,blockId,'act');if(b)right.current?.scrollToBlock(b);};
+ const pairFromRight=(blockId:string)=>{const b=pairedTu&&pairedBlock(check,blockId,'tu');if(b)left.current?.scrollToBlock(b);};
  const runCheck=()=>void action(()=>api(`/api/v1/acts/${detail.id}/check-tu`,{versionId:newest.id,expectedRevision:detail.revision}));
  const confirm=(field:string,comment:string)=>void action(()=>api(`/api/v1/acts/${detail.id}/check-tu/${check!.id}/confirm`,{field,comment,expectedRevision:detail.revision}));
  const event=async(c:Row,type:string)=>{const explanation=explanations.current[c.id]?.trim();if(!explanation){setError('Опишите результат проверки исправления.');return;}setError('');await action(async()=>{await api(`/api/v1/comments/${c.id}/events`,{versionId,type,explanation});explanations.current[c.id]='';});};
@@ -92,6 +102,7 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
    <span className="review-contract">Договор {detail.contract_number}</span>
    <StatusBadge status={detail.presentation.status}/>
    <span className="review-spacer"/>
+   <label className="review-switch"><input type="checkbox" checked={showMarks} onChange={e=>setShowMarks(e.target.checked)}/><span aria-hidden="true"/>Подсветка</label>
    <label className="review-switch"><input type="checkbox" checked={sync} onChange={e=>setSync(e.target.checked)}/><span aria-hidden="true"/>Синхронная прокрутка</label>
    <button type="button" className="review-toggle" aria-pressed={panel} onClick={()=>setPanel(v=>!v)}><Icon name="file"/>Замечания · {notes.length}</button>
    <button type="button" className="review-icon" aria-label="Во весь экран" title="Во весь экран" onClick={fullscreen}>⛶</button>
@@ -104,7 +115,8 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
       {detail.versions.map((v:Row)=><option key={v.id} value={v.id}>{kind} · версия {v.number}{v.id===newest?.id?' · последняя':''}</option>)}
      </select>
     </div>
-    {leftDoc.data?<DocumentViewer key={versionId} ref={left} bytes={leftDoc.data.bytes} model={leftDoc.data.model} comments={versionNotes} onSelection={setSelection} onComment={id=>{setFocused(id);setPanel(true);setTab('remarks');}} focusedId={focused} focusRequest={focusRequest} onScrollRatio={sync?r=>right.current?.scrollToRatio(r):undefined}/>:viewerTitle(leftDoc,kind)}
+    {showMarks&&(leftMarks.length>0)&&<div className="mark-legend review-legend">{rightVersion?<span><i className="changed"/>отличается от версии {rightVersion.number}</span>:<><span><i className="ok"/>совпадает с ТУ</span><span><i className="bad"/>расхождение</span><span><i className="warn"/>проверить вручную</span>{pairedTu&&<span className="legend-hint">клик по пункту — парный пункт в ТУ</span>}</>}</div>}
+    {leftDoc.data?<DocumentViewer key={versionId} ref={left} bytes={leftDoc.data.bytes} model={leftDoc.data.model} comments={versionNotes} onSelection={setSelection} onComment={id=>{setFocused(id);setPanel(true);setTab('remarks');}} focusedId={focused} focusRequest={focusRequest} onScrollRatio={sync?r=>right.current?.scrollToRatio(r):undefined} marks={leftMarks} onMarkClick={pairedTu?pairFromLeft:undefined} onAddRemark={effective?addRemark:undefined}/>:viewerTitle(leftDoc,kind)}
    </section>
    <section className="review-pane" aria-label="Документ для сравнения">
     <div className="review-pane-head"><Icon name="file"/>
@@ -115,8 +127,9 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
      </select>
      <span className="review-readonly">только просмотр</span>
     </div>
-    {!source?<div className="review-empty">Загрузите ТУ в пакет документов, чтобы сверять акт с ними.</div>:rightDoc.data?<DocumentViewer key={source} ref={right} bytes={rightDoc.data.bytes} model={rightDoc.data.model} comments={[]} onSelection={()=>{}} onComment={()=>{}} onScrollRatio={sync?r=>left.current?.scrollToRatio(r):undefined}/>:viewerTitle(rightDoc,'документ')}
+    {!source?<div className="review-empty">Загрузите ТУ в пакет документов, чтобы сверять акт с ними.</div>:rightDoc.data?<DocumentViewer key={source} ref={right} bytes={rightDoc.data.bytes} model={rightDoc.data.model} comments={[]} onSelection={()=>{}} onComment={()=>{}} onScrollRatio={sync?r=>left.current?.scrollToRatio(r):undefined} marks={rightMarks} onMarkClick={pairedTu?pairFromRight:undefined}/>:viewerTitle(rightDoc,'документ')}
    </section>
+   {!panel&&<button type="button" className="review-edge" onClick={()=>setPanel(true)} aria-label={`Показать замечания: ${notes.length}`}><span>Замечания · {notes.length}</span></button>}
    {panel&&<aside className="review-side" aria-label="Замечания и сверка">
     <div className="review-side-head">
      <div className="review-tabs" role="tablist">
@@ -126,7 +139,8 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
      <button type="button" className="review-icon" aria-label="Скрыть панель" onClick={()=>setPanel(false)}>»</button>
     </div>
     {tab==='check'?<div className="review-side-scroll">
-     {flagged.length>0&&<p className="helper-text">Жёлтым подсвечены фрагменты с расхождениями{rightTuId===check?.technical_conditions_id?' в обоих документах':''}. Нажмите на значение, чтобы перейти к нему.</p>}
+     {flagged.length>0&&<div className="review-nav"><button type="button" aria-label="Предыдущее расхождение" onClick={()=>goFlag(-1)}>‹</button><span>{nav>=0?`${nav+1} из ${flagged.length}`:`Требуют внимания: ${flagged.length}`}</span><button type="button" aria-label="Следующее расхождение" onClick={()=>goFlag(1)}>›</button></div>}
+     {check&&<p className="helper-text">Пункты акта{pairedTu?' и ТУ':''} размечены цветом: зелёный — совпадает, красный — расхождение, жёлтый — проверить вручную. Нажмите на значение или на пункт в документе, чтобы перейти к паре.</p>}
      <TuPreflight check={check} required={detail.tu_check_required} busy={busy} editable={preparing} onCheck={preparing?runCheck:undefined} onConfirm={preparing?confirm:undefined} onJump={jump} tuJump/>
     </div>:<div className="review-side-scroll">
      <div className="review-subtabs" role="group" aria-label="Фильтр замечаний">
@@ -155,7 +169,7 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
        <span className="review-chip"><Icon name="file" size={14}/>{kind} · версия {version?.number}: «{form.quote.slice(0,40)}{form.quote.length>40?'…':''}»<button type="button" aria-label="Отменить" onClick={()=>setForm(undefined)}>×</button></span>
        <button className="primary-button" disabled={busy}>Сохранить замечание</button>
       </form>:<button type="button" className="primary-button review-wide" disabled={!selection||busy} title={selection?undefined:'Выделите фрагмент в левом документе'} onClick={()=>{if(selection){setForm(selection);setPanel(true);}}}>+ Добавить замечание</button>}
-      {!selection&&!form&&<p className="helper-text">Выделите фрагмент в документе слева, чтобы добавить замечание.</p>}
+      {!selection&&!form&&<p className="helper-text">Как оставить замечание: выделите мышью текст в документе слева — рядом появится кнопка «＋ Замечание».</p>}
       <p className="task-deadline">Ваша задача: {roleNames[task!.role]} · срок {dateTime(task!.due_at)} МСК</p>
       <div className="review-decide">
        <button className="danger-button" disabled={busy||!!form} onClick={()=>setChoice('return')}><Icon name="return"/>Вернуть</button>

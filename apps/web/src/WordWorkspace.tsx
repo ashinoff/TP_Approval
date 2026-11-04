@@ -6,6 +6,7 @@ import PackagePanel from './ContractDocuments.js';
 import TuPreflight from './TuPreflight.js';
 import DocumentCardPanel from './DocumentCard.js';
 import ReviewMode from './ReviewMode.js';
+import {checkMarks} from './review-marks.js';
 import DecisionDialog from './DecisionDialog.js';
 import {initialVersion,assignedVersion,type Section} from './workplace.js';
 
@@ -110,6 +111,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
  const checkTuId=cycle?.technical_conditions_id??detail.technical_conditions_id;
  const check=checkFor(detail,versionId,checkTuId);
  const showCheck=detail.tu_check_required!==false&&!!current&&(preparing||!!check);
+ const actMarks=useMemo(()=>checkMarks(check,'act'),[check]);
  const runCheck=()=>void action(()=>api(`/api/v1/acts/${detail.id}/check-tu`,{versionId:newest.id,expectedRevision:detail.revision}));
  const confirm=(field:string,comment:string)=>void action(()=>api(`/api/v1/acts/${detail.id}/check-tu/${check!.id}/confirm`,{field,comment,expectedRevision:detail.revision}));
 
@@ -151,9 +153,9 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
     {openTu&&<TuViewer key={openTu} detail={detail} tuId={openTu} api={api} loadFile={loadFile}/>}
     {!current&&!openTu&&<div className="empty-document"><p>Загрузите DOCX в панели «Пакет документов», чтобы начать работу с документом.</p></div>}
     {current&&<div className="word-grid" style={referenceView?{display:'none'}:undefined}>
-     <div className="word-document">{model&&bytes?<DocumentViewer key={versionId} ref={viewerRef} bytes={bytes} model={model} comments={versionNotes} onSelection={setSelection} onComment={focus} focusedId={focused} focusRequest={focusRequest}/>:!error&&<p role="status">Загрузка документа…</p>}</div>
+     <div className="word-document">{model&&bytes?<DocumentViewer key={versionId} ref={viewerRef} bytes={bytes} model={model} comments={versionNotes} onSelection={setSelection} onComment={focus} focusedId={focused} focusRequest={focusRequest} marks={actMarks} onAddRemark={effective&&!form?()=>{if(selection){setForm(selection);dirty('remark',true);}}:undefined}/>:!error&&<p role="status">Загрузка документа…</p>}</div>
      <aside className="word-remarks" aria-label="Замечания к документу">
-      {showCheck&&<details className="side-block check-block" open={preparing||undefined}>
+      {showCheck&&<details className="side-block check-block" open={preparing||!!effective||undefined}>
        <summary>{checkSummary(check)}</summary>
        <TuPreflight check={check} required={detail.tu_check_required} busy={busy} editable={preparing} onCheck={preparing?runCheck:undefined} onConfirm={preparing?confirm:undefined} onJump={id=>viewerRef.current?.scrollToBlock(id)}/>
       </details>}
@@ -163,7 +165,8 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
        <h3>Замечания · {notes.length}{openCount?<span className="remarks-open"> · открытых {openCount}</span>:null}</h3>
        <button className="danger-button" disabled={!effective||!selection||busy} onClick={()=>{if(selection){setForm(selection);dirty('remark',true);}}}>Добавить замечание</button>
       </div>
-      {effective&&!selection&&!form&&<p className="helper-text">Выделите фрагмент в документе внутри одного абзаца, затем нажмите «Добавить замечание».</p>}
+      {effective&&!selection&&!form&&<p className="helper-text">Выделите мышью текст в документе (внутри одного абзаца) — рядом появится кнопка «＋ Замечание».</p>}
+      {actMarks.length>0&&<div className="mark-legend"><span><i className="ok"/>совпадает с ТУ</span><span><i className="bad"/>расхождение</span><span><i className="warn"/>проверить вручную</span></div>}
       {notes.length>1&&<div className="note-filter" role="group" aria-label="Фильтр замечаний">
        {([['all','Все'],['open','Открытые'],['waiting','Ждут проверки'],['mine','Мои']] as const).map(([key,label])=><button key={key} type="button" aria-pressed={noteFilter===key} onClick={()=>setNoteFilter(key)}>{label}</button>)}
       </div>}

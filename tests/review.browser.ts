@@ -58,8 +58,15 @@ try{
  // 2. Режим проверки у инженера: автосверка подсвечивает расхождение в обоих окнах.
  await page.getByRole('button',{name:'Режим проверки'}).click();const review=page.getByRole('dialog',{name:'Режим проверки документов'});
  await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();await review.getByText(/⚠ Расхождение/).first().waitFor({timeout:20000});
- const frames=review.locator('iframe');await frames.nth(0).contentFrame().locator('p.check-hit').first().waitFor({timeout:15000});await frames.nth(1).contentFrame().locator('p.check-hit').first().waitFor({timeout:15000});
- await review.getByLabel('Синхронная прокрутка').check({force:true});await page.waitForTimeout(800);await shot('02-review-engineer');console.log('OK 2: review mode shows act and TU side by side; differences highlighted in both panes');
+ const frames=review.locator('iframe');const actFrame=frames.nth(0).contentFrame(),tuFrame=frames.nth(1).contentFrame();
+ await actFrame.locator('p[data-mark=bad]').filter({hasText:'150 кВт'}).waitFor({timeout:15000});await tuFrame.locator('p[data-mark=bad]').filter({hasText:'15 кВт'}).waitFor({timeout:15000});
+ assert.ok(await actFrame.locator('p[data-mark=ok]').count()>=3,'Matching requisites are marked green');assert.match(await actFrame.locator('p[data-mark=bad]').first().getAttribute('title')??'',/расхождение — в акте 150 кВт, в ТУ 15 кВт/);
+ // Увеличение: при прокрутке до упора влево страница видна целиком (раньше левая часть «съедалась»).
+ for(let i=0;i<8;i++)await review.getByRole('button',{name:'Увеличить'}).first().click();
+ assert.equal(await review.locator('.zoom-control output').first().textContent(),'140%');
+ assert.ok(await actFrame.locator('section.docx').first().evaluate((el:Element)=>{el.ownerDocument.defaultView!.scrollTo({left:0});return el.getBoundingClientRect().left>=0;}),'Zoomed page is not clipped on the left');
+ await review.getByRole('button',{name:'По ширине'}).first().click();
+ await review.getByLabel('Синхронная прокрутка').check({force:true});await page.waitForTimeout(800);await shot('02-review-engineer');console.log('OK 2: act and TU side by side; requisites marked green/red in both panes with tooltips; zoom +/− without left clipping');
  assert.equal(await review.getByRole('button',{name:'+ Добавить замечание'}).count(),0);
  await review.getByRole('button',{name:'Завершить проверку'}).click();await review.waitFor({state:'detached'});
  // 3. Исправленная версия, сверка, отправка из режима проверки.
@@ -74,9 +81,15 @@ try{
  await page.locator('[data-testid^="registry-row-"]').first().click();await page.getByRole('button',{name:'Режим проверки'}).click();
  const left=review.locator('iframe').nth(0).contentFrame();await left.locator('p[data-block-id]').filter({hasText:'15 кВт'}).first().waitFor({timeout:20000});
  await left.locator('p[data-block-id]').filter({hasText:'15 кВт'}).first().evaluate((el:Element)=>{const doc=el.ownerDocument,w=doc.createTreeWalker(el,4);let n;while(n=w.nextNode()){const i=n.textContent!.indexOf('15 кВт');if(i>=0){const r=doc.createRange();r.setStart(n,i);r.setEnd(n,i+6);doc.getSelection()!.removeAllRanges();doc.getSelection()!.addRange(r);el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));return;}}});
- await review.getByRole('button',{name:'+ Добавить замечание'}).click();await review.getByLabel('Текст замечания').fill('Сверить мощность с расчётом нагрузки (синтетическое замечание).');
+ await review.getByRole('button',{name:'＋ Замечание'}).click();await review.getByLabel('Текст замечания').fill('Сверить мощность с расчётом нагрузки (синтетическое замечание).');
  await review.getByRole('button',{name:'Сохранить замечание',exact:true}).click();await review.locator('.review-note').first().waitFor({timeout:15000});await left.locator('mark[data-remark-ids]').first().waitFor({timeout:15000});
- await page.waitForTimeout(500);await shot('04-review-head');console.log('OK 4: reviewer adds a remark to a selected fragment of the act in review mode');
+ await page.waitForTimeout(500);await shot('04-review-head');
+ await review.getByRole('combobox',{name:'Документ для сравнения'}).selectOption({label:'Акт ТП · версия 1'});
+ const changed=review.locator('iframe').nth(0).contentFrame().locator('p[data-mark=changed]');await changed.filter({hasText:'15 кВт'}).waitFor({timeout:15000});
+ assert.equal(await review.locator('iframe').nth(1).contentFrame().locator('p[data-mark=changed]').filter({hasText:'150 кВт'}).count(),1);await shot('04b-versions');
+ console.log('OK 4a: comparing with the previous version marks changed paragraphs blue in both panes');
+ await review.getByRole('button',{name:'Скрыть панель'}).click();await review.getByRole('button',{name:'Показать замечания: 1'}).click();await review.locator('.review-note').filter({hasText:'Начальник РИРУ · синтетический'}).filter({hasText:'Сверить мощность'}).waitFor();
+ console.log('OK 4: reviewer adds a remark from the floating button at the selection; edge tab reopens remarks with author and text');
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);
  assert.ok(await page.evaluate(()=>{const m=document.querySelector('.review-mode')!;return m.scrollWidth<=innerWidth&&m.scrollHeight>innerHeight;}),'Review mode on a phone scrolls vertically without horizontal overflow');
  await review.locator('.review-pane').nth(1).scrollIntoViewIfNeeded();await page.screenshot({path:`${out}/05-mobile.png`});console.log('OK 5: phone layout stacks panes and scrolls without horizontal overflow');
