@@ -15,9 +15,9 @@ export function PasswordForm({session,onSession,onCancel}:{session:LocalSession;
     {error&&<p role="alert" className="error">{error}</p>}
     <form onSubmit={async e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);if(data.get('newPassword')!==data.get('repeatPassword')){setError('Новые пароли не совпадают.');return;}setBusy(true);setError('');try{onSession(await authRequest('/auth/password',{currentPassword:data.get('currentPassword'),newPassword:data.get('newPassword')},session.csrfToken));form.reset();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>
       <label>{session.mustChangePassword?'Временный пароль':'Текущий пароль'}<input name="currentPassword" type="password" autoComplete="current-password" required maxLength={128}/></label>
-      <label>Новый пароль<input name="newPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128}/></label>
-      <label>Повторите новый пароль<input name="repeatPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128}/></label>
-      <small>Не менее 12 символов.</small><button disabled={busy}>{busy?'Сохранение…':'Сохранить пароль'}</button>
+      <label>Новый пароль<input name="newPassword" type="password" autoComplete="new-password" required minLength={4} maxLength={128}/></label>
+      <label>Повторите новый пароль<input name="repeatPassword" type="password" autoComplete="new-password" required minLength={4} maxLength={128}/></label>
+      <small>Не менее 4 символов.</small><button disabled={busy}>{busy?'Сохранение…':'Сохранить пароль'}</button>
       {onCancel&&<button type="button" className="text-button" onClick={onCancel}>Отмена</button>}
     </form></section>;
 }

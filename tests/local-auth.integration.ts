@@ -4,7 +4,7 @@ import request from 'supertest';
 import {randomUUID} from 'node:crypto';
 import {resolve} from 'node:path';
 import {createApp,type AppConfig} from '../apps/api/src/app.js';
-import {bootstrapLocalAdmin} from '../scripts/setup-standalone.js';
+import {bootstrapLocalAdmin,resetLocalAdmin} from '../scripts/setup-standalone.js';
 import {zip,docxParts} from './zip.js';
 
 export async function runLocalAuthIntegration(ownerUrl:string,runtimeUrl:string,root:string){
@@ -197,5 +197,11 @@ export async function runLocalAuthIntegration(ownerUrl:string,runtimeUrl:string,
     assert.equal(crossed.filter(r=>r.status===200).length,1);assert.ok(crossed.some(r=>r.status===403||r.status===401));
     assert.equal(Number((await owner.query("SELECT count(*) FROM app.users u JOIN app.roles r ON r.user_id=u.id WHERE u.active AND r.role='TECH_ADMIN' AND r.revoked_at IS NULL")).rows[0].count),1);
     pass('Concurrent administrators cannot delete each other and leave the system without an administrator');
+    await owner.query("UPDATE app.local_credentials SET failed_attempts=5,locked_until=now()+interval '15 minutes' WHERE login='admin'");
+    await resetLocalAdmin(ownerUrl,'1191');
+    const resetLogin=await request(app).post('/auth/login').set('Host','app.test').set('Origin','https://app.test').send({login:'admin',password:'1191'});
+    assert.equal(resetLogin.status,200,JSON.stringify(resetLogin.body));assert.equal(resetLogin.body.mustChangePassword,false);
+    assert.equal((await owner.query("SELECT count(*) FROM app.audit_events WHERE action='LOCAL_ADMIN_PASSWORD_RESET'")).rows[0].count,'1');
+    pass('ADMIN_RESET_PASSWORD restores admin login with a 4-digit password, unlocks the account and is audited');
   }finally{await runtime.end();await owner.end();}
 }

@@ -4,11 +4,11 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { HttpError, transaction, requireValue, type DB } from './db.js';
-import { hashPassword, checkPassword } from './passwords.js';
+import { hashPassword, checkPassword, PASSWORD_MIN } from './passwords.js';
 import { role } from './workflow.js';
 
 export const loginSchema=z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9._-]{2,63}$/);
-export const passwordSchema=z.string().min(12).max(128);
+export const passwordSchema=z.string().min(PASSWORD_MIN).max(128);
 export const emailSchema=z.string().trim().toLowerCase().max(254).email();
 const credentialSchema=z.object({login:loginSchema,password:z.string().min(1).max(128)}).strict();
 const hash=(value:string)=>createHash('sha256').update(value).digest('hex');

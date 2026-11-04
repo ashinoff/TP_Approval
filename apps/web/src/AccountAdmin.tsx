@@ -63,7 +63,7 @@ export default function AccountAdmin({api,resUnits,currentUserId,onUpdated}:{api
       <label>ФИО<input name="name" required maxLength={200} autoComplete="off"/></label>
       <label>Логин<input name="login" aria-label="Логин" required pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{2,63}" minLength={3} maxLength={64} autoCapitalize="none" autoComplete="off"/><small>Латиница, цифры, точка, дефис или подчёркивание.</small></label>
       <label>Email<input name="email" aria-label="Email" type="email" required maxLength={254} autoCapitalize="none" autoComplete="off"/><small>Адрес почты сотрудника в Keycloak.</small></label>
-      <label>Временный пароль<input name="password" aria-label="Временный пароль" type="password" required minLength={12} maxLength={128} autoComplete="new-password"/><small>Не менее 12 символов.</small></label>
+      <label>Временный пароль<input name="password" aria-label="Временный пароль" type="password" required minLength={4} maxLength={128} autoComplete="new-password"/><small>Не менее 12 символов.</small></label>
       <Assignment resUnits={resUnits}/><button>Создать пользователя</button>
     </fieldset></form></section>
     <section className="card"><div className="account-list-heading"><h2>Пользователи ({users.length})</h2><button disabled={busy} onClick={()=>{setError('');setEditing(undefined);void load().catch(e=>setError(e.message));}}>Обновить список</button></div>
@@ -79,7 +79,7 @@ export default function AccountAdmin({api,resUnits,currentUserId,onUpdated}:{api
         </div>
         {editing&&editing.user.id===user.id&&(editing.kind==='profile'?<ProfileForm key={user.id+':'+editing.user.revision} user={editing.user} resUnits={resUnits} busy={busy} onCancel={()=>setEditing(undefined)} onSave={body=>void run(()=>api('/api/v1/admin/local-users/'+user.id+'/profile',body),'Учётная запись обновлена.')}/>
           :<form className="account-form account-edit" onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);void run(()=>api('/api/v1/admin/local-users/'+user.id+'/access',{password:data.get('password')}),'Временный пароль установлен. Старые сеансы завершены.');}}>
-            <label>Новый временный пароль<input name="password" aria-label="Временный пароль" type="password" required minLength={12} maxLength={128} autoComplete="new-password"/></label>
+            <label>Новый временный пароль<input name="password" aria-label="Временный пароль" type="password" required minLength={4} maxLength={128} autoComplete="new-password"/></label>
             <button disabled={busy}>Сохранить</button><button disabled={busy} type="button" className="text-button" onClick={()=>setEditing(undefined)}>Отмена</button>
           </form>)}
       </article>)}</div>

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { migrate } from './migrate.js';
-import { hashPassword } from '../apps/api/src/passwords.js';
+import { hashPassword,PASSWORD_MIN } from '../apps/api/src/passwords.js';
 
 export async function bootstrapLocalAdmin(url:string,password?:string,login='admin',name='Администратор') {
   const db=new pg.Client({connectionString:url});await db.connect();
@@ -11,12 +11,37 @@ export async function bootstrapLocalAdmin(url:string,password?:string,login='adm
     await db.query('BEGIN');await db.query('SELECT pg_advisory_xact_lock(817625)');
     // Repeated container starts must never reset an existing password.
     if((await db.query('SELECT 1 FROM app.local_credentials LIMIT 1')).rowCount){await db.query('COMMIT');return false;}
-    const valid=z.object({password:z.string().min(12).max(128),login:z.string().regex(/^[a-z0-9][a-z0-9._-]{2,63}$/),name:z.string().trim().min(1).max(200)}).parse({password,login,name});
+    const valid=z.object({password:z.string().min(PASSWORD_MIN).max(128),login:z.string().regex(/^[a-z0-9][a-z0-9._-]{2,63}$/),name:z.string().trim().min(1).max(200)}).parse({password,login,name});
     const user=(await db.query("INSERT INTO app.users(issuer,subject,name) VALUES('urn:tp-approval:local',$1,$2) RETURNING id",[randomUUID(),valid.name])).rows[0].id;
     await db.query("INSERT INTO app.roles(user_id,role) VALUES($1,'TECH_ADMIN')",[user]);
     await db.query('INSERT INTO app.local_credentials(user_id,login,password_hash) VALUES($1,$2,$3)',[user,valid.login,await hashPassword(valid.password)]);
     await db.query("INSERT INTO app.audit_events(actor_id,action) VALUES($1,'LOCAL_ADMIN_BOOTSTRAPPED')",[user]);
     await db.query('COMMIT');return true;
+  }catch(error){await db.query('ROLLBACK');throw error;}finally{await db.end();}
+}
+
+/** Аварийный сброс: задаёт пароль учётке администратора из переменной ADMIN_RESET_PASSWORD (пароль не хранится в коде).
+ * Снимает блокировку и требование смены пароля, завершает сеансы. Учётки нет — создаёт TECH_ADMIN. Переменную удалить после входа. */
+export async function resetLocalAdmin(url:string,password:string,login='admin',name='Администратор') {
+  const valid=z.object({password:z.string().min(PASSWORD_MIN).max(128),login:z.string().regex(/^[a-z0-9][a-z0-9._-]{2,63}$/)}).parse({password,login});
+  const db=new pg.Client({connectionString:url});await db.connect();
+  try{
+    await db.query('BEGIN');await db.query('SELECT pg_advisory_xact_lock(817625)');
+    const hash=await hashPassword(valid.password);
+    const found=(await db.query('SELECT c.user_id FROM app.local_credentials c JOIN app.users u ON u.id=c.user_id WHERE c.login=$1 AND u.deleted_at IS NULL',[valid.login])).rows[0];
+    let user=found?.user_id as string|undefined;
+    if(user){
+      await db.query('UPDATE app.local_credentials SET password_hash=$2,must_change=false,password_version=password_version+1,failed_attempts=0,locked_until=NULL WHERE user_id=$1',[user,hash]);
+      await db.query('UPDATE app.users SET active=true WHERE id=$1',[user]);
+      await db.query('DELETE FROM app.local_sessions WHERE user_id=$1',[user]);
+      if(!(await db.query("SELECT 1 FROM app.roles WHERE user_id=$1 AND role='TECH_ADMIN' AND revoked_at IS NULL",[user])).rowCount)await db.query("INSERT INTO app.roles(user_id,role) VALUES($1,'TECH_ADMIN')",[user]);
+    }else{
+      user=(await db.query("INSERT INTO app.users(issuer,subject,name) VALUES('urn:tp-approval:local',$1,$2) RETURNING id",[randomUUID(),name])).rows[0].id;
+      await db.query("INSERT INTO app.roles(user_id,role) VALUES($1,'TECH_ADMIN')",[user]);
+      await db.query('INSERT INTO app.local_credentials(user_id,login,password_hash,must_change) VALUES($1,$2,$3,false)',[user,valid.login,hash]);
+    }
+    await db.query("INSERT INTO app.audit_events(actor_id,action) VALUES($1,'LOCAL_ADMIN_PASSWORD_RESET')",[user]);
+    await db.query('COMMIT');
   }catch(error){await db.query('ROLLBACK');throw error;}finally{await db.end();}
 }
 
@@ -33,5 +58,6 @@ export async function setupStandalone(env:NodeJS.ProcessEnv) {
   await migrate(env.MIGRATION_DATABASE_URL,runtimePassword);
   const created=await bootstrapLocalAdmin(env.MIGRATION_DATABASE_URL,env.INITIAL_ADMIN_PASSWORD,env.INITIAL_ADMIN_LOGIN??'admin',env.INITIAL_ADMIN_NAME??'Администратор');
   console.log(created?'Миграции применены, создан первый администратор.':'Миграции применены, существующие учётные записи сохранены.');
+  if(env.ADMIN_RESET_PASSWORD){await resetLocalAdmin(env.MIGRATION_DATABASE_URL,env.ADMIN_RESET_PASSWORD,env.INITIAL_ADMIN_LOGIN??'admin',env.INITIAL_ADMIN_NAME??'Администратор');console.log('Пароль администратора сброшен из ADMIN_RESET_PASSWORD. Удалите эту переменную и MIGRATION_DATABASE_URL после входа.');}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)await setupStandalone(process.env);
