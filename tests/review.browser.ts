@@ -56,6 +56,7 @@ try{
  await form.getByLabel('Планируемая дата исполнения').fill('2026-12-15');await form.getByLabel('Файл загружаемого документа').setInputFiles(docs+'engineer-act-bad.docx');
  await shot('01-upload');console.log('OK 1: TU fills contract number and card (15 кВт, 0,4 кВ, 3ф)');
  await form.getByRole('button',{name:'Сохранить документ',exact:true}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor({timeout:20000});
+ await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Матрица'}).click();await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Документ'}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor();await page.waitForTimeout(800);await shot('01b-act');
  // 2. Режим проверки у инженера: автосверка подсвечивает расхождение в обоих окнах.
  await page.getByRole('button',{name:'Режим проверки'}).click();const review=page.getByRole('dialog',{name:'Режим проверки документов'});
  await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();await review.getByText(/⚠ Расхождение/).first().waitFor({timeout:20000});

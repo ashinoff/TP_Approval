@@ -132,7 +132,6 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
    {current&&<button className="primary-button review-launch" onClick={()=>{if(canLeave())setReviewOpen(true);}} title="Акт и ТУ рядом, замечания и автосверка"><Icon name="file"/>Режим проверки</button>}
    {detail.cycles.length>0&&<button className="secondary-button sheet-launch" onClick={()=>setSheetOpen(true)} title="ФИО согласовавших, решения, замечания — для печати"><Icon name="check"/>Лист согласования</button>}
    {current&&<button className="text-button" disabled={busy} onClick={()=>void action(()=>onDownload(current.file_id,current.number))}><Icon name="download"/>Скачать оригинал</button>}
-   <span className="word-limit" title="Просмотр приблизительный: переносы строк, поля и разрывы страниц могут отличаться от Word. Для печати и работы используйте исходный DOCX.">Просмотр приблизительный</span>
    <span className="word-heading-spacer"/>
    {effective&&<p className={`task-deadline ${task.overdue?'overdue':''}`}>Ваша задача: {roleNames[task.role]} · срок {dateTime(task.due_at)} МСК{task.overdue?' · Просрочено':''}</p>}
    {effective&&<div className="word-review-actions">

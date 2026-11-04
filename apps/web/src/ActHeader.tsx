@@ -15,7 +15,9 @@ function stageCaption(detail:Row,presentation:Row){
  * Top of the document workplace: what the document is, for whom and where, its status and the route.
  * Everything a reviewer needs to recognise the package without scrolling.
  */
-export default function ActHeader({detail,profile,onPanel}:{detail:Row;profile?:Row;onPanel:(panel:'details'|'matrix'|'history')=>void}){
+type Panel='document'|'details'|'matrix'|'history';
+const panels:[Panel,string][]=[['document','Документ'],['details','Реквизиты'],['matrix','Матрица'],['history','История']];
+export default function ActHeader({detail,profile,panel='document',onPanel}:{detail:Row;profile?:Row;panel?:string;onPanel:(panel:Panel)=>void}){
  const presentation=detail.presentation;
  const kind=detail.act_type==='AVTU'?'АВТУ':'Акт';
  const showContractNumber=detail.contract_number&&detail.contract_number!==detail.act_number;
@@ -24,10 +26,8 @@ export default function ActHeader({detail,profile,onPanel}:{detail:Row;profile?:
    <h2 className="act-title"><span className="act-kind">{kind}</span>{' '}<span className="act-number">{detail.act_number}</span></h2>
    <StatusBadge status={presentation.status}/>
    {presentation.overdue&&<span className="deadline-danger">⚠ Просрочено</span>}
-   <div className="card-tools">
-    <button className="text-button" onClick={()=>onPanel('details')}>Реквизиты</button>
-    <button className="text-button" onClick={()=>onPanel('matrix')}>Матрица</button>
-    <button className="text-button" onClick={()=>onPanel('history')}>История</button>
+   <div className="card-tools act-panels" role="group" aria-label="Разделы документа">
+    {panels.map(([key,label])=><button key={key} type="button" aria-pressed={panel===key} onClick={()=>onPanel(key)}>{label}</button>)}
    </div>
   </div>
   <dl className="act-facts">

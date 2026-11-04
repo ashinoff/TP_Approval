@@ -1,6 +1,6 @@
 body.sheet-open{overflow:hidden}
 .sheet-root{position:fixed;inset:0;z-index:95;display:flex;flex-direction:column;background:#e9edf5}
-.sheet-toolbar{display:flex;align-items:center;gap:10px;padding:10px 18px;background:linear-gradient(90deg,var(--brand-dark,#072672),var(--brand,#09318D));color:#fff}
+.sheet-toolbar{display:flex;align-items:center;gap:10px;padding:10px 18px;background:var(--menu,#142238);color:#fff}
 .sheet-toolbar .secondary-button{background:#fff}
 .sheet-spacer{flex:1}
 .sheet-scroll{flex:1;overflow:auto;padding:24px 12px}
@@ -23,7 +23,7 @@ body.sheet-open{overflow:hidden}
 .decision-APPROVED{font-weight:bold}.decision-RETURNED{font-weight:bold;color:#a11}
 .remark-VERIFIED{font-weight:bold}
 .sheet-line{margin:4px 0}
-.sheet-draft{position:absolute;top:8mm;right:16mm;border:2px solid #c2367f;color:#c2367f;padding:2px 8px;font:bold 11px sans-serif;transform:rotate(2deg)}
+.sheet-draft{position:absolute;top:8mm;right:16mm;border:2px solid #c62828;color:#c62828;padding:2px 8px;font:bold 11px sans-serif;transform:rotate(2deg)}
 .sheet-footer{margin-top:18px;padding-top:6px;border-top:1px solid #bbb;font-size:11px;color:#555}
 @media print{
  @page{size:A4;margin:12mm}

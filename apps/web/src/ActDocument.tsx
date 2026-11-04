@@ -71,9 +71,12 @@ export default function PreparationControls({detail,api,action,busy,onVersion}:{
    <label>Собственный номер ТУ<input aria-label="Собственный номер ТУ" value={number} maxLength={200} onChange={e=>setNumber(e.target.value)}/></label>
    <label>Дата ТУ<input aria-label="Дата ТУ" type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
   </>}
-  <label className="upload-field">{uploadLabel}
-   <input aria-label="Новая версия DOCX" type="file" accept=".docx" disabled={busy} onChange={e=>{const f=e.target.files?.[0];if(f)void action(()=>upload(f));e.target.value='';}}/>
-  </label>
+  <div className="upload-field upload-pill">
+   <span className="upload-pill-title">{uploadLabel}</span>
+   <label className={`primary-button file-button${busy?' is-disabled':''}`}>Выбрать файл DOCX
+    <input className="sr-only" aria-label="Новая версия DOCX" type="file" accept=".docx" disabled={busy} onChange={e=>{const f=e.target.files?.[0];if(f)void action(()=>upload(f));e.target.value='';}}/>
+   </label>
+  </div>
   {type==='TU'&&<small>ТУ прикрепляются к договору; номер договора не меняется. Формат — DOCX.</small>}
   {detail.state==='RETURNED'&&<small>Перед повторной отправкой укажите исправления в замечаниях.</small>}
  </section>;

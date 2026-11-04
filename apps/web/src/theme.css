@@ -1,147 +1,121 @@
 /*
- * Цветовая тема (выбор владельца 05.11.2026): глубокий синий #09318D, белый, нежно-розовый #F59ACC.
- * Синий — основной цвет (меню, кнопки, ссылки), розовый — акцент (счётчики, активный пункт).
- * Красный/зелёный/жёлтый сохраняют смысл статусов (ошибка/согласовано/внимание). Подключается последним.
+ * Цветовая тема (палитра владельца, 05.11.2026): спокойная деловая.
+ * Меню #142238 · активный пункт #253B59 · фон #F3F5F9 · карточки #FFFFFF · главная кнопка #3156A3 (наведение #274684)
+ * · основной текст #202C3D · границы #DFE5ED. Красный и зелёный сохраняют смысл: ошибка/расхождение и согласовано/совпадает.
+ * Подключается последним и перекрывает прежние цвета.
  */
 :root{
-  --brand:#09318D;--brand-2:#0b3db0;--brand-dark:#072672;--brand-soft:#e8edf9;
-  --pink:#F59ACC;--pink-strong:#c2367f;--pink-soft:#fdeef6;
-  --teal:var(--brand);--teal-soft:var(--brand-soft);--blue:var(--brand);--petrol:var(--brand-dark);--petrol-2:var(--brand);
-  --paper:#f3f5fb;--bg:var(--paper);--line:#dbe1ef;--line-2:#eaeef7;
-  --current:#2457c5;--current-soft:#e8eefb;
+  --menu:#142238;--menu-active:#253B59;--brand:#3156A3;--brand-hover:#274684;--brand-soft:#eaf0fa;
+  --ink:#202C3D;--ink-2:#4a5870;--muted:#6b778a;--paper:#F3F5F9;--bg:var(--paper);--surface:#FFFFFF;--line:#DFE5ED;--line-2:#ebeff5;
+  --teal:var(--brand);--teal-soft:var(--brand-soft);--blue:var(--brand);--petrol:var(--menu);--petrol-2:var(--menu-active);
+  --current:var(--brand);--current-soft:var(--brand-soft);
+  --red:#c62828;--red-soft:#fdecea;--green:#2e7d32;--green-soft:#e7f4e8;
 }
-body{background:var(--paper)}
+body{background:var(--paper);color:var(--ink)}
 :focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline-color:var(--brand)!important}
+.card{border-color:var(--line)}
 
-/* Боковое меню: глубокий синий с мягким переходом, активный пункт — розовая полоса. */
-aside.main-sidebar,.practical-layout .main-sidebar{background:linear-gradient(180deg,#0c3db3 0%,var(--brand) 45%,var(--brand-dark) 100%)!important;color:#fff}
-.main-sidebar nav button{color:#dfe6fb;background:transparent;position:relative}
-.main-sidebar nav button:hover{background:#ffffff14;color:#fff}
-.main-sidebar nav button{border-radius:12px!important}
-.main-sidebar nav button.selected{background:#fff!important;color:var(--brand)!important;box-shadow:0 6px 16px #0006}
-.main-sidebar nav button.selected svg{color:var(--brand)}
-.main-sidebar nav button b{background:#ffffff26;color:#fff;font-weight:700}
-.main-sidebar nav button.selected b{background:var(--pink);color:#fff}
-.platform-badge{color:#c9d4f5!important}
+/* Левое меню. */
+aside.main-sidebar,.practical-layout .main-sidebar{background:var(--menu)!important;color:#fff}
+.main-sidebar nav button{border-radius:10px!important;border:0!important;color:#c9d2e0!important;background:transparent!important;box-shadow:none!important}
+.main-sidebar nav button:hover{background:#ffffff0f!important;color:#fff!important}
+.main-sidebar nav button.selected{background:var(--menu-active)!important;color:#fff!important}
+.main-sidebar nav button b{background:#ffffff1a!important;color:#fff!important;border-radius:999px!important;font-weight:700}
+.main-sidebar nav button.selected b{background:#ffffff2e!important}
+.platform-badge{color:#8e9bb1!important}
 
-/* Кнопки и ссылки. */
-.primary-button{background:var(--brand)!important;color:#fff!important;box-shadow:0 2px 6px #09318d33}
-.primary-button:hover:not(:disabled){background:var(--brand-2)!important}
-.primary-button:disabled{background:#9aa9cf!important;box-shadow:none}
-.secondary-button{border-color:#c5d0ec;color:var(--brand)}
+/* Кнопки: главная — синяя, второстепенная — контурная, опасное действие — красное. Все со скруглением-таблеткой. */
+.primary-button{background:var(--brand)!important;color:#fff!important;border:0!important;border-radius:999px!important;box-shadow:0 2px 6px #3156a333!important;font-weight:600}
+.primary-button:hover:not(:disabled){background:var(--brand-hover)!important}
+.primary-button:disabled{background:#a9b6cf!important;box-shadow:none!important}
+.secondary-button{background:#fff!important;color:var(--brand)!important;border:1px solid var(--line)!important;border-radius:999px!important}
+.secondary-button:hover:not(:disabled){background:var(--brand-soft)!important;border-color:#c3d0ea!important}
+.danger-button{background:#fff!important;color:var(--red)!important;border:1px solid #f0bcbc!important;border-radius:999px!important}
+.danger-button:hover:not(:disabled){background:var(--red-soft)!important}
 .text-button,.extra-filters summary,.compare-extra summary{color:var(--brand)}
+button:not([class]),.review-verify button,.note-actions button,.card-actions button,.card-row-actions button,.package-use{border-radius:999px!important}
 .icon-button:hover{background:var(--brand-soft);color:var(--brand)}
+
+/* Сегментированные переключатели: одна рамка-таблетка, активный пункт — заливка цветом активного пункта меню. */
+.queue-switch,.doc-type-switch,.review-subtabs,.note-filter,.review-tabs,.act-panels{display:inline-flex!important;flex-wrap:wrap;gap:2px!important;padding:3px;border:1px solid var(--line);border-radius:999px;background:#fff;width:auto;max-width:100%}
+.queue-switch button,.doc-type-switch button,.review-subtabs button,.note-filter button,.review-tabs button,.act-panels button{border:0!important;border-radius:999px!important;background:transparent!important;color:var(--ink-2)!important;box-shadow:none!important;padding:7px 14px!important;font-weight:600;font-size:13px;cursor:pointer}
+.queue-switch button:hover,.doc-type-switch button:hover,.review-subtabs button:hover,.note-filter button:hover,.review-tabs button:hover,.act-panels button:hover{background:var(--paper)!important;color:var(--ink)!important}
+.queue-switch button[aria-pressed=true],.doc-type-switch button[aria-pressed=true],.review-subtabs button[aria-pressed=true],.note-filter button[aria-pressed=true],.review-tabs button[aria-selected=true],.act-panels button[aria-pressed=true]{background:var(--menu-active)!important;color:#fff!important}
+.card-tools.act-panels{margin-left:auto}
+
+/* Вкладки «Все документы»: число — бейдж; у «Не согласованных» и «Согласованных» — красный и зелёный. */
+.document-tabs button{display:inline-flex;align-items:center;gap:8px}
+.document-tabs .tab-count{min-width:22px;height:22px;padding:0 7px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--paper);color:var(--ink-2)}
+.document-tabs .tab-count.is-zero{color:#a3adbd}
+.document-tabs [data-tab=corrections] .tab-count:not(.is-zero){background:var(--red-soft);color:var(--red)}
+.document-tabs [data-tab=approved] .tab-count:not(.is-zero){background:var(--green-soft);color:var(--green)}
+.queue-switch.document-tabs button[aria-pressed=true] .tab-count{background:#ffffff26;color:#fff}
+.review-tabs b,.review-subtabs b{background:var(--paper)!important;color:inherit;border-radius:999px}
+.review-tabs button[aria-selected=true] b,.review-subtabs button[aria-pressed=true] b{background:#ffffff26!important;color:#fff!important}
 
 /* Уведомления: колокольчик и число красные, когда есть непрочитанные. */
 .bell-button{position:relative}
-.bell-button.has-unread{color:#d32f2f!important}
+.bell-button.has-unread{color:var(--red)!important}
 .bell-button.has-unread svg{animation:bell-ring 2.4s ease-in-out 1}
 .bell-button b{color:inherit}
-.bell-button.has-unread b{position:absolute;top:-6px;right:-8px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#d32f2f;color:#fff;font-size:11px;line-height:18px;text-align:center;box-shadow:0 0 0 2px #fff}
+.bell-button.has-unread b{position:absolute;top:-6px;right:-8px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;line-height:18px;text-align:center;box-shadow:0 0 0 2px #fff}
 @keyframes bell-ring{0%,100%{transform:rotate(0)}10%,30%{transform:rotate(14deg)}20%,40%{transform:rotate(-12deg)}50%{transform:rotate(0)}}
 
-/* Вкладки «Все документы»: у каждой свой цвет, число — отдельный бейдж. */
-.document-tabs{flex-wrap:wrap;gap:8px}
-.document-tabs button{display:inline-flex;align-items:center;gap:8px;padding:8px 10px 8px 16px;border:0;border-radius:999px;background:color-mix(in srgb,var(--tab) 10%,#fff);color:var(--tab);font-weight:650;cursor:pointer;transition:background .15s,box-shadow .15s,transform .15s}
-.document-tabs button:hover{background:color-mix(in srgb,var(--tab) 18%,#fff);transform:translateY(-1px)}
-.queue-switch.document-tabs button[aria-pressed=true]{background:linear-gradient(135deg,color-mix(in srgb,var(--tab) 80%,#fff),var(--tab));color:#fff;box-shadow:0 6px 16px color-mix(in srgb,var(--tab) 35%,transparent)}
-.document-tabs .tab-count{min-width:24px;height:24px;padding:0 7px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:#fff;color:var(--tab);box-shadow:0 1px 3px color-mix(in srgb,var(--tab) 25%,transparent)}
-.document-tabs .tab-count.is-zero{color:#9aa5b8;box-shadow:none;background:#ffffffb3}
-.queue-switch.document-tabs button[aria-pressed=true] .tab-count{background:#fff;color:var(--tab)}
-.document-tabs [data-tab=drafts]{--tab:#5b6b8c}.document-tabs [data-tab=progress]{--tab:#2457c5}.document-tabs [data-tab=corrections]{--tab:#d14b8f}
-.document-tabs [data-tab=approved]{--tab:#2e8b57}.document-tabs [data-tab=documents]{--tab:var(--brand)}
-
-/* Режим проверки и прочие тёмные шапки. */
-.review-top{background:linear-gradient(90deg,var(--brand-dark),var(--brand))!important}
-.review-pane-main{border-color:var(--brand)!important}
-.review-num,.review-edge{background:var(--brand)!important}
-.review-tabs button[aria-selected=true]{border-bottom-color:var(--pink)!important}
-.review-subtabs button[aria-pressed=true]{background:var(--brand-soft);border-color:var(--brand);color:var(--brand)}
-.doc-type-switch button[aria-pressed=true]{background:var(--brand)!important;border-color:var(--brand)!important}
-.queue-switch button[aria-pressed=true]{background:var(--brand-soft);border-color:var(--brand);color:var(--brand)}
-.file-tile-ready{border-color:var(--brand)!important;background:var(--brand-soft)!important}
-
 /* Шапка: ФИО с должностью и РЭС — вход в профиль. */
-.profile-chip{display:flex;flex-direction:column;align-items:flex-end;gap:1px;border:1px solid transparent;background:transparent;border-radius:8px;padding:4px 10px;cursor:pointer;text-align:right;max-width:340px}
-.profile-chip:hover,.profile-chip.selected{background:var(--brand-soft);border-color:#cdd7f1}
-.profile-chip b{font-size:13px;color:#16244a}.profile-chip small{font-size:12px;color:#5b6b8c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
+.profile-chip{display:flex;flex-direction:column;align-items:flex-end;gap:1px;border:1px solid transparent;background:transparent;border-radius:12px;padding:4px 10px;cursor:pointer;text-align:right;max-width:340px}
+.profile-chip:hover,.profile-chip.selected{background:#fff;border-color:var(--line)}
+.profile-chip b{font-size:13px;color:var(--ink)}.profile-chip small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
 .profile-page{display:grid;gap:14px;max-width:900px}
 .profile-card{display:flex;gap:18px;align-items:flex-start;padding:20px}
-.profile-avatar{flex:none;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--pink));color:#fff;font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center}
-.profile-main{flex:1;min-width:0}.profile-main h2{margin:0 0 4px}.profile-sub{margin:0 0 10px;color:#3d4c6e}.profile-sub .muted{color:#8a96ad;font-size:13px}
-.profile-facts{display:grid;gap:8px;margin:0}.profile-facts div{display:grid;grid-template-columns:80px 1fr;gap:10px}.profile-facts dt{color:#6b7896;font-size:13px}.profile-facts dd{margin:0;display:flex;flex-wrap:wrap;gap:6px}
-.profile-role{background:var(--brand-soft);color:var(--brand);border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600}
+.profile-avatar{flex:none;width:64px;height:64px;border-radius:50%;background:var(--menu-active);color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.profile-main{flex:1;min-width:0}.profile-main h2{margin:0 0 4px}.profile-sub{margin:0 0 10px;color:var(--ink-2)}.profile-sub .muted{color:var(--muted);font-size:13px}
+.profile-facts{display:grid;gap:8px;margin:0}.profile-facts div{display:grid;grid-template-columns:80px 1fr;gap:10px}.profile-facts dt{color:var(--muted);font-size:13px}.profile-facts dd{margin:0;display:flex;flex-wrap:wrap;gap:6px}
+.profile-role{background:var(--brand-soft);color:var(--brand);border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600}
 .profile-section{padding:18px}.profile-section h3{margin-top:0}
-.account-position{display:block;color:#5b6b8c;font-size:13px;margin-top:2px}
+.account-position{display:block;color:var(--muted);font-size:13px;margin-top:2px}
 @media(max-width:600px){.profile-card{flex-direction:column}.profile-chip{align-items:flex-start;text-align:left}}
 
-/* Пакет документов: одна строка — один документ, клик открывает его в окне просмотра. */
-.package-list .package-item{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0!important;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:6px;overflow:hidden}
-.package-list .package-item.is-open{border-color:transparent;background:var(--brand-soft);box-shadow:0 0 0 2px var(--brand)}
-.package-list .package-open{flex:1;min-width:0;display:flex!important;align-items:flex-start;gap:8px;text-align:left;border:0!important;background:transparent!important;padding:10px 10px!important;cursor:pointer;color:inherit;box-shadow:none!important}
-.package-list .package-open:hover{background:#f6f8fd!important}
-.package-list .package-open span{display:grid;gap:2px;min-width:0}.package-list .package-open b{color:#16244a}.package-list .package-open small{color:#5b6b8c}
+/* Панель над документом: версия, статус и действия — одна таблетка. */
+.word-heading{display:flex;align-items:center;flex-wrap:wrap;gap:6px!important;padding:5px 6px 5px 14px!important;margin:6px 0 10px;background:#fff;border:1px solid var(--line);border-radius:999px}
+.word-heading .word-version{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin:0}
+.word-heading .word-version select{border:0;background:var(--paper);border-radius:999px;padding:6px 12px;font-weight:600;color:var(--ink)}
+.word-heading .word-meta{font-size:12px;color:var(--muted);padding:0 8px;border-left:1px solid var(--line)}
+.word-heading .primary-button,.word-heading .secondary-button,.word-heading .text-button,.word-heading .danger-button{padding:7px 14px!important;display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.word-heading .text-button{border-radius:999px;color:var(--brand)}.word-heading .text-button:hover{background:var(--brand-soft)}
+.word-heading .task-deadline{margin:0 6px;font-size:12px}
+@media(max-width:760px){.word-heading{border-radius:14px}}
+
+/* Пакет документов: строка — документ в окне просмотра. */
+.package-list .package-item{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0!important;border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:6px;overflow:hidden}
+.package-list .package-item.is-open{border-color:var(--brand);background:var(--brand-soft)}
+.package-list .package-open{flex:1;min-width:0;display:flex!important;align-items:flex-start;gap:8px;text-align:left;border:0!important;background:transparent!important;padding:10px!important;cursor:pointer;color:inherit;box-shadow:none!important}
+.package-list .package-open:hover{background:var(--paper)!important}
+.package-list .package-open span{display:grid;gap:2px;min-width:0}.package-list .package-open b{color:var(--ink)}.package-list .package-open small{color:var(--muted)}
 .package-list .package-open svg{margin-top:2px;color:var(--brand)}
 .package-download{margin-right:6px}
-.package-use{margin:0 10px 10px 34px;font-size:12px;border:1px solid #c5d0ec;background:#fff;color:var(--brand);border-radius:6px;padding:5px 9px}
-.package-print{color:#2e8b57!important;font-weight:700}
+.package-use{margin:0 10px 10px 34px;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--brand);padding:5px 10px}
+.package-print{color:var(--green)!important;font-weight:700}
+/* Загрузка новой версии — такая же кнопка «Выбрать файл DOCX», как в форме загрузки. */
+.upload-pill{display:grid!important;gap:8px;padding:12px!important;border-radius:12px;background:var(--paper);border:1px solid var(--line);width:100%;box-sizing:border-box}
+.upload-pill-title{font-weight:600;color:var(--ink);font-size:13px}
+.upload-pill .file-button{position:relative;justify-self:start;cursor:pointer;padding:9px 16px;font-size:13px}
+.upload-pill input.sr-only{width:1px;height:1px;left:0;top:0}
+.file-button.is-disabled{opacity:.6;cursor:not-allowed}
+.file-tile{border:1px solid var(--line)!important;background:var(--paper)!important;border-radius:14px}
+.file-tile-ready{border-color:var(--brand)!important;background:var(--brand-soft)!important}
 .sheet-launch{display:inline-flex;align-items:center;gap:6px}
 
-/* Кнопки без «стандартных» полосок: скруглённые, мягкая заливка, активные — градиент. */
-.primary-button,.secondary-button,.danger-button{border-radius:10px!important;border:0}
-.primary-button{background:linear-gradient(135deg,var(--brand-2),var(--brand))!important}
-.secondary-button{background:var(--brand-soft)!important;color:var(--brand)!important;border:0!important}
-.secondary-button:hover:not(:disabled){background:#dbe3f7!important}
-.danger-button{background:linear-gradient(135deg,#e0559a,#c2367f)!important;color:#fff!important}
-.queue-switch:not(.document-tabs) button,.review-subtabs button,.doc-type-switch button,.note-filter button{border:0!important;border-radius:999px!important;background:var(--brand-soft)!important;color:var(--brand)!important;font-weight:600}
-.queue-switch:not(.document-tabs) button[aria-pressed=true],.review-subtabs button[aria-pressed=true],.doc-type-switch button[aria-pressed=true],.note-filter button[aria-pressed=true]{background:linear-gradient(135deg,var(--brand-2),var(--brand))!important;color:#fff!important;box-shadow:0 4px 12px #09318d33}
-.review-subtabs button b{background:#ffffffcc;color:inherit}
-.review-tabs button{border-radius:999px!important;border-bottom:0!important;padding:8px 14px!important}
-.review-tabs button[aria-selected=true]{background:var(--brand-soft);color:var(--brand)!important}
-.zoom-control{border-radius:999px;border:0;background:var(--brand-soft)}.zoom-control button{border-radius:999px;color:var(--brand)}.zoom-control button:hover:not(:disabled){background:#fff}
-.zoom-control .zoom-fit{border-left:0;border-radius:999px;margin-left:4px;background:#fff}
-.file-tile{border-style:solid!important;border-color:transparent!important;background:var(--brand-soft)!important;border-radius:14px}
-.file-tile-ready{box-shadow:0 0 0 2px var(--brand)}
-.review-edge{border-radius:14px 0 0 14px}
-
-/* ===== Стиль по эталону (05.11.2026): таблетки, сегментированные переключатели, розовая главная кнопка ===== */
-/* Левое меню: синий с точечным узором, активный пункт — полупрозрачная таблетка с тонкой рамкой. */
-aside.main-sidebar,.practical-layout .main-sidebar{background:radial-gradient(#ffffff1f 1px,transparent 1.2px) 0 0/14px 14px,linear-gradient(180deg,#0c3db3 0%,var(--brand) 45%,var(--brand-dark) 100%)!important}
-.main-sidebar nav button{border-radius:999px!important;border:1px solid transparent!important;color:#e3e9fb!important}
-.main-sidebar nav button:hover{background:#ffffff14!important}
-.main-sidebar nav button.selected{background:#ffffff2e!important;color:#fff!important;border-color:#ffffff59!important;box-shadow:none!important}
-.main-sidebar nav button.selected svg{color:#fff}
-.main-sidebar nav button b{border-radius:999px!important}
-.main-sidebar nav button.selected b{background:var(--pink)!important;color:#fff!important}
-
-/* Главная кнопка — розовая таблетка; второстепенная — контурная; опасное действие — красная таблетка. */
-.primary-button{background:linear-gradient(135deg,#f7aed6,#ec7fb8)!important;color:#fff!important;border:0!important;border-radius:999px!important;box-shadow:0 6px 16px #ec7fb855!important;font-weight:650}
-.primary-button:hover:not(:disabled){background:linear-gradient(135deg,#f59acc,#e2669f)!important}
-.primary-button:disabled{background:#e9c9dc!important;box-shadow:none!important}
-.secondary-button{background:#fff!important;color:var(--brand)!important;border:1px solid #b9c6ea!important;border-radius:999px!important}
-.secondary-button:hover:not(:disabled){background:var(--brand-soft)!important;border-color:var(--brand)!important}
-.danger-button{background:#fff!important;color:#c62828!important;border:1px solid #f0b4b4!important;border-radius:999px!important}
-.danger-button:hover:not(:disabled){background:#fdecea!important}
-
-/* Сегментированные переключатели: общая рамка-таблетка, активный пункт — заливка. */
-.queue-switch,.doc-type-switch,.review-subtabs,.note-filter,.review-tabs{display:inline-flex!important;flex-wrap:wrap;gap:4px!important;padding:4px;border:1px solid var(--line);border-radius:999px;background:#fff;width:auto;max-width:100%}
-.queue-switch button,.doc-type-switch button,.review-subtabs button,.note-filter button,.review-tabs button{border:0!important;border-radius:999px!important;background:transparent!important;color:#3b4a6b!important;box-shadow:none!important;padding:7px 14px!important;font-weight:600;transform:none!important}
-.queue-switch button:hover,.doc-type-switch button:hover,.review-subtabs button:hover,.note-filter button:hover,.review-tabs button:hover{background:var(--brand-soft)!important}
-.queue-switch button[aria-pressed=true],.doc-type-switch button[aria-pressed=true],.review-subtabs button[aria-pressed=true],.note-filter button[aria-pressed=true],.review-tabs button[aria-selected=true]{background:var(--brand)!important;color:#fff!important;box-shadow:0 4px 12px #09318d40!important}
-/* Вкладки документов: в той же рамке, цвет вкладки — у активной заливки и у числа. */
-.queue-switch.document-tabs button[aria-pressed=true]{background:var(--tab)!important;box-shadow:0 4px 12px color-mix(in srgb,var(--tab) 40%,transparent)!important}
-.document-tabs .tab-count{background:color-mix(in srgb,var(--tab) 12%,#fff)!important;color:var(--tab)!important;box-shadow:none!important}
-.document-tabs .tab-count.is-zero{background:#f0f2f7!important;color:#9aa5b8!important}
-.queue-switch.document-tabs button[aria-pressed=true] .tab-count{background:#fff!important;color:var(--tab)!important}
-.review-tabs b,.review-subtabs b{background:#ffffffd9!important;color:inherit}
+/* Режим проверки и лист согласования. */
+.review-top,.sheet-toolbar{background:var(--menu)!important}
+.review-pane-main{border:2px solid var(--brand)!important}
+.review-num,.review-edge{background:var(--brand)!important}
 .review-side-head{border-bottom:0!important;padding:10px!important}
-.review-tabs button[aria-selected=true] b,.review-subtabs button[aria-pressed=true] b{background:#fff!important;color:var(--brand)!important}
-.file-tile{box-shadow:0 0 0 1px #c9d4f0!important;background:#f4f7fd!important}
-.file-tile-ready{box-shadow:0 0 0 1.5px #ec7fb8!important;background:#fff6fb!important}
-/* Оставшиеся прямоугольные кнопки — тоже таблетки. */
-.tu-preflight .section-heading button{border:0!important;border-radius:999px!important;padding:8px 16px!important;background:linear-gradient(135deg,#f7aed6,#ec7fb8)!important;color:#fff!important;font-weight:650;box-shadow:0 4px 12px #ec7fb855}
-.tu-preflight .section-heading button:disabled{background:#e9c9dc!important;box-shadow:none}
-.review-nav{border-radius:999px!important;border:0!important;background:#fdeef6!important;color:#a8326f!important}
-.review-nav button{border:0!important;border-radius:999px!important;background:#fff!important;color:#a8326f!important;box-shadow:0 1px 4px #c2367f33}
-button:not([class]),.word-tools .secondary-button{border-radius:999px!important}
-.review-verify button,.note-actions button,.card-actions button,.card-row-actions button,.package-use{border-radius:999px!important}
+.review-nav{border-radius:999px!important;border:1px solid #f3c9c0!important;background:var(--red-soft)!important;color:#9b2c22!important}
+.review-nav button{border:0!important;border-radius:999px!important;background:#fff!important;color:#9b2c22!important}
+.tu-preflight .section-heading button{border:0!important;border-radius:999px!important;padding:8px 16px!important;background:var(--brand)!important;color:#fff!important;font-weight:600}
+.tu-preflight .section-heading button:hover:not(:disabled){background:var(--brand-hover)!important}
+.zoom-control{border-radius:999px;border:1px solid var(--line);background:#fff}.zoom-control button{border-radius:999px;color:var(--ink-2)}.zoom-control button:hover:not(:disabled){background:var(--paper)}
+.zoom-control .zoom-fit{border-left:1px solid var(--line);border-radius:0 999px 999px 0}
+.float-remark{background:var(--brand)!important}.float-remark:hover{background:var(--brand-hover)!important}
+.float-remark.float-blocked{background:#8a95a8!important}
+.upload-pill{border-style:solid!important;border-width:1px!important}
