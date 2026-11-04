@@ -15,6 +15,8 @@ export async function notify(db:DB,actId:string,userId:string,type:string) {
   await db.query('INSERT INTO app.notifications(act_id,recipient_id,type) VALUES($1,$2,$3)',[actId,userId,type]);
 }
 export async function assigned(db:DB,wanted:string,area:string,excluded:string[]) {
+  // Do not assign a new task while an administrator revokes the selected role/account.
+  await db.query('SELECT pg_advisory_xact_lock(817624)');
   const found=await db.query('SELECT id FROM app.candidates($1,$2) WHERE NOT(id=ANY($3::uuid[]))',[wanted,area,excluded]);
   const label:Record<string,string>={RIRU_ENGINEER:'Инженера РИРУ',RIRU_HEAD:'Начальника РИРУ',RES_HEAD:'Начальника РЭС',SUE:'СУЭ',STP:'СТП',GI:'ТЕХБЛОКА'};
   if(found.rowCount!==1) throw new HttpError(409,'ASSIGNEE_CONFIGURATION',`Для ${label[wanted]??wanted} требуется один доступный исполнитель без конфликта ролей`);

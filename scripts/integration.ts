@@ -10,6 +10,7 @@ import { runIntegration } from '../tests/core.integration.js';
 import pg from 'pg';
 import {runMatrixIntegration} from '../tests/matrix.integration.js';
 import {runLocalAuthIntegration} from '../tests/local-auth.integration.js';
+import {runAccountUpgradeIntegration} from '../tests/account-upgrade.integration.js';
 import {runStandaloneBrowser} from '../tests/standalone.browser.js';
 import {setupStandalone} from './setup-standalone.js';
 import {createApp} from '../apps/api/src/app.js';
@@ -46,6 +47,8 @@ try {
   const localUrl=`postgres://postgres:${password}@127.0.0.1:${port}/local_auth_tests`;
   await migrate(localUrl,runtimePassword);
   await runLocalAuthIntegration(localUrl,`postgres://tp_runtime:${runtimePassword}@127.0.0.1:${port}/local_auth_tests`,root);
+  const upgradeDb=new pg.Client({connectionString:url});await upgradeDb.connect();try{await upgradeDb.query('CREATE DATABASE account_upgrade_tests');}finally{await upgradeDb.end();}
+  await runAccountUpgradeIntegration(`postgres://postgres:${password}@127.0.0.1:${port}/account_upgrade_tests`,`postgres://tp_runtime:${runtimePassword}@127.0.0.1:${port}/account_upgrade_tests`,root);
   if(process.argv.includes('--standalone-browser')){
     const setup=new pg.Client({connectionString:url});await setup.connect();try{await setup.query('CREATE DATABASE standalone_browser');}finally{await setup.end();}
     // Exercise the real entrypoint setup with an existing-format DB password (<16 characters).

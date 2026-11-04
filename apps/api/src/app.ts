@@ -22,7 +22,7 @@ import {RULES_VERSION} from './tu-rules.js';
 import {extractTuMetadata} from './tu-import.js';
 import {documentModel} from './documents.js';
 import {prepareTu} from './prepare-tu.js';
-import {localAuth,createLocalUser,updateLocalAccess,assignmentSchema} from './local-auth.js';
+import {localAuth,listLocalUsers,createLocalUser,updateLocalAccess,addLocalRole,updateLocalProfile,deleteLocalUser} from './local-auth.js';
 
 export type AppConfig = {storagePath:string;maxFileBytes:number;production:boolean;clamavHost?:string;clamavPort?:number;webPath?:string;trustProxyHops?:number} &
   ((AuthConfig & {authMode?:'keycloak';platformOrigin:string}) | {authMode:'local';appOrigin?:string});
@@ -71,15 +71,14 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   get('/api/v1/me',async db=>(await db.query('SELECT app.my_profile() AS profile')).rows[0].profile);
   get('/api/v1/res',async db=>(await db.query('SELECT * FROM app.res_units ORDER BY code')).rows);
   if(standalone){
-    get('/api/v1/admin/local-users',async db=>(await db.query('SELECT app.local_admin_users() AS users')).rows[0].users);
+    get('/api/v1/admin/local-users',listLocalUsers);
     // Password-bearing requests must not enter command(): its fast request digest
     // would provide a second, weaker offline password-verification target.
     app.post('/api/v1/admin/local-users',async(req,res)=>res.json(await transaction(pool,res.locals.userId,db=>createLocalUser(db,req.body))));
     app.post('/api/v1/admin/local-users/:id/access',async(req,res)=>res.json(await transaction(pool,res.locals.userId,db=>updateLocalAccess(db,id.parse(req.params.id),req.body))));
-    post('/api/v1/admin/local-users/:id/roles',async(db,req)=>{
-      const b=assignmentSchema.parse(req.body);
-      return (await db.query('SELECT app.local_admin_role($1,$2,$3) AS id',[id.parse(req.params.id),b.role,b.resId])).rows[0];
-    });
+    post('/api/v1/admin/local-users/:id/roles',(db,req)=>addLocalRole(db,id.parse(req.params.id),req.body));
+    post('/api/v1/admin/local-users/:id/profile',(db,req)=>updateLocalProfile(db,id.parse(req.params.id),req.body));
+    post('/api/v1/admin/local-users/:id/delete',(db,req)=>deleteLocalUser(db,id.parse(req.params.id),req.body));
   }
   get('/api/v1/registry',async(db,req)=>registry(db,req.query));
   get('/api/v1/registry-counts',async db=>registryCounts(db));

@@ -9,6 +9,7 @@ import { role } from './workflow.js';
 
 export const loginSchema=z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9._-]{2,63}$/);
 export const passwordSchema=z.string().min(12).max(128);
+export const emailSchema=z.string().trim().toLowerCase().max(254).email();
 const credentialSchema=z.object({login:loginSchema,password:z.string().min(1).max(128)}).strict();
 const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
 const csrf=(token:string)=>hash('tp-approval-csrf:'+token);
@@ -100,14 +101,60 @@ export const assignmentSchema=z.object({
   resId:z.string().uuid().nullable()
 }).strict().refine(b=>['RIRU_ENGINEER','RIRU_HEAD','RES_HEAD'].includes(b.role)?b.resId!==null:b.role==='PROCESS_ADMIN'||b.resId===null,'Укажите РЭС для районной роли');
 
-export async function createLocalUser(db:DB,input:unknown) {
+export const localProfileSchema=z.object({
+  login:loginSchema,name:z.string().trim().min(1).max(200),email:emailSchema,
+  expectedRevision:z.number().int().nonnegative(),
+  assignments:z.array(assignmentSchema).max(32).refine(rows=>new Set(rows.map(r=>r.role+':'+(r.resId??''))).size===rows.length,'Роли не должны повторяться')
+}).strict();
+
+async function accountCommand<T>(db:DB,fn:()=>Promise<T>):Promise<T> {
   await role(db,'TECH_ADMIN');
-  const b=z.object({login:loginSchema,name:z.string().trim().min(1).max(200),password:passwordSchema,assignment:assignmentSchema}).strict().parse(input);
-  return (await db.query('SELECT app.local_admin_create($1,$2,$3,$4,$5) AS id',[b.login,b.name,await hashPassword(b.password),b.assignment.role,b.assignment.resId])).rows[0];
+  const ready=(await db.query("SELECT to_regprocedure('app.local_admin_profile(uuid,integer,text,text,text,jsonb)') IS NOT NULL AS ready")).rows[0].ready;
+  if(!ready)throw new HttpError(503,'ACCOUNT_SCHEMA_REQUIRED','Для обновления учётных записей временно верните MIGRATION_DATABASE_URL в настройки Amvera и перезапустите контейнер.');
+  try{return await fn();}catch(error){
+    const e=error as {code?:string;constraint?:string;message?:string};
+    if(e.code==='23505'&&e.constraint==='users_email_unique')throw new HttpError(409,'EMAIL_IN_USE','Этот email уже указан в другой учётной записи.');
+    if(e.code==='23505'&&e.constraint==='local_credentials_login_key')throw new HttpError(409,'LOGIN_IN_USE','Этот логин уже используется другой учётной записью.');
+    if(e.code==='23503')throw new HttpError(422,'UNKNOWN_RES','Указанный РЭС не найден.');
+    if(e.code==='23514'&&e.constraint==='users_email_format')throw new HttpError(422,'INVALID_EMAIL','Укажите корректный email.');
+    const messages:Record<string,string>={
+      ACCOUNT_NOT_FOUND:'Учётная запись не найдена или уже удалена.',ACCOUNT_CHANGED:'Учётная запись уже изменена. Обновите список и повторите редактирование.',
+      EMAIL_REQUIRED:'Укажите email сотрудника.',KEEP_ADMIN_ROLE:'Нельзя снять у себя роль технического администратора.',SELF_DELETE:'Нельзя удалить собственную учётную запись.',
+      SELF_ACCESS_CHANGE:'Для смены своего пароля используйте кнопку «Пароль». Закрыть доступ себе нельзя.',
+      ROLE_IN_USE:'Роль используется в незавершённых задачах или действующем/будущем замещении. Сначала завершите задачи и замещения.',
+      ACCOUNT_IN_USE:'У сотрудника есть незавершённые задачи или замещения. Сначала завершите их.'
+    };
+    if(e.code==='22023'&&e.message&&messages[e.message])throw new HttpError(e.message==='ACCOUNT_NOT_FOUND'?404:409,e.message,messages[e.message]);
+    throw error;
+  }
+}
+
+export const listLocalUsers=(db:DB)=>accountCommand(db,async()=>(await db.query('SELECT app.local_admin_users() AS users')).rows[0].users);
+
+export async function createLocalUser(db:DB,input:unknown) {
+  return accountCommand(db,async()=>{
+    const b=z.object({login:loginSchema,name:z.string().trim().min(1).max(200),email:emailSchema,password:passwordSchema,assignment:assignmentSchema}).strict().parse(input);
+    return (await db.query('SELECT app.local_admin_create($1,$2,$3,$4,$5,$6) AS id',[b.login,b.name,b.email,await hashPassword(b.password),b.assignment.role,b.assignment.resId])).rows[0];
+  });
 }
 export async function updateLocalAccess(db:DB,userId:string,input:unknown) {
-  await role(db,'TECH_ADMIN');
-  const b=z.object({active:z.boolean().optional(),password:passwordSchema.optional()}).strict().refine(b=>b.active!==undefined||b.password!==undefined).parse(input);
-  await db.query('SELECT app.local_admin_access($1,$2,$3)',[userId,b.active??null,b.password?await hashPassword(b.password):null]);
-  return {updated:true};
+  return accountCommand(db,async()=>{
+    const b=z.object({active:z.boolean().optional(),password:passwordSchema.optional()}).strict().refine(b=>b.active!==undefined||b.password!==undefined).parse(input);
+    await db.query('SELECT app.local_admin_access($1,$2,$3)',[userId,b.active??null,b.password?await hashPassword(b.password):null]);
+    return {updated:true};
+  });
 }
+export const addLocalRole=(db:DB,userId:string,input:unknown)=>accountCommand(db,async()=>{
+  const b=assignmentSchema.parse(input);
+  return (await db.query('SELECT app.local_admin_role($1,$2,$3) AS id',[userId,b.role,b.resId])).rows[0];
+});
+export const updateLocalProfile=(db:DB,userId:string,input:unknown)=>accountCommand(db,async()=>{
+  const b=localProfileSchema.parse(input);
+  await db.query('SELECT app.local_admin_profile($1,$2,$3,$4,$5,$6)',[userId,b.expectedRevision,b.login,b.name,b.email,JSON.stringify(b.assignments)]);
+  return {updated:true};
+});
+export const deleteLocalUser=(db:DB,userId:string,input:unknown)=>accountCommand(db,async()=>{
+  const b=z.object({expectedRevision:z.number().int().nonnegative()}).strict().parse(input);
+  await db.query('SELECT app.local_admin_delete($1,$2)',[userId,b.expectedRevision]);
+  return {deleted:true};
+});
