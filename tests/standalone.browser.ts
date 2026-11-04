@@ -30,14 +30,41 @@ export async function runStandaloneBrowser(options:{url:string;initialPassword:s
     pass('Login, mandatory password change and session recovery after F5 on HTTPS');
     const form=page.locator('form').filter({has:page.getByRole('button',{name:'Создать пользователя',exact:true})});
     await form.getByLabel('ФИО',{exact:true}).fill('Учебный инженер');await form.getByLabel('Логин',{exact:true}).fill('browser.engineer');
+    await form.getByLabel('Email',{exact:true}).fill('browser.engineer@example.test');
     await form.getByLabel('Временный пароль',{exact:true}).fill(options.initialPassword);
     await form.getByLabel('РЭС',{exact:true}).selectOption({index:1});
     await form.getByRole('button',{name:'Создать пользователя',exact:true}).click();
     await page.getByRole('status').filter({hasText:'Сотрудник добавлен'}).waitFor();
     await page.screenshot({path:options.output+'/users.png',fullPage:true});
-    pass('Admin creates an employee with a real stored password and RES assignment');
+    pass('Admin creates an employee with email, a real stored password and RES assignment');
+
+    await form.getByLabel('ФИО',{exact:true}).fill('Учебный второй сотрудник');await form.getByLabel('Логин',{exact:true}).fill('browser.other');
+    await form.getByLabel('Email',{exact:true}).fill('BROWSER.ENGINEER@example.test');
+    await form.getByLabel('Временный пароль',{exact:true}).fill(options.initialPassword);await form.getByLabel('РЭС',{exact:true}).selectOption({index:1});
+    await form.getByRole('button',{name:'Создать пользователя',exact:true}).click();
+    await page.getByRole('alert').filter({hasText:'Этот email уже указан'}).waitFor();
+    await form.getByLabel('Email',{exact:true}).fill('browser.other@example.test');await form.getByRole('button',{name:'Создать пользователя',exact:true}).click();
+    await page.getByRole('status').filter({hasText:'Сотрудник добавлен'}).waitFor();
+    let row=page.getByRole('article',{name:'Учётная запись browser.engineer',exact:true});
+    await row.getByRole('button',{name:'Изменить',exact:true}).click();
+    let edit=row.getByRole('form',{name:'Редактирование учётной записи'});
+    await edit.getByLabel('ФИО',{exact:true}).fill('Учебное новое имя');await edit.getByLabel('Логин',{exact:true}).fill('browser.engineer.new');
+    await edit.getByLabel('Email',{exact:true}).fill('Updated.Engineer@Example.Test');await edit.getByLabel('РЭС 1',{exact:true}).selectOption({index:2});
+    await edit.getByRole('button',{name:'Добавить роль',exact:true}).click();await edit.getByLabel('Роль 2',{exact:true}).selectOption('SUE');
+    await edit.getByRole('button',{name:'Сохранить изменения',exact:true}).click();await page.getByRole('status').filter({hasText:'Учётная запись обновлена'}).waitFor();
+    await page.reload();row=page.getByRole('article',{name:'Учётная запись browser.engineer.new',exact:true});
+    await row.getByText('updated.engineer@example.test',{exact:true}).waitFor();await row.getByText('Учебное новое имя',{exact:true}).waitFor();await row.getByText('СУЭ',{exact:true}).waitFor();
+    await row.getByRole('button',{name:'Изменить',exact:true}).click();edit=row.getByRole('form',{name:'Редактирование учётной записи'});
+    // The list is sorted by role code: the additional SUE assignment is second.
+    assert.equal(await edit.getByLabel('Роль 1',{exact:true}).inputValue(),'RIRU_ENGINEER');assert.equal(await edit.getByLabel('Роль 2',{exact:true}).inputValue(),'SUE');
+    await edit.getByRole('button',{name:'Убрать роль 2',exact:true}).click();
+    await edit.getByLabel('Email',{exact:true}).fill('browser.other@example.test');await edit.getByRole('button',{name:'Сохранить изменения',exact:true}).click();
+    await page.getByRole('alert').filter({hasText:'Этот email уже указан'}).waitFor();
+    await edit.getByLabel('Email',{exact:true}).fill('updated.engineer@example.test');await edit.getByRole('button',{name:'Сохранить изменения',exact:true}).click();
+    await page.getByRole('status').filter({hasText:'Учётная запись обновлена'}).waitFor();assert.equal(await row.getByText('СУЭ',{exact:true}).count(),0);
+    pass('Duplicate email is explained; name/login/email/RES and additional roles can be edited and persist after F5');
     await page.getByRole('button',{name:'Выйти',exact:true}).click();await page.getByRole('heading',{name:'Вход в ТП Согласование'}).waitFor();
-    await login('browser.engineer',options.initialPassword);await change(options.initialPassword);
+    await login('browser.engineer.new',options.initialPassword);await change(options.initialPassword);
     await page.getByRole('heading',{name:'Загрузка документа',exact:true}).waitFor();
     assert.equal(await page.getByRole('button',{name:'Пользователи',exact:true}).count(),0);
     await page.reload();await page.getByRole('heading',{name:'Загрузка документа',exact:true}).waitFor();
@@ -48,7 +75,32 @@ export async function runStandaloneBrowser(options:{url:string;initialPassword:s
     await page.screenshot({path:options.output+'/mobile.png',fullPage:true});
     await page.getByRole('button',{name:'Выйти',exact:true}).click();await page.reload();
     await page.getByRole('heading',{name:'Вход в ТП Согласование'}).waitFor();
-    assert.deepEqual(errors,[]);pass('Mobile layout, logout revocation and no uncaught browser errors');
+    pass('Mobile employee layout and logout revocation');
+
+    await login('admin',password);await page.getByRole('heading',{name:'Добавить сотрудника'}).waitFor();
+    row=page.getByRole('article',{name:'Учётная запись browser.engineer.new',exact:true});
+    await row.getByRole('button',{name:'Изменить',exact:true}).click();
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await page.screenshot({path:options.output+'/account-edit-mobile.png',fullPage:true});
+    await row.getByRole('button',{name:'Отмена',exact:true}).click();
+    page.once('dialog',dialog=>dialog.dismiss());await row.getByRole('button',{name:'Удалить',exact:true}).click();
+    assert.equal(await row.count(),1);
+    page.once('dialog',dialog=>dialog.accept());await row.getByRole('button',{name:'Удалить',exact:true}).click();
+    await page.getByRole('status').filter({hasText:'Учётная запись удалена'}).waitFor();assert.equal(await row.count(),0);
+    await options.restart();await page.reload();await page.getByRole('heading',{name:'Добавить сотрудника'}).waitFor();assert.equal(await row.count(),0);
+    assert.equal(await page.getByRole('article',{name:'Учётная запись admin',exact:true}).getByRole('button',{name:'Удалить',exact:true}).count(),0);
+    await page.screenshot({path:options.output+'/accounts-after-delete.png',fullPage:true});
+    await page.getByRole('button',{name:'Выйти',exact:true}).click();await page.getByRole('heading',{name:'Вход в ТП Согласование'}).waitFor();
+    await login('browser.engineer.new',password);await page.getByRole('alert').filter({hasText:'Неверный логин или пароль'}).waitFor();
+    pass('Mobile account editor, deletion confirmation/cancel, persistent removal and revoked login');
+    await login('admin',password);await page.getByRole('heading',{name:'Добавить сотрудника'}).waitFor();
+    const own=page.getByRole('article',{name:'Учётная запись admin',exact:true});await own.getByRole('button',{name:'Изменить',exact:true}).click();
+    const ownEdit=own.getByRole('form',{name:'Редактирование учётной записи'});
+    await ownEdit.getByLabel('Email',{exact:true}).fill('browser.admin@example.test');await ownEdit.getByLabel('ФИО',{exact:true}).fill('Учебный администратор');
+    await ownEdit.getByRole('button',{name:'Сохранить изменения',exact:true}).click();
+    await page.getByRole('heading',{name:'Вход в ТП Согласование'}).waitFor();await login('admin',password);
+    await page.getByRole('heading',{name:'Добавить сотрудника'}).waitFor();await own.getByText('browser.admin@example.test',{exact:true}).waitFor();
+    assert.deepEqual(errors,[]);pass('Administrator can fill their own email and sign back in after session revocation without browser errors');
     await writeFile(options.output+'/result.json',JSON.stringify({browser:browser.version(),checks,errors},null,2));
   }catch(error){await page.screenshot({path:options.output+'/failure.png',fullPage:true});await writeFile(options.output+'/result.json',JSON.stringify({checks,errors,failure:String(error)},null,2));throw error;}
   finally{await browser.close();}

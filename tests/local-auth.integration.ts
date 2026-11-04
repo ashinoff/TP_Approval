@@ -42,7 +42,7 @@ export async function runLocalAuthIntegration(ownerUrl:string,runtimeUrl:string,
 
     const units=(await get(admin,'/api/v1/res')).body,area=units[0].id,other=units[1].id;
     const create=async(login:string,resId:string)=>{
-      const r=await post(admin,'/api/v1/admin/local-users',{login,name:'Синтетический '+login,password:'Synthetic-initial-123',assignment:{role:'RIRU_ENGINEER',resId}});
+      const r=await post(admin,'/api/v1/admin/local-users',{login,name:'Синтетический '+login,email:login+'@example.test',password:'Synthetic-initial-123',assignment:{role:'RIRU_ENGINEER',resId}});
       assert.equal(r.status,200,JSON.stringify(r.body));return r.body.id;
     };
     const engineerId=await create('engineer',area);await create('other',other);
@@ -99,7 +99,103 @@ export async function runLocalAuthIntegration(ownerUrl:string,runtimeUrl:string,
     await login('engineer','Synthetic-after-reset-012');
     const own=(await get(admin,'/api/v1/me')).body.id;
     assert.equal((await post(admin,'/api/v1/admin/local-users/'+own+'/access',{active:false})).status,409);
-    assert.equal(Number((await owner.query("SELECT count(*) FROM app.idempotency WHERE path LIKE '/api/v1/admin/local-users%' AND path NOT LIKE '%/roles'")).rows[0].count),0);
+    assert.equal(Number((await owner.query("SELECT count(*) FROM app.idempotency WHERE path='/api/v1/admin/local-users' OR path LIKE '/api/v1/admin/local-users/%/access'")).rows[0].count),0);
     pass('Logout, expiry, brute-force lock/recovery and protection from self-disabling');
+
+    const account=async(id:string)=>(await get(admin,'/api/v1/admin/local-users')).body.find((u:any)=>u.id===id);
+    const profileBody=(u:any,patch:object={})=>({name:u.name,login:u.login,email:u.email,expectedRevision:u.revision,assignments:u.roles,...patch});
+    const createBody={login:'mail.check',name:'Учебная почта',email:'  Mail.Check@Example.Test  ',password:'Synthetic-initial-123',assignment:{role:'SUE',resId:null}};
+    const mailUser=await post(admin,'/api/v1/admin/local-users',createBody);assert.equal(mailUser.status,200,JSON.stringify(mailUser.body));
+    assert.equal((await account(mailUser.body.id)).email,'mail.check@example.test');
+    const duplicate=await post(admin,'/api/v1/admin/local-users',{...createBody,login:'mail.duplicate',email:'MAIL.CHECK@example.test'});
+    assert.equal(duplicate.status,409);assert.equal(duplicate.body.error.code,'EMAIL_IN_USE');
+    assert.equal((await post(admin,'/api/v1/admin/local-users',{...createBody,login:'mail.invalid',email:'broken'})).status,422);
+    assert.equal((await account(own)).email,null);
+    assert.equal((await post(stranger,'/api/v1/admin/local-users/'+engineerId+'/profile',profileBody(await account(engineerId)))).status,403);
+    assert.equal((await post(stranger,'/api/v1/admin/local-users/'+engineerId+'/delete',{expectedRevision:0})).status,403);
+    pass('Email normalization/uniqueness, legacy accounts without invented email and admin-only profile/delete');
+
+    // Synthetic cancelled task: keep its identity/assignment snapshots across edits and deletion.
+    const oldAssignment=(await owner.query('SELECT id FROM app.roles WHERE user_id=$1 AND revoked_at IS NULL',[engineerId])).rows[0].id;
+    const fileId=randomUUID(),versionId=randomUUID(),cycleId=randomUUID(),historyTask=randomUUID();
+    await owner.query("INSERT INTO app.files(id,act_id,sha256,size,kind,scan_status,created_by) VALUES($1,$2,$3,1,'ACT_DOCX','READY',$4)",[fileId,actId,'a'.repeat(64),engineerId]);
+    await owner.query("INSERT INTO app.versions(id,act_id,number,file_id,snapshot,created_by) VALUES($1,$2,1,$3,'{}',$4)",[versionId,actId,fileId,engineerId]);
+    await owner.query("INSERT INTO app.cycles(id,act_id,version_id,number,state,closed_at) VALUES($1,$2,$3,1,'RETURNED',now())",[cycleId,actId,versionId]);
+    await owner.query("INSERT INTO app.tasks(id,act_id,cycle_id,role,assignee_id,status,policy_id,calendar_snapshot,due_at,assignment_id) VALUES($1,$2,$3,'RIRU_ENGINEER',$4,'CANCELLED',(SELECT id FROM app.deadline_policies WHERE role='RIRU_ENGINEER' LIMIT 1),'[]',now(),$5)",[historyTask,actId,cycleId,engineerId,oldAssignment]);
+    const historyBefore=(await owner.query('SELECT to_jsonb(t) AS data FROM app.tasks t WHERE id=$1',[historyTask])).rows[0].data;
+    const beforeEdit=await account(engineerId),oldSession=await login('engineer','Synthetic-after-reset-012');
+    const edited=await post(admin,'/api/v1/admin/local-users/'+engineerId+'/profile',profileBody(beforeEdit,{name:'Учебное новое имя',login:'engineer.updated',email:'ENGINEER.UPDATED@EXAMPLE.TEST',assignments:[{role:'RIRU_ENGINEER',resId:other}]}));
+    assert.equal(edited.status,200,JSON.stringify(edited.body));
+    assert.equal((await get(oldSession,'/api/v1/me')).status,401);
+    assert.equal((await request(app).post('/auth/login').set('Host','app.test').set('Origin','https://app.test').send({login:'engineer',password:'Synthetic-after-reset-012'})).status,401);
+    const editedSession=await login('engineer.updated','Synthetic-after-reset-012');
+    const me=(await get(editedSession,'/api/v1/me')).body;
+    assert.equal(me.id,engineerId);assert.equal(me.name,'Учебное новое имя');assert.equal(me.email,'engineer.updated@example.test');assert.deepEqual(me.roles,[{role:'RIRU_ENGINEER',resId:other}]);
+    assert.equal((await get(editedSession,'/api/v1/acts/'+actId)).status,404);
+    assert.ok((await owner.query('SELECT revoked_at FROM app.roles WHERE id=$1',[oldAssignment])).rows[0].revoked_at);
+    assert.deepEqual((await owner.query('SELECT to_jsonb(t) AS data FROM app.tasks t WHERE id=$1',[historyTask])).rows[0].data,historyBefore);
+    pass('Editing name/login/email/RES revokes sessions, preserves password and UUID, updates RLS, retains historical assignments');
+
+    let current=await account(engineerId);
+    assert.equal((await post(admin,'/api/v1/admin/local-users/'+engineerId+'/profile',profileBody(current,{email:'OTHER@example.test'}))).body.error.code,'EMAIL_IN_USE');
+    assert.equal((await post(admin,'/api/v1/admin/local-users/'+engineerId+'/profile',profileBody(current,{login:'other'}))).body.error.code,'LOGIN_IN_USE');
+    const [concurrent,parallelLogin]=await Promise.all([
+      Promise.all(['Версия А','Версия Б'].map(name=>post(admin,'/api/v1/admin/local-users/'+engineerId+'/profile',profileBody(current,{name:'Учебная '+name})))),
+      request(app).post('/auth/login').set('Host','app.test').set('Origin','https://app.test').send({login:'engineer.updated',password:'Synthetic-after-reset-012'})
+    ]);
+    assert.equal(parallelLogin.status,200,JSON.stringify(parallelLogin.body));
+    assert.deepEqual(concurrent.map(r=>r.status).sort(),[200,409]);assert.equal(concurrent.find(r=>r.status===409)!.body.error.code,'ACCOUNT_CHANGED');
+    const retained=await account(engineerId);assert.equal(retained.email,'engineer.updated@example.test');assert.equal(retained.login,'engineer.updated');
+    assert.equal((await post(admin,'/api/v1/admin/local-users/'+own+'/profile',profileBody(await account(own),{email:'admin@example.test',assignments:[]}))).body.error.code,'KEEP_ADMIN_ROLE');
+    assert.equal((await post(admin,'/api/v1/admin/local-users/'+own+'/delete',{expectedRevision:0})).body.error.code,'SELF_DELETE');
+    pass('Atomic duplicate rejection, concurrent edit conflict and self-admin protection');
+
+    const liveAssignment=(await owner.query('SELECT id FROM app.roles WHERE user_id=$1 AND revoked_at IS NULL',[engineerId])).rows[0].id;
+    const pendingAct=await post(editedSession,'/api/v1/acts',{...body,resId:other,contractNumber:'SYNTHETIC-PENDING',actNumber:'SYNTHETIC-PENDING'});
+    assert.equal(pendingAct.status,200,JSON.stringify(pendingAct.body));
+    const pendingId=pendingAct.body.id,pendingFile=randomUUID(),pendingVersion=randomUUID(),pendingCycle=randomUUID(),liveTask=randomUUID();
+    await owner.query("INSERT INTO app.files(id,act_id,sha256,size,kind,scan_status,created_by) VALUES($1,$2,$3,1,'ACT_DOCX','READY',$4)",[pendingFile,pendingId,'b'.repeat(64),engineerId]);
+    await owner.query("INSERT INTO app.versions(id,act_id,number,file_id,snapshot,created_by) VALUES($1,$2,1,$3,'{}',$4)",[pendingVersion,pendingId,pendingFile,engineerId]);
+    await owner.query("INSERT INTO app.cycles(id,act_id,version_id,number,state,closed_at) VALUES($1,$2,$3,1,'RETURNED',now())",[pendingCycle,pendingId,pendingVersion]);
+    await owner.query("INSERT INTO app.tasks(id,act_id,cycle_id,role,assignee_id,status,policy_id,calendar_snapshot,due_at,assignment_id) VALUES($1,$2,$3,'RIRU_ENGINEER',$4,'OPEN',(SELECT id FROM app.deadline_policies WHERE role='RIRU_ENGINEER' LIMIT 1),'[]',now(),$5)",[liveTask,pendingId,pendingCycle,engineerId,liveAssignment]);
+    current=await account(engineerId);
+    assert.equal((await post(admin,'/api/v1/admin/local-users/'+engineerId+'/delete',{expectedRevision:current.revision})).body.error.code,'ACCOUNT_IN_USE');
+    assert.equal((await post(admin,'/api/v1/admin/local-users/'+engineerId+'/profile',profileBody(current,{assignments:[]}))).body.error.code,'ROLE_IN_USE');
+    await owner.query("UPDATE app.tasks SET status='CANCELLED',completed_at=now() WHERE id=$1",[liveTask]);
+    const substituteId=(await owner.query("SELECT user_id FROM app.local_credentials WHERE login='other'")).rows[0].user_id;
+    const subId=(await owner.query("INSERT INTO app.substitutions(role_id,substitute_id,starts_at,ends_at,created_by) VALUES($1,$2,now()+interval '1 day',now()+interval '2 days',$3) RETURNING id",[liveAssignment,substituteId,own])).rows[0].id;
+    assert.equal((await post(admin,'/api/v1/admin/local-users/'+engineerId+'/profile',profileBody(current,{assignments:[]}))).body.error.code,'ROLE_IN_USE');
+    assert.equal((await post(admin,'/api/v1/admin/local-users/'+substituteId+'/delete',{expectedRevision:(await account(substituteId)).revision})).body.error.code,'ACCOUNT_IN_USE');
+    await owner.query("UPDATE app.substitutions SET starts_at=now()-interval '2 days',ends_at=now()-interval '1 day' WHERE id=$1",[subId]);
+    pass('Open task and future substitution prevent role removal/account deletion without changing assignments');
+
+    const toDelete=await account(engineerId),liveSession=await login('engineer.updated','Synthetic-after-reset-012');
+    const [deletion,...parallelLogins]=await Promise.all([
+      post(admin,'/api/v1/admin/local-users/'+engineerId+'/delete',{expectedRevision:toDelete.revision}),
+      ...Array.from({length:3},()=>request(app).post('/auth/login').set('Host','app.test').set('Origin','https://app.test').send({login:'engineer.updated',password:'Synthetic-after-reset-012'}))
+    ]);
+    assert.equal(deletion.status,200,JSON.stringify(deletion.body));
+    for(const response of parallelLogins){assert.ok([200,401].includes(response.status),JSON.stringify(response.body));if(response.status===200)assert.equal((await get(take(response),'/api/v1/me')).status,401);}
+    assert.equal(await account(engineerId),undefined);
+    assert.equal((await get(liveSession,'/api/v1/me')).status,401);
+    assert.equal((await request(app).post('/auth/login').set('Host','app.test').set('Origin','https://app.test').send({login:'engineer.updated',password:'Synthetic-after-reset-012'})).status,401);
+    assert.equal((await post(admin,'/api/v1/admin/local-users/'+engineerId+'/access',{active:true})).status,404);
+    assert.equal((await post(admin,'/api/v1/admin/local-users/'+engineerId+'/roles',{role:'SUE',resId:null})).status,404);
+    assert.equal((await owner.query('SELECT author_id FROM app.acts WHERE id=$1',[actId])).rows[0].author_id,engineerId);
+    assert.deepEqual((await owner.query('SELECT to_jsonb(t) AS data FROM app.tasks t WHERE id=$1',[historyTask])).rows[0].data,historyBefore);
+    assert.ok((await owner.query("SELECT 1 FROM app.audit_events WHERE action='LOCAL_ACCOUNT_DELETED' AND details->>'userId'=$1",[engineerId])).rowCount);
+    assert.equal(Number((await owner.query('SELECT count(*) FROM app.local_credentials WHERE user_id=$1',[engineerId])).rows[0].count),0);
+    const recreated=await post(admin,'/api/v1/admin/local-users',{login:'engineer.updated',name:'Учебная новая учётная запись',email:'engineer.updated@example.test',password:'Synthetic-initial-123',assignment:{role:'RIRU_ENGINEER',resId:other}});
+    assert.equal(recreated.status,200,JSON.stringify(recreated.body));assert.notEqual(recreated.body.id,engineerId);
+    assert.equal((await owner.query('SELECT author_id FROM app.acts WHERE id=$1',[actId])).rows[0].author_id,engineerId);
+    pass('Deletion removes credentials, revokes login, preserves history/audit; reused login/email creates a different identity');
+
+    const second=await post(admin,'/api/v1/admin/local-users',{login:'second.admin',name:'Учебный второй администратор',email:'second.admin@example.test',password:'Synthetic-initial-123',assignment:{role:'TECH_ADMIN',resId:null}});
+    assert.equal(second.status,200);const secondId=second.body.id,secondSession=await change(await login('second.admin'));
+    const originalVersion=(await account(own)).revision,secondVersion=(await account(secondId)).revision;
+    const crossed=await Promise.all([post(admin,'/api/v1/admin/local-users/'+secondId+'/delete',{expectedRevision:secondVersion}),post(secondSession,'/api/v1/admin/local-users/'+own+'/delete',{expectedRevision:originalVersion})]);
+    assert.equal(crossed.filter(r=>r.status===200).length,1);assert.ok(crossed.some(r=>r.status===403||r.status===401));
+    assert.equal(Number((await owner.query("SELECT count(*) FROM app.users u JOIN app.roles r ON r.user_id=u.id WHERE u.active AND r.role='TECH_ADMIN' AND r.revoked_at IS NULL")).rows[0].count),1);
+    pass('Concurrent administrators cannot delete each other and leave the system without an administrator');
   }finally{await runtime.end();await owner.end();}
 }
