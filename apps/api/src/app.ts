@@ -22,8 +22,10 @@ import {RULES_VERSION} from './tu-rules.js';
 import {extractTuMetadata} from './tu-import.js';
 import {documentModel} from './documents.js';
 import {prepareTu} from './prepare-tu.js';
+import {localAuth,createLocalUser,updateLocalAccess,assignmentSchema} from './local-auth.js';
 
-export interface AppConfig extends AuthConfig {platformOrigin:string; storagePath:string; maxFileBytes:number; production:boolean; clamavHost?:string; clamavPort?:number;webPath?:string}
+export type AppConfig = {storagePath:string;maxFileBytes:number;production:boolean;clamavHost?:string;clamavPort?:number;webPath?:string;trustProxyHops?:number} &
+  ((AuthConfig & {authMode?:'keycloak';platformOrigin:string}) | {authMode:'local';appOrigin?:string});
 const id=z.string().uuid();
 const text=z.string().trim().min(1).max(2000);
 const expected=z.number().int().nonnegative();
@@ -31,22 +33,34 @@ const createAct=z.object({resId:id,contractNumber:text,contractDate:z.iso.date()
 const myTasks=async(db:DB)=>(await db.query("SELECT t.*,app.task_role(t.role,t.cycle_id) AS role,a.act_number,a.contract_number,a.applicant,a.res_id,a.state AS act_state,(t.due_at<now()) AS overdue FROM app.tasks t JOIN app.acts a ON a.id=t.act_id WHERE app.task_user(t.assignment_id,t.assignee_id)=app.uid() AND t.status='OPEN' AND app.has_role(app.task_role(t.role,t.cycle_id),a.res_id) ORDER BY t.due_at")).rows;
 const myBadge=async(db:DB)=>({count:Number((await db.query("SELECT count(DISTINCT t.act_id) FROM app.tasks t JOIN app.acts a ON a.id=t.act_id WHERE app.task_user(t.assignment_id,t.assignee_id)=app.uid() AND t.status='OPEN' AND app.has_role(app.task_role(t.role,t.cycle_id),a.res_id)")).rows[0].count)});
 const myNotifications=async(db:DB)=>(await db.query("SELECT n.*,a.act_number,a.contract_number,CASE WHEN n.type='RETURNED' THEN (SELECT c.id FROM app.comments c WHERE c.act_id=n.act_id AND c.created_at<=n.created_at ORDER BY c.created_at DESC,c.id LIMIT 1) END AS comment_id FROM app.notifications n JOIN app.acts a ON a.id=n.act_id ORDER BY n.created_at DESC LIMIT 100")).rows;
-export function createApp(pool:pg.Pool, config:AppConfig, verify=verifier(config)) {
-  if(config.production&&!config.clamavHost) throw new Error('Production requires CLAMAV_HOST');
+export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typeof verifier>) {
+  const standalone=config.authMode==='local'?localAuth(pool,config):undefined;
+  const verifyToken=config.authMode==='local'?undefined:verify??verifier(config);
+  const scan=async(buffer:Buffer)=>{
+    if(config.production&&!config.clamavHost)throw new HttpError(503,'SCANNER_NOT_CONFIGURED','Загрузка документов недоступна: администратору нужно подключить антивирус.');
+    await antivirus(buffer,config.clamavHost,config.clamavPort);
+  };
   const app=express(); app.disable('x-powered-by');
-  app.use(helmet({contentSecurityPolicy:{directives:{frameAncestors:[config.platformOrigin]}},frameguard:false}));
-  app.use(cors({origin:config.platformOrigin,allowedHeaders:['Authorization','Content-Type','Idempotency-Key'],methods:['GET','POST','OPTIONS']}));
+  if(config.trustProxyHops)app.set('trust proxy',config.trustProxyHops);
+  app.use(helmet({contentSecurityPolicy:{directives:{frameAncestors:[config.authMode==='local'?"'self'":config.platformOrigin]}},frameguard:false}));
+  app.use(cors({origin:config.authMode==='local'?false:config.platformOrigin,allowedHeaders:['Authorization','Content-Type','Idempotency-Key'],methods:['GET','POST','OPTIONS']}));
   const rateMessage={error:{code:'RATE_LIMITED',message:'Слишком много запросов. Подождите минуту и обновите данные.'}};
   app.use(rateLimit({windowMs:60000,limit:600,standardHeaders:'draft-7',legacyHeaders:false,message:rateMessage}));
   app.use(express.json({limit:'256kb'}));
   app.use((req,res,next)=>{res.locals.requestId=randomUUID();res.setHeader('X-Request-Id',res.locals.requestId);res.setHeader('Cache-Control','no-store');next();});
   app.get('/health',(_req,res)=>res.json({status:'ok'}));
-  app.get('/ready',async(_req,res)=>{try{await pool.query('SELECT id FROM app.res_units LIMIT 1');res.json({status:'ready'});}catch{res.status(503).json({status:'unavailable'});}});
+  app.get('/ready',async(_req,res)=>{try{await pool.query('SELECT id FROM app.res_units LIMIT 1');res.json({status:'ready',uploadsConfigured:!config.production||!!config.clamavHost});}catch{res.status(503).json({status:'unavailable'});}});
+  if(standalone)standalone.install(app);
+  else app.get('/auth/session',(_req,res)=>res.json({mode:'keycloak',authenticated:false}));
   app.use('/api',async(req,res,next)=>{
     try {
-      const identity=await verify(req.headers.authorization);
-      const found=await pool.query('SELECT app.resolve_identity($1,$2) AS id',[identity.issuer,identity.subject]);
-      res.locals.userId=requireValue(found.rows[0].id,403,'USER_NOT_PROVISIONED'); next();
+      if(standalone)res.locals.userId=await standalone.authenticate(req);
+      else {
+        const identity=await verifyToken!(req.headers.authorization);
+        const found=await pool.query('SELECT app.resolve_identity($1,$2) AS id',[identity.issuer,identity.subject]);
+        res.locals.userId=requireValue(found.rows[0].id,403,'USER_NOT_PROVISIONED');
+      }
+      next();
     }catch(e){next(e);}
   });
   app.use('/api',rateLimit({windowMs:60000,limit:180,keyGenerator:(_req,res)=>String(res.locals.userId),standardHeaders:'draft-7',legacyHeaders:false,message:rateMessage}));
@@ -56,6 +70,17 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify=verifier(config
   });
   get('/api/v1/me',async db=>(await db.query('SELECT app.my_profile() AS profile')).rows[0].profile);
   get('/api/v1/res',async db=>(await db.query('SELECT * FROM app.res_units ORDER BY code')).rows);
+  if(standalone){
+    get('/api/v1/admin/local-users',async db=>(await db.query('SELECT app.local_admin_users() AS users')).rows[0].users);
+    // Password-bearing requests must not enter command(): its fast request digest
+    // would provide a second, weaker offline password-verification target.
+    app.post('/api/v1/admin/local-users',async(req,res)=>res.json(await transaction(pool,res.locals.userId,db=>createLocalUser(db,req.body))));
+    app.post('/api/v1/admin/local-users/:id/access',async(req,res)=>res.json(await transaction(pool,res.locals.userId,db=>updateLocalAccess(db,id.parse(req.params.id),req.body))));
+    post('/api/v1/admin/local-users/:id/roles',async(db,req)=>{
+      const b=assignmentSchema.parse(req.body);
+      return (await db.query('SELECT app.local_admin_role($1,$2,$3) AS id',[id.parse(req.params.id),b.role,b.resId])).rows[0];
+    });
+  }
   get('/api/v1/registry',async(db,req)=>registry(db,req.query));
   get('/api/v1/registry-counts',async db=>registryCounts(db));
   get('/api/v1/workspace-state',async db=>({tasks:await myTasks(db),notifications:await myNotifications(db),badge:await myBadge(db),counts:await registryCounts(db)}),true);
@@ -133,7 +158,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify=verifier(config
     const area=id.parse(req.body.resId);
     await transaction(pool,res.locals.userId,db=>role(db,'RIRU_ENGINEER',area));
     const file=requireValue(req.file,422,'FILE_REQUIRED');
-    await antivirus(file.buffer,config.clamavHost,config.clamavPort);
+    await scan(file.buffer);
     const prepared=await prepareTu(file.buffer);
     const model=await documentModel(prepared.bytes);
     if(model.blocks.reduce((n,b)=>n+b.text.length,0)>200000)throw new HttpError(422,'DOCUMENT_TOO_LARGE');
@@ -145,7 +170,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify=verifier(config
     await transaction(pool,res.locals.userId,async db=>{const a=await lockAct(db,actId);await role(db,'RIRU_ENGINEER',a.res_id);if(!['DRAFT','RETURNED','REVISING'].includes(a.state))throw new HttpError(409,'INVALID_STATE');});
     // TU PDF support is deferred: reject explicitly rather than pretend it was checked.
     try{await validateDocx(file.buffer);}catch(e){if(e instanceof HttpError)throw e;throw new HttpError(415,'INVALID_DOCX');}
-    await antivirus(file.buffer,config.clamavHost,config.clamavPort);
+    await scan(file.buffer);
     const fileId=randomUUID();const dir=resolve(config.storagePath);await mkdir(dir,{recursive:true});
     await writeFile(resolve(dir,fileId),file.buffer,{flag:'wx',mode:0o600});
     const result=await transaction(pool,res.locals.userId,async db=>{
