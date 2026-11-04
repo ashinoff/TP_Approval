@@ -6,6 +6,7 @@ import PackagePanel from './ContractDocuments.js';
 import TuPreflight from './TuPreflight.js';
 import DocumentCardPanel from './DocumentCard.js';
 import ReviewMode from './ReviewMode.js';
+import ApprovalSheet from './ApprovalSheet.js';
 import {checkMarks} from './review-marks.js';
 import DecisionDialog from './DecisionDialog.js';
 import {initialVersion,assignedVersion,remarkBlockReason,type Section} from './workplace.js';
@@ -53,7 +54,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
  const referenceView=!!openTu;
  const [focusRequest,setFocusRequest]=useState(0);
  const [choice,setChoice]=useState<'approve'|'return'>();
- const [reviewOpen,setReviewOpen]=useState(false);
+ const [reviewOpen,setReviewOpen]=useState(false),[sheetOpen,setSheetOpen]=useState(false);
  const dirtyKeys=useRef(new Set<string>());
  const dirty=(key:string,value:boolean)=>{if(value)dirtyKeys.current.add(key);else dirtyKeys.current.delete(key);onDirty(dirtyKeys.current.size>0);};
  const [versionId,setVersionId]=useState(()=>detail.comments.find((c:Row)=>c.id===focusComment)?.version_id??(detail.versions.some((v:Row)=>v.id===focusVersion)?focusVersion!:initialVersion(detail,tasks,section)));
@@ -118,7 +119,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
  const statusOf=(c:Row)=>c.events.filter((e:Row)=>e.version_id===versionId).at(-1)?.type??'OPEN';
  const shownNotes=notes.filter(c=>noteFilter==='all'||(noteFilter==='open'&&['OPEN','REOPENED'].includes(statusOf(c)))||(noteFilter==='waiting'&&statusOf(c)==='REPORTED_FIXED')||(noteFilter==='mine'&&c.author_id===profile.id));
  const openCount=notes.filter(c=>['OPEN','REOPENED'].includes(statusOf(c))).length;
- const versionLabel=(v:Row)=>`Версия ${v.number}${v.id===assigned?' · ваша задача':v.id===detail.presentation.approvedPublication?.versionId?' · утверждённая':v.id===newest?.id?' · последняя':''}`;
+ const versionLabel=(v:Row)=>`Версия ${v.number}${v.id===assigned?' · ваша задача':v.id===detail.presentation.approvedPublication?.versionId?' · согласована, к печати':v.id===newest?.id?' · последняя':''}`;
 
  return <section className="word-workspace" aria-label="Работа с документом">
   <div className="word-heading">
@@ -129,6 +130,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
    </label>
    <span className="word-meta">{!current?'файл не загружен':cycle?`цикл согласования ${cycle.number}`:'ещё не отправлялась'}</span>
    {current&&<button className="primary-button review-launch" onClick={()=>{if(canLeave())setReviewOpen(true);}} title="Акт и ТУ рядом, замечания и автосверка"><Icon name="file"/>Режим проверки</button>}
+   {detail.cycles.length>0&&<button className="secondary-button sheet-launch" onClick={()=>setSheetOpen(true)} title="ФИО согласовавших, решения, замечания — для печати"><Icon name="check"/>Лист согласования</button>}
    {current&&<button className="text-button" disabled={busy} onClick={()=>void action(()=>onDownload(current.file_id,current.number))}><Icon name="download"/>Скачать оригинал</button>}
    <span className="word-limit" title="Просмотр приблизительный: переносы строк, поля и разрывы страниц могут отличаться от Word. Для печати и работы используйте исходный DOCX.">Просмотр приблизительный</span>
    <span className="word-heading-spacer"/>
@@ -139,6 +141,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
    </div>}
    {preparing&&<SendButton detail={detail} api={api} action={action} busy={busy}/>}
   </div>
+  {sheetOpen&&<ApprovalSheet detail={detail} api={api} profile={profile} onClose={()=>setSheetOpen(false)}/>}
   {reviewOpen&&<ReviewMode detail={detail} profile={profile} tasks={tasks} api={api} loadFile={loadFile} action={action} busy={busy} section={section} startVersion={versionId} onClose={()=>setReviewOpen(false)}/>}
   {historical&&<p role="note" className="historical-note">Историческая версия · только просмотр. Решения недоступны.{assigned?<button onClick={()=>changeVersion(assigned)}>Открыть назначенную версию</button>:newest&&<button onClick={()=>changeVersion(newest.id)}>Открыть последнюю версию</button>}</p>}
   {choice&&effective&&<DecisionDialog record={{act_number:detail.act_number,version:current.number,cycle:cycle.number}} comments={notes.filter(c=>c.task_id===task.id)} choice={choice} busy={busy} onClose={()=>setChoice(undefined)} onSubmit={reason=>void action(async()=>{await api(`/api/v1/tasks/${task.id}/decision`,{decision:choice==='approve'?'APPROVE':'RETURN',reason,versionId});setChoice(undefined);})}/>}

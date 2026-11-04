@@ -102,7 +102,7 @@ export const assignmentSchema=z.object({
 }).strict().refine(b=>['RIRU_ENGINEER','RIRU_HEAD','RES_HEAD'].includes(b.role)?b.resId!==null:b.role==='PROCESS_ADMIN'||b.resId===null,'Укажите РЭС для районной роли');
 
 export const localProfileSchema=z.object({
-  login:loginSchema,name:z.string().trim().min(1).max(200),email:emailSchema,
+  login:loginSchema,name:z.string().trim().min(1).max(200),email:emailSchema,position:z.string().trim().max(200).optional(),
   expectedRevision:z.number().int().nonnegative(),
   assignments:z.array(assignmentSchema).max(32).refine(rows=>new Set(rows.map(r=>r.role+':'+(r.resId??''))).size===rows.length,'Роли не должны повторяться')
 }).strict();
@@ -133,8 +133,10 @@ export const listLocalUsers=(db:DB)=>accountCommand(db,async()=>(await db.query(
 
 export async function createLocalUser(db:DB,input:unknown) {
   return accountCommand(db,async()=>{
-    const b=z.object({login:loginSchema,name:z.string().trim().min(1).max(200),email:emailSchema,password:passwordSchema,assignment:assignmentSchema}).strict().parse(input);
-    return (await db.query('SELECT app.local_admin_create($1,$2,$3,$4,$5,$6) AS id',[b.login,b.name,b.email,await hashPassword(b.password),b.assignment.role,b.assignment.resId])).rows[0];
+    const b=z.object({login:loginSchema,name:z.string().trim().min(1).max(200),email:emailSchema,position:z.string().trim().max(200).optional(),password:passwordSchema,assignment:assignmentSchema}).strict().parse(input);
+    const created=(await db.query('SELECT app.local_admin_create($1,$2,$3,$4,$5,$6) AS id',[b.login,b.name,b.email,await hashPassword(b.password),b.assignment.role,b.assignment.resId])).rows[0];
+    if(b.position)await db.query('SELECT app.local_admin_position($1,$2)',[created.id,b.position]);
+    return created;
   });
 }
 export async function updateLocalAccess(db:DB,userId:string,input:unknown) {
@@ -151,6 +153,7 @@ export const addLocalRole=(db:DB,userId:string,input:unknown)=>accountCommand(db
 export const updateLocalProfile=(db:DB,userId:string,input:unknown)=>accountCommand(db,async()=>{
   const b=localProfileSchema.parse(input);
   await db.query('SELECT app.local_admin_profile($1,$2,$3,$4,$5,$6)',[userId,b.expectedRevision,b.login,b.name,b.email,JSON.stringify(b.assignments)]);
+  if(b.position!==undefined)await db.query('SELECT app.local_admin_position($1,$2)',[userId,b.position]);
   return {updated:true};
 });
 export const deleteLocalUser=(db:DB,userId:string,input:unknown)=>accountCommand(db,async()=>{

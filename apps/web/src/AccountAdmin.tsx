@@ -18,11 +18,12 @@ function ProfileForm({user,resUnits,busy,onSave,onCancel}:{user:Row;resUnits:Row
   const update=(index:number,value:RoleValue)=>setRoles(rows=>rows.map((row,i)=>i===index?value:row));
   return <form className="account-edit" aria-label="Редактирование учётной записи" onSubmit={e=>{
     e.preventDefault();const data=new FormData(e.currentTarget);
-    onSave({name:data.get('name'),login:data.get('login'),email:data.get('email'),expectedRevision:user.revision,assignments:roles});
+    onSave({name:data.get('name'),position:String(data.get('position')??''),login:data.get('login'),email:data.get('email'),expectedRevision:user.revision,assignments:roles});
   }}>
     <h3>Редактирование учётной записи</h3>
     <fieldset disabled={busy} className="account-fields account-form">
       <label>ФИО<input name="name" required maxLength={200} defaultValue={user.name} autoComplete="off"/></label>
+      <label>Должность<input name="position" aria-label="Должность" maxLength={200} defaultValue={user.position??''} placeholder="Например: Начальник РИРУ" autoComplete="off"/></label>
       <label>Логин<input name="login" aria-label="Логин" required pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{2,63}" minLength={3} maxLength={64} defaultValue={user.login} autoCapitalize="none" autoComplete="off"/></label>
       <label>Email<input name="email" aria-label="Email" type="email" required maxLength={254} defaultValue={user.email??''} autoCapitalize="none" autoComplete="off"/></label>
     </fieldset>
@@ -58,9 +59,10 @@ export default function AccountAdmin({api,resUnits,currentUserId,onUpdated}:{api
     {error&&<p className="error" role="alert">{error}</p>}{notice&&<p role="status" className="account-notice">{notice}</p>}
     <section className="card"><h2>Добавить сотрудника</h2><form onSubmit={e=>{
       e.preventDefault();const form=e.currentTarget;const data=new FormData(form);
-      void run(async()=>{await api('/api/v1/admin/local-users',{name:data.get('name'),login:data.get('login'),email:data.get('email'),password:data.get('password'),assignment:assignment(data)});form.reset();},'Сотрудник добавлен. Передайте ему логин и временный пароль. При первом входе он задаст свой пароль.');
+      void run(async()=>{await api('/api/v1/admin/local-users',{name:data.get('name'),position:String(data.get('position')??''),login:data.get('login'),email:data.get('email'),password:data.get('password'),assignment:assignment(data)});form.reset();},'Сотрудник добавлен. Передайте ему логин и временный пароль. При первом входе он задаст свой пароль.');
     }}><fieldset className="account-fields account-form" disabled={busy||!loaded}>
       <label>ФИО<input name="name" required maxLength={200} autoComplete="off"/></label>
+      <label>Должность<input name="position" aria-label="Должность" maxLength={200} placeholder="Например: Инженер РИРУ" autoComplete="off"/></label>
       <label>Логин<input name="login" aria-label="Логин" required pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{2,63}" minLength={3} maxLength={64} autoCapitalize="none" autoComplete="off"/><small>Латиница, цифры, точка, дефис или подчёркивание.</small></label>
       <label>Email<input name="email" aria-label="Email" type="email" required maxLength={254} autoCapitalize="none" autoComplete="off"/><small>Адрес почты сотрудника в Keycloak.</small></label>
       <label>Временный пароль<input name="password" aria-label="Временный пароль" type="password" required minLength={4} maxLength={128} autoComplete="new-password"/><small>Не менее 12 символов.</small></label>
@@ -68,7 +70,7 @@ export default function AccountAdmin({api,resUnits,currentUserId,onUpdated}:{api
     </fieldset></form></section>
     <section className="card"><div className="account-list-heading"><h2>Пользователи ({users.length})</h2><button disabled={busy} onClick={()=>{setError('');setEditing(undefined);void load().catch(e=>setError(e.message));}}>Обновить список</button></div>
       <div className="account-list">{users.map(user=><article className="account-row" key={user.id} aria-label={'Учётная запись '+user.login}>
-        <div className="account-summary"><strong>{user.name}</strong><p>{user.login} · {user.active?'Доступ открыт':'Доступ закрыт'}{user.mustChangePassword?' · Требуется смена пароля':''}</p>
+        <div className="account-summary"><strong>{user.name}</strong>{user.position&&<span className="account-position">{user.position}</span>}<p>{user.login} · {user.active?'Доступ открыт':'Доступ закрыт'}{user.mustChangePassword?' · Требуется смена пароля':''}</p>
           <p className={user.email?'account-email':'account-missing-email'}>{user.email??'Email не указан — заполните в учётной записи'}</p>
           <ul>{user.roles.map((r:Row,i:number)=><li key={i}>{roleNames[r.role]??r.role}{r.resId?' · '+(resUnits.find(unit=>unit.id===r.resId)?.name??'РЭС'):''}</li>)}</ul>
         </div>

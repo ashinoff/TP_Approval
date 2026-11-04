@@ -36,6 +36,7 @@ try{
   const id=(await db.query("INSERT INTO app.users(issuer,subject,name) VALUES('urn:tp-approval:local',$1,$2) RETURNING id",[randomUUID(),name])).rows[0].id;
   await db.query("INSERT INTO app.roles(user_id,role,res_id) VALUES($1,$2,(SELECT id FROM app.res_units WHERE code='ADLER'))",[id,role]);
   await db.query('INSERT INTO app.local_credentials(user_id,login,password_hash,must_change) VALUES($1,$2,$3,false)',[id,login,hash]);
+  await db.query('UPDATE app.users SET position=$2 WHERE id=$1',[id,role==='RIRU_HEAD'?'Начальник РИРУ (тест)':'Инженер РИРУ (тест)']);
  }
  await db.end();
  const pool=new pg.Pool({connectionString:runtime});
@@ -81,9 +82,11 @@ try{
  await own.evaluate((el:Element)=>{const doc=el.ownerDocument,r=doc.createRange();r.selectNodeContents(el);doc.getSelection()!.removeAllRanges();doc.getSelection()!.addRange(r);el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));});
  await review.getByRole('button',{name:'＋ Замечание'}).click();await review.getByRole('alert').filter({hasText:'Вы автор этого документа'}).waitFor();
  await review.getByRole('button',{name:'Завершить проверку'}).click();
+ await page.getByRole('button',{name:'Все документы',exact:true}).click();await page.getByRole('button',{name:'На согласовании: 1'}).click();await page.locator('[data-testid^="registry-row-"]').first().waitFor();await shot('03b-tabs');
  console.log('OK 3: corrected version passes check and is sent from review mode; author gets an explanation instead of a silent selection');
  // 4. Начальник РИРУ: замечание к выделенному фрагменту в режиме проверки.
  await page.getByRole('button',{name:'Выйти',exact:true}).click();await login('head');
+ assert.ok(await page.locator('.bell-button.has-unread').count()===1,'Unread notifications make the bell red');await page.locator('header.work-page-header').screenshot({path:`${out}/04-header.png`});
  await page.locator('[data-testid^="registry-row-"]').first().click();await page.getByRole('button',{name:'Режим проверки'}).click();
  const left=review.locator('iframe').nth(0).contentFrame();await left.locator('p[data-block-id]').filter({hasText:'15 кВт'}).first().waitFor({timeout:20000});
  await left.locator('p[data-block-id]').filter({hasText:'15 кВт'}).first().evaluate((el:Element)=>{const doc=el.ownerDocument,w=doc.createTreeWalker(el,4);let n;while(n=w.nextNode()){const i=n.textContent!.indexOf('15 кВт');if(i>=0){const r=doc.createRange();r.setStart(n,i);r.setEnd(n,i+6);doc.getSelection()!.removeAllRanges();doc.getSelection()!.addRange(r);el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));return;}}});
@@ -97,6 +100,13 @@ try{
  console.log('OK 4a: comparing with the previous version marks changed paragraphs blue in both panes');
  await review.getByRole('button',{name:'Скрыть панель'}).click();await review.getByRole('button',{name:'Показать замечания: 1'}).click();await review.locator('.review-note').filter({hasText:'Начальник РИРУ · синтетический'}).filter({hasText:'Сверить мощность'}).waitFor();
  console.log('OK 4: reviewer adds a remark from the floating button at the selection; edge tab reopens remarks with author and text');
+ // Лист согласования: предварительный, с ФИО и должностью автора замечания и самим замечанием.
+ await review.getByRole('button',{name:'Завершить проверку'}).click();await page.getByRole('button',{name:'Лист согласования'}).click();
+ const sheet=page.getByRole('dialog',{name:'Лист согласования'});await sheet.getByRole('heading',{name:'ЛИСТ СОГЛАСОВАНИЯ'}).waitFor({timeout:15000});
+ await sheet.getByText('Согласование не завершено — предварительный лист').waitFor();await sheet.getByText('Начальник РИРУ (тест)').first().waitFor();await sheet.getByText('Сверить мощность с расчётом нагрузки',{exact:false}).waitFor();
+ await sheet.getByText('Ожидает решения').first().waitFor();await shot('06-sheet');await sheet.getByRole('button',{name:'Закрыть'}).click();
+ console.log('OK 6: approval sheet lists preparer, approvers with positions, decisions and remarks');
+ await page.getByRole('button',{name:'Режим проверки'}).click();
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);
  assert.ok(await page.evaluate(()=>{const m=document.querySelector('.review-mode')!;return m.scrollWidth<=innerWidth&&m.scrollHeight>innerHeight;}),'Review mode on a phone scrolls vertically without horizontal overflow');
  await review.locator('.review-pane').nth(1).scrollIntoViewIfNeeded();await page.screenshot({path:`${out}/05-mobile.png`});console.log('OK 5: phone layout stacks panes and scrolls without horizontal overflow');

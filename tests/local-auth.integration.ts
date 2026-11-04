@@ -216,5 +216,11 @@ export async function runLocalAuthIntegration(ownerUrl:string,runtimeUrl:string,
     const listed=(await get(adminClient,'/api/v1/admin/card-fields'.replace('/admin','')+'?all=1')).body;assert.ok(listed.some((f:any)=>f.code==='f_nomer_opory'&&!f.active));
     assert.ok(!(await get(adminClient,'/api/v1/card-fields')).body.some((f:any)=>f.code==='f_nomer_opory'));
     pass('Administrator adds and disables card fields without migrations; kind is fixed; list fields require options');
+    const someRes=(await owner.query("SELECT id FROM app.res_units WHERE code='ADLER'")).rows[0].id;
+    const withPosition=await post(adminClient,'/api/v1/admin/local-users',{login:'positioned',name:'Синтетический с должностью',email:'positioned@example.test',position:'Начальник РИРУ',password:'Synthetic-initial-123',assignment:{role:'RIRU_HEAD',resId:someRes}});assert.equal(withPosition.status,200,JSON.stringify(withPosition.body));
+    let positioned=(await get(adminClient,'/api/v1/admin/local-users')).body.find((u:any)=>u.login==='positioned');assert.equal(positioned.position,'Начальник РИРУ');
+    const moved=await post(adminClient,`/api/v1/admin/local-users/${positioned.id}/profile`,{login:'positioned',name:positioned.name,email:positioned.email,position:'Заместитель начальника РИРУ',expectedRevision:positioned.revision,assignments:positioned.roles});assert.equal(moved.status,200,JSON.stringify(moved.body));
+    positioned=(await get(adminClient,'/api/v1/admin/local-users')).body.find((u:any)=>u.login==='positioned');assert.equal(positioned.position,'Заместитель начальника РИРУ');
+    pass('Administrator sets and edits employee position; it is returned with the account');
   }finally{await runtime.end();await owner.end();}
 }

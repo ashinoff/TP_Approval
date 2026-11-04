@@ -1,0 +1,86 @@
+/*
+ * Цветовая тема (выбор владельца 05.11.2026): глубокий синий #09318D, белый, нежно-розовый #F59ACC.
+ * Синий — основной цвет (меню, кнопки, ссылки), розовый — акцент (счётчики, активный пункт).
+ * Красный/зелёный/жёлтый сохраняют смысл статусов (ошибка/согласовано/внимание). Подключается последним.
+ */
+:root{
+  --brand:#09318D;--brand-2:#0b3db0;--brand-dark:#072672;--brand-soft:#e8edf9;
+  --pink:#F59ACC;--pink-strong:#c2367f;--pink-soft:#fdeef6;
+  --teal:var(--brand);--teal-soft:var(--brand-soft);--blue:var(--brand);--petrol:var(--brand-dark);--petrol-2:var(--brand);
+  --paper:#f3f5fb;--bg:var(--paper);--line:#dbe1ef;--line-2:#eaeef7;
+  --current:#2457c5;--current-soft:#e8eefb;
+}
+body{background:var(--paper)}
+:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline-color:var(--brand)!important}
+
+/* Боковое меню: глубокий синий с мягким переходом, активный пункт — розовая полоса. */
+aside.main-sidebar,.practical-layout .main-sidebar{background:linear-gradient(180deg,#0c3db3 0%,var(--brand) 45%,var(--brand-dark) 100%)!important;color:#fff}
+.main-sidebar nav button{color:#dfe6fb;background:transparent;position:relative}
+.main-sidebar nav button:hover{background:#ffffff14;color:#fff}
+.main-sidebar nav button.selected{background:#ffffff22!important;color:#fff;box-shadow:inset 3px 0 0 var(--pink)}
+.main-sidebar nav button b{background:#ffffff26;color:#fff;font-weight:700}
+.main-sidebar nav button.selected b{background:var(--pink);color:var(--brand-dark)}
+.platform-badge{color:#c9d4f5!important}
+
+/* Кнопки и ссылки. */
+.primary-button{background:var(--brand)!important;color:#fff!important;box-shadow:0 2px 6px #09318d33}
+.primary-button:hover:not(:disabled){background:var(--brand-2)!important}
+.primary-button:disabled{background:#9aa9cf!important;box-shadow:none}
+.secondary-button{border-color:#c5d0ec;color:var(--brand)}
+.text-button,.extra-filters summary,.compare-extra summary{color:var(--brand)}
+.icon-button:hover{background:var(--brand-soft);color:var(--brand)}
+
+/* Уведомления: колокольчик и число красные, когда есть непрочитанные. */
+.bell-button{position:relative}
+.bell-button.has-unread{color:#d32f2f!important}
+.bell-button.has-unread svg{animation:bell-ring 2.4s ease-in-out 1}
+.bell-button b{color:inherit}
+.bell-button.has-unread b{position:absolute;top:-6px;right:-8px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#d32f2f;color:#fff;font-size:11px;line-height:18px;text-align:center;box-shadow:0 0 0 2px #fff}
+@keyframes bell-ring{0%,100%{transform:rotate(0)}10%,30%{transform:rotate(14deg)}20%,40%{transform:rotate(-12deg)}50%{transform:rotate(0)}}
+
+/* Вкладки «Все документы»: у каждой свой цвет, число — отдельный бейдж. */
+.document-tabs{flex-wrap:wrap;gap:8px}
+.document-tabs button{display:inline-flex;align-items:center;gap:8px;padding:8px 12px 8px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#22304f;font-weight:600;box-shadow:inset 3px 0 0 var(--tab);cursor:pointer;transition:background .15s,box-shadow .15s}
+.document-tabs button:hover{background:color-mix(in srgb,var(--tab) 8%,#fff)}
+.queue-switch.document-tabs button[aria-pressed=true]{background:var(--tab);border-color:var(--tab);color:#fff;box-shadow:0 3px 10px color-mix(in srgb,var(--tab) 35%,transparent)}
+.document-tabs .tab-count{min-width:24px;height:24px;padding:0 7px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:color-mix(in srgb,var(--tab) 14%,#fff);color:var(--tab)}
+.document-tabs .tab-count.is-zero{background:#eef1f6;color:#9aa5b8}
+.queue-switch.document-tabs button[aria-pressed=true] .tab-count{background:#fff;color:var(--tab)}
+.document-tabs [data-tab=drafts]{--tab:#5b6b8c}.document-tabs [data-tab=progress]{--tab:#2457c5}.document-tabs [data-tab=corrections]{--tab:#d14b8f}
+.document-tabs [data-tab=approved]{--tab:#2e8b57}.document-tabs [data-tab=documents]{--tab:var(--brand)}
+
+/* Режим проверки и прочие тёмные шапки. */
+.review-top{background:linear-gradient(90deg,var(--brand-dark),var(--brand))!important}
+.review-pane-main{border-color:var(--brand)!important}
+.review-num,.review-edge{background:var(--brand)!important}
+.review-tabs button[aria-selected=true]{border-bottom-color:var(--pink)!important}
+.review-subtabs button[aria-pressed=true]{background:var(--brand-soft);border-color:var(--brand);color:var(--brand)}
+.doc-type-switch button[aria-pressed=true]{background:var(--brand)!important;border-color:var(--brand)!important}
+.queue-switch button[aria-pressed=true]{background:var(--brand-soft);border-color:var(--brand);color:var(--brand)}
+.file-tile-ready{border-color:var(--brand)!important;background:var(--brand-soft)!important}
+
+/* Шапка: ФИО с должностью и РЭС — вход в профиль. */
+.profile-chip{display:flex;flex-direction:column;align-items:flex-end;gap:1px;border:1px solid transparent;background:transparent;border-radius:8px;padding:4px 10px;cursor:pointer;text-align:right;max-width:340px}
+.profile-chip:hover,.profile-chip.selected{background:var(--brand-soft);border-color:#cdd7f1}
+.profile-chip b{font-size:13px;color:#16244a}.profile-chip small{font-size:12px;color:#5b6b8c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
+.profile-page{display:grid;gap:14px;max-width:900px}
+.profile-card{display:flex;gap:18px;align-items:flex-start;padding:20px}
+.profile-avatar{flex:none;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--pink));color:#fff;font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.profile-main{flex:1;min-width:0}.profile-main h2{margin:0 0 4px}.profile-sub{margin:0 0 10px;color:#3d4c6e}.profile-sub .muted{color:#8a96ad;font-size:13px}
+.profile-facts{display:grid;gap:8px;margin:0}.profile-facts div{display:grid;grid-template-columns:80px 1fr;gap:10px}.profile-facts dt{color:#6b7896;font-size:13px}.profile-facts dd{margin:0;display:flex;flex-wrap:wrap;gap:6px}
+.profile-role{background:var(--brand-soft);color:var(--brand);border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600}
+.profile-section{padding:18px}.profile-section h3{margin-top:0}
+.account-position{display:block;color:#5b6b8c;font-size:13px;margin-top:2px}
+@media(max-width:600px){.profile-card{flex-direction:column}.profile-chip{align-items:flex-start;text-align:left}}
+
+/* Пакет документов: одна строка — один документ, клик открывает его в окне просмотра. */
+.package-list .package-item{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0!important;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:6px;overflow:hidden}
+.package-list .package-item.is-open{border-color:var(--brand);box-shadow:inset 3px 0 0 var(--pink);background:var(--brand-soft)}
+.package-list .package-open{flex:1;min-width:0;display:flex!important;align-items:flex-start;gap:8px;text-align:left;border:0!important;background:transparent!important;padding:10px 10px!important;cursor:pointer;color:inherit;box-shadow:none!important}
+.package-list .package-open:hover{background:#f6f8fd!important}
+.package-list .package-open span{display:grid;gap:2px;min-width:0}.package-list .package-open b{color:#16244a}.package-list .package-open small{color:#5b6b8c}
+.package-list .package-open svg{margin-top:2px;color:var(--brand)}
+.package-download{margin-right:6px}
+.package-use{margin:0 10px 10px 34px;font-size:12px;border:1px solid #c5d0ec;background:#fff;color:var(--brand);border-radius:6px;padding:5px 9px}
+.package-print{color:#2e8b57!important;font-weight:700}
+.sheet-launch{display:inline-flex;align-items:center;gap:6px}

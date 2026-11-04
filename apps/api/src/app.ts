@@ -154,6 +154,13 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
     const act=(await db.query('INSERT INTO app.acts(res_id,author_id,contract_number,contract_date,act_number,applicant,address,act_type) VALUES($1,app.uid(),$2,$3,$4,$5,$6,$7) RETURNING *',[b.resId,contractNumber,b.contractDate,actNumber,b.applicant,b.address,b.actType])).rows[0];
     await audit(db,act.id,'CREATED');return act;
   });
+  // Участники документа (автор, исполнители задач, согласовавшие, авторы замечаний): ФИО и должность для листа согласования.
+  get('/api/v1/acts/:id/people',async(db,req)=>{
+    const act=requireValue((await db.query('SELECT id,author_id FROM app.acts WHERE id=$1',[id.parse(req.params.id)])).rows[0]);
+    return (await db.query(`SELECT DISTINCT ON (u) u AS id,app.act_user_label($1,u) AS label FROM (SELECT $2::uuid AS u UNION SELECT assignee_id FROM app.tasks WHERE act_id=$1
+      UNION SELECT d.actor_id FROM app.decisions d JOIN app.tasks t ON t.id=d.task_id WHERE t.act_id=$1 UNION SELECT author_id FROM app.comments WHERE act_id=$1
+      UNION SELECT created_by FROM app.versions WHERE act_id=$1) people WHERE u IS NOT NULL`,[act.id,act.author_id])).rows.map(r=>({id:r.id,name:r.label?.name??null,position:r.label?.position??null}));
+  },true);
   get('/api/v1/acts/:id/approval-matrix',async(db,req)=>approvalMatrix(db,id.parse(req.params.id),req.query.cycleId===undefined?undefined:id.parse(req.query.cycleId)));
   get('/api/v1/acts/:id',async(db,req)=>{
     const act=requireValue((await db.query('SELECT * FROM app.acts WHERE id=$1',[id.parse(req.params.id)])).rows[0]);

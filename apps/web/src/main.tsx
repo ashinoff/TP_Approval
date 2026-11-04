@@ -8,4 +8,5 @@ import './word.css';
 import './practical.css';
 import './engineer.css';
 import './workspace.css';
+import './theme.css';
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
