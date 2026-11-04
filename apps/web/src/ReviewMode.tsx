@@ -5,7 +5,7 @@ import {Icon,StatusBadge,dateTime,roleNames} from './Ui.js';
 import TuPreflight from './TuPreflight.js';
 import DecisionDialog from './DecisionDialog.js';
 import {SendButton,checkFor,isPreparing,openBlockers} from './ActDocument.js';
-import {initialVersion,type Section} from './workplace.js';
+import {initialVersion,remarkBlockReason,type Section} from './workplace.js';
 import {checkMarks,changedMarks,pairedBlock} from './review-marks.js';
 import './review.css';
 
@@ -70,7 +70,8 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  const rightMarks=useMemo(()=>!showMarks?[]:rightVersion?changedMarks(rightDoc.data?.model,leftDoc.data?.model,`версии ${version?.number}`):pairedTu?checkMarks(check,'tu'):[],[showMarks,rightVersion,leftDoc.data,rightDoc.data,check,pairedTu,version]);
  const [nav,setNav]=useState(-1);
  const goFlag=(step:number)=>{if(!flagged.length)return;const i=(nav+step+flagged.length)%flagged.length;setNav(i);const f=flagged[i];if(f.act?.[0]?.blockId)left.current?.scrollToBlock(f.act[0].blockId);if(pairedTu&&f.tu?.[0]?.blockId)right.current?.scrollToBlock(f.tu[0].blockId);};
- const addRemark=()=>{if(selection){setForm(selection);setPanel(true);setTab('remarks');}else setError('Выделите текст внутри одного абзаца, затем нажмите «＋ Замечание».');};
+ const blocked=remarkBlockReason(detail,tasks,profile,versionId);
+ const addRemark=()=>{if(blocked){setError(blocked);return;}if(selection){setForm(selection);setPanel(true);setTab('remarks');}else setError('Выделите текст внутри одного абзаца, затем нажмите «＋ Замечание».');};
 
  const notes:Row[]=detail.comments;
  const statusOf=(c:Row)=>c.events.filter((e:Row)=>e.version_id===versionId).at(-1)?.type??c.events.at(-1)?.type??'OPEN';
@@ -116,7 +117,7 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
      </select>
     </div>
     {showMarks&&(leftMarks.length>0)&&<div className="mark-legend review-legend">{rightVersion?<span><i className="changed"/>отличается от версии {rightVersion.number}</span>:<><span><i className="ok"/>совпадает с ТУ</span><span><i className="bad"/>расхождение</span><span><i className="warn"/>проверить вручную</span>{pairedTu&&<span className="legend-hint">клик по пункту — парный пункт в ТУ</span>}</>}</div>}
-    {leftDoc.data?<DocumentViewer key={versionId} ref={left} bytes={leftDoc.data.bytes} model={leftDoc.data.model} comments={versionNotes} onSelection={setSelection} onComment={id=>{setFocused(id);setPanel(true);setTab('remarks');}} focusedId={focused} focusRequest={focusRequest} onScrollRatio={sync?r=>right.current?.scrollToRatio(r):undefined} marks={leftMarks} onMarkClick={pairedTu?pairFromLeft:undefined} onAddRemark={effective?addRemark:undefined}/>:viewerTitle(leftDoc,kind)}
+    {leftDoc.data?<DocumentViewer key={versionId} ref={left} bytes={leftDoc.data.bytes} model={leftDoc.data.model} comments={versionNotes} onSelection={setSelection} onComment={id=>{setFocused(id);setPanel(true);setTab('remarks');}} focusedId={focused} focusRequest={focusRequest} onScrollRatio={sync?r=>right.current?.scrollToRatio(r):undefined} marks={leftMarks} onMarkClick={pairedTu?pairFromLeft:undefined} onAddRemark={addRemark} remarkBlocked={blocked}/>:viewerTitle(leftDoc,kind)}
    </section>
    <section className="review-pane" aria-label="Документ для сравнения">
     <div className="review-pane-head"><Icon name="file"/>

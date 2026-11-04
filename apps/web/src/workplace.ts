@@ -13,3 +13,17 @@ export function assignedVersion(detail:Row,tasks:Row[]){const task=tasks.find(t=
 export function initialVersion(detail:Row,tasks:Row[],section:Section){return (section==='approved'?detail.presentation.approvedPublication?.versionId:null)??assignedVersion(detail,tasks)??detail.versions.at(-1)?.id??'';}
 export function actUrl(id:string,section:Section,extra:Record<string,string>={}){return `#/acts/${id}?`+new URLSearchParams({section,...extra});}
 export function parseLocation(hash:string){const [path,query='']=hash.replace(/^#\/?/,'').split('?');const q=new URLSearchParams(query);const valid=(s:string|null):Section|undefined=>s&&s in sectionNames?s as Section:undefined;const match=/^acts\/([a-f0-9-]{36})$/i.exec(path);return {id:match?.[1],section:valid(q.get('section'))??valid(path),panel:q.get('panel')??'document',comment:q.get('comment')??undefined,version:q.get('version')??undefined};}
+/** Почему пользователь не может оставить замечание к этой версии; undefined — может. */
+export function remarkBlockReason(detail:Row,tasks:Row[],profile:Row,versionId:string|undefined):string|undefined{
+ const version=detail.versions.find((v:Row)=>v.id===versionId);
+ if(!version)return 'Документ ещё не загружен.';
+ const cycle=detail.cycles.find((c:Row)=>c.version_id===versionId);
+ const mine=tasks.filter(t=>t.act_id===detail.id&&t.role!=='RIRU_ENGINEER');
+ const task=mine.find(t=>t.cycle_id===cycle?.id);
+ if(task&&detail.author_id!==profile.id&&version.created_by!==profile.id)return undefined;
+ if(detail.author_id===profile.id||version.created_by===profile.id)return 'Вы автор этого документа: замечания оставляют согласующие. Исправления вносятся новой версией.';
+ if(mine.length){const other=detail.versions.find((v:Row)=>detail.cycles.some((c:Row)=>c.id===mine[0].cycle_id&&c.version_id===v.id));return `Ваша задача относится к версии ${other?.number??'другой'} — выберите её в списке версий.`;}
+ if(['DRAFT','RETURNED','REVISING'].includes(detail.state))return 'Документ не на согласовании: замечания оставляют согласующие после отправки.';
+ const route=detail.presentation?.route;const active=[route?.head,route?.res,...(route?.parallel??[])].filter((s:Row|null)=>s?.status==='active').map((s:Row)=>s.label);
+ return `Замечания оставляет согласующий текущего этапа${active.length?` (${active.join(', ')})`:''}. У вас нет открытой задачи по этой версии документа.`;
+}

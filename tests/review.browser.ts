@@ -60,7 +60,9 @@ try{
  await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();await review.getByText(/⚠ Расхождение/).first().waitFor({timeout:20000});
  const frames=review.locator('iframe');const actFrame=frames.nth(0).contentFrame(),tuFrame=frames.nth(1).contentFrame();
  await actFrame.locator('p[data-mark=bad]').filter({hasText:'150 кВт'}).waitFor({timeout:15000});await tuFrame.locator('p[data-mark=bad]').filter({hasText:'15 кВт'}).waitFor({timeout:15000});
- assert.ok(await actFrame.locator('p[data-mark=ok]').count()>=3,'Matching requisites are marked green');assert.match(await actFrame.locator('p[data-mark=bad]').first().getAttribute('title')??'',/расхождение — в акте 150 кВт, в ТУ 15 кВт/);
+ assert.ok(await actFrame.locator('p[data-mark=ok]').count()>=3,'Matching requisites are marked green');
+ // Абзацы с табуляцией и переносом строки (как в реальных документах) тоже размечаются.
+ await tuFrame.locator('p[data-mark=ok]').filter({hasText:'д. 15/31'}).waitFor();await actFrame.locator('p[data-mark=ok]').filter({hasText:'д. 15/31'}).waitFor();assert.match(await actFrame.locator('p[data-mark=bad]').first().getAttribute('title')??'',/расхождение — в акте 150 кВт, в ТУ 15 кВт/);
  // Увеличение: при прокрутке до упора влево страница видна целиком (раньше левая часть «съедалась»).
  for(let i=0;i<8;i++)await review.getByRole('button',{name:'Увеличить'}).first().click();
  assert.equal(await review.locator('.zoom-control output').first().textContent(),'140%');
@@ -74,8 +76,12 @@ try{
  await page.getByRole('button',{name:'Режим проверки'}).click();await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();
  await review.getByText('Проверенные реквизиты совпали. Можно отправить на согласование.',{exact:true}).waitFor({timeout:20000});
  await review.getByRole('button',{name:'Отправить на согласование',exact:true}).click();await page.waitForTimeout(1500);await shot('03-sent');
+ // Автор не может оставлять замечания — кнопка у выделения объясняет причину, а не молчит.
+ const own=review.locator('iframe').nth(0).contentFrame().locator('p[data-block-id]').filter({hasText:'Класс напряжения'}).first();
+ await own.evaluate((el:Element)=>{const doc=el.ownerDocument,r=doc.createRange();r.selectNodeContents(el);doc.getSelection()!.removeAllRanges();doc.getSelection()!.addRange(r);el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));});
+ await review.getByRole('button',{name:'＋ Замечание'}).click();await review.getByRole('alert').filter({hasText:'Вы автор этого документа'}).waitFor();
  await review.getByRole('button',{name:'Завершить проверку'}).click();
- console.log('OK 3: corrected version passes check and is sent from review mode');
+ console.log('OK 3: corrected version passes check and is sent from review mode; author gets an explanation instead of a silent selection');
  // 4. Начальник РИРУ: замечание к выделенному фрагменту в режиме проверки.
  await page.getByRole('button',{name:'Выйти',exact:true}).click();await login('head');
  await page.locator('[data-testid^="registry-row-"]').first().click();await page.getByRole('button',{name:'Режим проверки'}).click();
@@ -83,6 +89,7 @@ try{
  await left.locator('p[data-block-id]').filter({hasText:'15 кВт'}).first().evaluate((el:Element)=>{const doc=el.ownerDocument,w=doc.createTreeWalker(el,4);let n;while(n=w.nextNode()){const i=n.textContent!.indexOf('15 кВт');if(i>=0){const r=doc.createRange();r.setStart(n,i);r.setEnd(n,i+6);doc.getSelection()!.removeAllRanges();doc.getSelection()!.addRange(r);el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));return;}}});
  await review.getByRole('button',{name:'＋ Замечание'}).click();await review.getByLabel('Текст замечания').fill('Сверить мощность с расчётом нагрузки (синтетическое замечание).');
  await review.getByRole('button',{name:'Сохранить замечание',exact:true}).click();await review.locator('.review-note').first().waitFor({timeout:15000});await left.locator('mark[data-remark-ids]').first().waitFor({timeout:15000});
+ assert.equal(await left.locator('mark[data-remark-ids]').first().textContent(),'15 кВт','Remark is anchored exactly to the selected words in a paragraph with a tab');
  await page.waitForTimeout(500);await shot('04-review-head');
  await review.getByRole('combobox',{name:'Документ для сравнения'}).selectOption({label:'Акт ТП · версия 1'});
  const changed=review.locator('iframe').nth(0).contentFrame().locator('p[data-mark=changed]');await changed.filter({hasText:'15 кВт'}).waitFor({timeout:15000});

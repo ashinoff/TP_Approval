@@ -8,7 +8,7 @@ import DocumentCardPanel from './DocumentCard.js';
 import ReviewMode from './ReviewMode.js';
 import {checkMarks} from './review-marks.js';
 import DecisionDialog from './DecisionDialog.js';
-import {initialVersion,assignedVersion,type Section} from './workplace.js';
+import {initialVersion,assignedVersion,remarkBlockReason,type Section} from './workplace.js';
 
 type Row=Record<string,any>;
 type Api=(p:string,b?:object|FormData)=>Promise<any>;
@@ -153,7 +153,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
     {openTu&&<TuViewer key={openTu} detail={detail} tuId={openTu} api={api} loadFile={loadFile}/>}
     {!current&&!openTu&&<div className="empty-document"><p>Загрузите DOCX в панели «Пакет документов», чтобы начать работу с документом.</p></div>}
     {current&&<div className="word-grid" style={referenceView?{display:'none'}:undefined}>
-     <div className="word-document">{model&&bytes?<DocumentViewer key={versionId} ref={viewerRef} bytes={bytes} model={model} comments={versionNotes} onSelection={setSelection} onComment={focus} focusedId={focused} focusRequest={focusRequest} marks={actMarks} onAddRemark={effective&&!form?()=>{if(selection){setForm(selection);dirty('remark',true);}}:undefined}/>:!error&&<p role="status">Загрузка документа…</p>}</div>
+     <div className="word-document">{model&&bytes?<DocumentViewer key={versionId} ref={viewerRef} bytes={bytes} model={model} comments={versionNotes} onSelection={setSelection} onComment={focus} focusedId={focused} focusRequest={focusRequest} marks={actMarks} onAddRemark={form?undefined:()=>{const why=remarkBlockReason(detail,tasks,profile,versionId);if(why){setError(why);return;}if(selection){setForm(selection);dirty('remark',true);}}} remarkBlocked={remarkBlockReason(detail,tasks,profile,versionId)}/>:!error&&<p role="status">Загрузка документа…</p>}</div>
      <aside className="word-remarks" aria-label="Замечания к документу">
       {showCheck&&<details className="side-block check-block" open={preparing||!!effective||undefined}>
        <summary>{checkSummary(check)}</summary>
