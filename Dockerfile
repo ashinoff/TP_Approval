@@ -11,9 +11,10 @@ RUN npx tsc -p tsconfig.setup.json
 RUN npm prune --omit=dev
 
 FROM node:22-bookworm-slim
-ENV NODE_ENV=production AUTH_MODE=local HOST=0.0.0.0 PORT=3000 WEB_PATH=/app/dist/web STORAGE_PATH=/data/storage TRUST_PROXY_HOPS=1
+ENV NODE_ENV=production AUTH_MODE=local HOST=0.0.0.0 PORT=3000 WEB_PATH=/app/dist/web STORAGE_PATH=/data/storage TRUST_PROXY_HOPS=1 CLAMAV_HOST=127.0.0.1 CLAMAV_PORT=3310
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends gosu ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends gosu ca-certificates clamav-daemon clamav-freshclam && rm -rf /var/lib/apt/lists/*
+COPY infra/clamav-embedded/clamd.conf infra/clamav-embedded/freshclam.conf /etc/clamav/
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
