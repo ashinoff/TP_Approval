@@ -11,7 +11,7 @@ import pg from 'pg';
 import {runMatrixIntegration} from '../tests/matrix.integration.js';
 import {runLocalAuthIntegration} from '../tests/local-auth.integration.js';
 import {runStandaloneBrowser} from '../tests/standalone.browser.js';
-import {bootstrapLocalAdmin} from './setup-standalone.js';
+import {setupStandalone} from './setup-standalone.js';
 import {createApp} from '../apps/api/src/app.js';
 import {createServer as httpsServer} from 'node:https';
 
@@ -48,9 +48,13 @@ try {
   await runLocalAuthIntegration(localUrl,`postgres://tp_runtime:${runtimePassword}@127.0.0.1:${port}/local_auth_tests`,root);
   if(process.argv.includes('--standalone-browser')){
     const setup=new pg.Client({connectionString:url});await setup.connect();try{await setup.query('CREATE DATABASE standalone_browser');}finally{await setup.end();}
-    const browserOwner=`postgres://postgres:${password}@127.0.0.1:${port}/standalone_browser`,browserRuntime=`postgres://tp_runtime:${runtimePassword}@127.0.0.1:${port}/standalone_browser`;
-    await migrate(browserOwner,runtimePassword);
-    const initialPassword=randomBytes(24).toString('hex');await bootstrapLocalAdmin(browserOwner,initialPassword);
+    // Exercise the real entrypoint setup with an existing-format DB password (<16 characters).
+    const browserPassword=randomBytes(8).toString('base64url');
+    const browserOwner=`postgres://postgres:${password}@127.0.0.1:${port}/standalone_browser`,browserRuntime=`postgres://tp_runtime:${browserPassword}@127.0.0.1:${port}/standalone_browser`;
+    const initialPassword=randomBytes(24).toString('hex');
+    const setupEnv={AUTH_MODE:'local',DATABASE_URL:browserRuntime,MIGRATION_DATABASE_URL:browserOwner};
+    await setupStandalone({...setupEnv,INITIAL_ADMIN_PASSWORD:initialPassword});
+    await setupStandalone(setupEnv);
     await run('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',resolve(root,'tls.key'),'-out',resolve(root,'tls.crt'),'-days','1','-subj','/CN=localhost']);
     const tls={key:await readFile(resolve(root,'tls.key')),cert:await readFile(resolve(root,'tls.crt'))};
     let browserPool=new pg.Pool({connectionString:browserRuntime});

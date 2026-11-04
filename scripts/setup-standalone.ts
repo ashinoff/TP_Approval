@@ -27,7 +27,8 @@ export async function setupStandalone(env:NodeJS.ProcessEnv) {
   if(!['postgres:','postgresql:'].includes(runtime.protocol)||!['postgres:','postgresql:'].includes(owner.protocol))throw new Error('Ожидаются адреса PostgreSQL');
   if(runtime.hostname!==owner.hostname||(runtime.port||'5432')!==(owner.port||'5432')||runtime.pathname!==owner.pathname)throw new Error('Адреса должны указывать на одну отдельную базу TP_Approval');
   const runtimePassword=decodeURIComponent(runtime.password);
-  if(decodeURIComponent(runtime.username)!=='tp_runtime'||runtimePassword.length<16)throw new Error('В DATABASE_URL укажите tp_runtime и отдельный пароль от 16 символов');
+  if(decodeURIComponent(runtime.username)!=='tp_runtime')throw new Error('В DATABASE_URL укажите пользователя tp_runtime; он будет создан автоматически при первичной настройке');
+  if(!runtimePassword)throw new Error('В DATABASE_URL укажите пароль пользователя tp_runtime');
   if(decodeURIComponent(owner.username)==='tp_runtime')throw new Error('Для миграций нужна отдельная роль владельца БД');
   await migrate(env.MIGRATION_DATABASE_URL,runtimePassword);
   const created=await bootstrapLocalAdmin(env.MIGRATION_DATABASE_URL,env.INITIAL_ADMIN_PASSWORD,env.INITIAL_ADMIN_LOGIN??'admin',env.INITIAL_ADMIN_NAME??'Администратор');
