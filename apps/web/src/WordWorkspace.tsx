@@ -1,10 +1,11 @@
 import {useEffect,useRef,useState,useMemo} from 'react';
-import DocumentViewer,{type SelectionAnchor} from './DocumentViewer.js';
+import DocumentViewer,{type SelectionAnchor,type DocumentViewerHandle} from './DocumentViewer.js';
 import {Icon,dateTime,roleNames} from './Ui.js';
 import PreparationControls,{SendButton,checkFor,isPreparing,openBlockers} from './ActDocument.js';
 import PackagePanel from './ContractDocuments.js';
 import TuPreflight from './TuPreflight.js';
 import DocumentCardPanel from './DocumentCard.js';
+import ReviewMode from './ReviewMode.js';
 import DecisionDialog from './DecisionDialog.js';
 import {initialVersion,assignedVersion,type Section} from './workplace.js';
 
@@ -51,6 +52,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
  const referenceView=!!openTu;
  const [focusRequest,setFocusRequest]=useState(0);
  const [choice,setChoice]=useState<'approve'|'return'>();
+ const [reviewOpen,setReviewOpen]=useState(false);
  const dirtyKeys=useRef(new Set<string>());
  const dirty=(key:string,value:boolean)=>{if(value)dirtyKeys.current.add(key);else dirtyKeys.current.delete(key);onDirty(dirtyKeys.current.size>0);};
  const [versionId,setVersionId]=useState(()=>detail.comments.find((c:Row)=>c.id===focusComment)?.version_id??(detail.versions.some((v:Row)=>v.id===focusVersion)?focusVersion!:initialVersion(detail,tasks,section)));
@@ -61,7 +63,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
  const [compare,setCompare]=useState<Row>(),[comparing,setComparing]=useState(false);
  const [noteFilter,setNoteFilter]=useState<'all'|'open'|'waiting'|'mine'>('all');
  const explanations=useRef<Record<string,string>>({});
- const viewerRef=useRef<{scrollToBlock:(id:string)=>void}>(null);
+ const viewerRef=useRef<DocumentViewerHandle>(null);
 
  const newest=detail.versions.at(-1);
  const current=detail.versions.find((v:Row)=>v.id===versionId);
@@ -124,6 +126,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
     </select>
    </label>
    <span className="word-meta">{!current?'файл не загружен':cycle?`цикл согласования ${cycle.number}`:'ещё не отправлялась'}</span>
+   {current&&<button className="primary-button review-launch" onClick={()=>{if(canLeave())setReviewOpen(true);}} title="Акт и ТУ рядом, замечания и автосверка"><Icon name="file"/>Режим проверки</button>}
    {current&&<button className="text-button" disabled={busy} onClick={()=>void action(()=>onDownload(current.file_id,current.number))}><Icon name="download"/>Скачать оригинал</button>}
    <span className="word-limit" title="Просмотр приблизительный: переносы строк, поля и разрывы страниц могут отличаться от Word. Для печати и работы используйте исходный DOCX.">Просмотр приблизительный</span>
    <span className="word-heading-spacer"/>
@@ -134,6 +137,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
    </div>}
    {preparing&&<SendButton detail={detail} api={api} action={action} busy={busy}/>}
   </div>
+  {reviewOpen&&<ReviewMode detail={detail} profile={profile} tasks={tasks} api={api} loadFile={loadFile} action={action} busy={busy} section={section} startVersion={versionId} onClose={()=>setReviewOpen(false)}/>}
   {historical&&<p role="note" className="historical-note">Историческая версия · только просмотр. Решения недоступны.{assigned?<button onClick={()=>changeVersion(assigned)}>Открыть назначенную версию</button>:newest&&<button onClick={()=>changeVersion(newest.id)}>Открыть последнюю версию</button>}</p>}
   {choice&&effective&&<DecisionDialog record={{act_number:detail.act_number,version:current.number,cycle:cycle.number}} comments={notes.filter(c=>c.task_id===task.id)} choice={choice} busy={busy} onClose={()=>setChoice(undefined)} onSubmit={reason=>void action(async()=>{await api(`/api/v1/tasks/${task.id}/decision`,{decision:choice==='approve'?'APPROVE':'RETURN',reason,versionId});setChoice(undefined);})}/>}
   {error&&<p role="alert" className="error">{error}</p>}

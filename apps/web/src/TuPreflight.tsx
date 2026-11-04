@@ -11,11 +11,12 @@ const RULES_HINT='Сверка выполняется локально по пр
 /** Shown value: the human form if the rule supplied one, otherwise the paragraph text. */
 const shown=(v:Row)=>v.shown??v.quote;
 
-function Evidence({side,values,onJump}:{side:string;values:Row[];onJump?:(blockId:string)=>void}){
+type Jump=(blockId:string,side:'act'|'tu')=>void;
+function Evidence({side,values,onJump}:{side:string;values:Row[];onJump?:Jump}){
  if(!values?.length)return <p className="tu-evidence tu-evidence-missing"><span>{side}</span>не найдено</p>;
  return <>{values.map((v,i)=><p className="tu-evidence" key={i}>
   <span>{side}</span>
-  {onJump?<button type="button" className="tu-quote" title={v.quote} onClick={()=>onJump(v.blockId)}>{shown(v)}</button>:<q title={v.quote}>{shown(v)}</q>}
+  {onJump?<button type="button" className="tu-quote" title={v.quote} onClick={()=>onJump(v.blockId,side==='ТУ'?'tu':'act')}>{shown(v)}</button>:<q title={v.quote}>{shown(v)}</q>}
  </p>)}</>;
 }
 
@@ -35,7 +36,8 @@ function ConfirmForm({field,busy,onConfirm}:{field:Row;busy:boolean;onConfirm:(f
  * «Сверка с ТУ». The engineer runs the check and confirms disputable items; reviewers see the same report read-only,
  * including who confirmed what manually.
  */
-export default function TuPreflight({check,required,busy,editable=true,onCheck,onConfirm,onJump}:{check?:Row;required:boolean;busy:boolean;editable?:boolean;onCheck?:()=>void;onConfirm?:(field:string,comment:string)=>void;onJump?:(blockId:string)=>void}){
+export default function TuPreflight({check,required,busy,editable=true,onCheck,onConfirm,onJump,tuJump}:{check?:Row;required:boolean;busy:boolean;editable?:boolean;onCheck?:()=>void;onConfirm?:(field:string,comment:string)=>void;onJump?:Jump;tuJump?:boolean}){
+ const onTuJump=tuJump?onJump:undefined;
  const findings:Row[]=check?.findings??[];
  const confirmations:Row[]=check?.confirmations??[];
  const confirmed=new Map<string,Row>(confirmations.map(c=>[c.field as string,c] as [string,Row]));
@@ -71,7 +73,7 @@ export default function TuPreflight({check,required,busy,editable=true,onCheck,o
      </div>
      {f.status!=='MATCH'&&<p className="tu-reason">{f.reason}</p>}
      <Evidence side="Акт" values={f.act} onJump={onJump}/>
-     <Evidence side="ТУ" values={f.tu}/>
+     <Evidence side="ТУ" values={f.tu} onJump={onTuJump}/>
      {confirmation&&<p className="tu-confirmed">Подтверждено вручную: {confirmation.actorName}, {dateTime(confirmation.createdAt)}. «{confirmation.comment}»</p>}
      {!confirmation&&editable&&onConfirm&&CONFIRMABLE.includes(f.status)&&<ConfirmForm field={f} busy={busy} onConfirm={onConfirm}/>}
     </li>;
@@ -82,7 +84,7 @@ export default function TuPreflight({check,required,busy,editable=true,onCheck,o
    <ul>
     {findings.filter(f=>f.status==='MATCH').map(f=><li key={f.field} className="tu-match">
      <span className="tu-match-label">✓ {f.label}</span>
-     <span className="tu-match-value" title={f.act[0]?.quote}>{f.act[0]?(onJump?<button type="button" className="tu-quote" onClick={()=>onJump(f.act[0].blockId)}>{shown(f.act[0])}</button>:shown(f.act[0])):''}</span>
+     <span className="tu-match-value" title={f.act[0]?.quote}>{f.act[0]?(onJump?<button type="button" className="tu-quote" onClick={()=>onJump(f.act[0].blockId,'act')}>{shown(f.act[0])}</button>:shown(f.act[0])):''}</span>
     </li>)}
    </ul>
   </details>}

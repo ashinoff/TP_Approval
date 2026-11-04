@@ -4,10 +4,11 @@ import DOMPurify from 'dompurify';
 type Row=Record<string,any>;
 export type SelectionAnchor={kind:'OOXML_PARAGRAPH_V1';part:string;blockId:string;blockHash:string;fileHash:string;start:number;end:number;quote:string};
 const frameHtml=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data: blob:; base-uri 'none'; form-action 'none'"></head><body></body></html>`;
-export type DocumentViewerHandle={scrollToBlock:(blockId:string)=>void};
-export default function DocumentViewer({bytes,model,comments,onSelection,onComment,focusedId,focusRequest,ref}:{bytes:ArrayBuffer;model:Row;comments:Row[];onSelection:(a:SelectionAnchor|null)=>void;onComment:(id:string)=>void;focusedId?:string;focusRequest?:number;ref?:Ref<DocumentViewerHandle>}){
+export type DocumentViewerHandle={scrollToBlock:(blockId:string)=>void;highlightBlocks:(blockIds:string[])=>void;scrollToRatio:(ratio:number)=>void};
+export default function DocumentViewer({bytes,model,comments,onSelection,onComment,focusedId,focusRequest,onScrollRatio,ref}:{bytes:ArrayBuffer;model:Row;comments:Row[];onSelection:(a:SelectionAnchor|null)=>void;onComment:(id:string)=>void;focusedId?:string;focusRequest?:number;onScrollRatio?:(ratio:number)=>void;ref?:Ref<DocumentViewerHandle>}){
  const frame=useRef<HTMLIFrameElement>(null);const [ready,setReady]=useState(0),[error,setError]=useState(''),[zoom,setZoom]=useState(85),[zoomChosen,setZoomChosen]=useState(false),[pages,setPages]=useState(0),[page,setPage]=useState(1),[query,setQuery]=useState(''),[hits,setHits]=useState<HTMLElement[]>([]),[hit,setHit]=useState(0);
- const callbacks=useRef({onSelection,onComment});callbacks.current={onSelection,onComment};
+ const callbacks=useRef({onSelection,onComment,onScrollRatio});callbacks.current={onSelection,onComment,onScrollRatio};
+ const silentScroll=useRef(false),highlighted=useRef<string[]>([]);
  // Lets the TU check panel show the paragraph a finding was taken from.
  useImperativeHandle(ref,()=>({scrollToBlock(blockId:string){
   const doc=frame.current?.contentDocument;
@@ -16,13 +17,32 @@ export default function DocumentViewer({bytes,model,comments,onSelection,onComme
   paragraph.scrollIntoView({block:'center'});
   paragraph.classList.add('jump-hit');
   setTimeout(()=>paragraph.classList.remove('jump-hit'),1800);
+ },
+ // Постоянная подсветка абзацев (например, расхождений автосверки) до следующего вызова.
+ highlightBlocks(blockIds:string[]){
+  highlighted.current=blockIds;
+  const doc=frame.current?.contentDocument;if(!doc)return;
+  doc.querySelectorAll('.check-hit').forEach(p=>p.classList.remove('check-hit'));
+  for(const id of blockIds)doc.querySelector(`p[data-block-id="${CSS.escape(id)}"]`)?.classList.add('check-hit');
+ },
+ // Синхронная прокрутка: доля прокрутки 0..1, без обратного события.
+ scrollToRatio(ratio:number){
+  const win=frame.current?.contentWindow,root=frame.current?.contentDocument?.documentElement;if(!win||!root)return;
+  silentScroll.current=true;win.scrollTo({top:Math.max(0,ratio*(root.scrollHeight-win.innerHeight))});
  }}),[]);
+ useEffect(()=>{
+  const win=frame.current?.contentWindow,doc=frame.current?.contentDocument;if(!ready||!win||!doc)return;
+  // Подсветка переживает повторную отрисовку документа.
+  for(const id of highlighted.current)doc.querySelector(`p[data-block-id="${CSS.escape(id)}"]`)?.classList.add('check-hit');
+  const scroll=()=>{if(silentScroll.current){silentScroll.current=false;return;}const max=doc.documentElement.scrollHeight-win.innerHeight;callbacks.current.onScrollRatio?.(max>0?win.scrollY/max:0);};
+  win.addEventListener('scroll',scroll,{passive:true});return()=>win.removeEventListener('scroll',scroll);
+ },[ready]);
  useEffect(()=>{let active=true;let started=false;let cleanup=()=>{};const run=async()=>{const doc=frame.current?.contentDocument;if(!doc?.body||!doc.querySelector('meta[http-equiv]')||started)return;started=true;setReady(0);setError('');callbacks.current.onSelection(null);
  try{const host=document.createElement('div'),styles=document.createElement('div');await renderAsync(bytes,host,styles,{renderHeaders:true,renderFooters:true,renderComments:false,renderAltChunks:false,ignoreLastRenderedPageBreak:false,breakPages:true,useBase64URL:true});if(!active)return;
  // Sanitize in the creating realm, then adopt into an iframe with no scripts/network/navigation.
  const safe=DOMPurify.sanitize(host.innerHTML,{FORBID_TAGS:['style','script','iframe','object','embed','form','input','button','svg','math','link','meta'],FORBID_ATTR:['srcset','formaction','action','href']});
  const css=[...styles.querySelectorAll('style')].map(s=>s.textContent??'').join('\n').replace(/@import[^;]*;/gi,'').replace(/url\((?!\s*["']?(?:data:|blob:))[^)]*\)/gi,'url("")');
- doc.body.innerHTML=safe;const style=doc.createElement('style');style.textContent=css+`\nhtml{background:#e9eef2}body{margin:0}.docx-wrapper{padding:20px!important;background:#e9eef2!important;zoom:var(--scale,.85)}mark[data-remark-ids]{background:#ffd9d3;color:inherit;box-shadow:inset 0 -2px 0 #c62828;border-radius:2px;padding:0 1px;cursor:pointer}mark[data-remark-ids]:hover{background:#ffc4ba}mark[data-remark-ids]:focus{outline:2px solid #c62828;outline-offset:1px}.jump-hit{background:#fff1b8!important;box-shadow:0 0 0 4px #fff1b8;transition:background .4s}.search-hit{outline:3px solid #d7a82e}.docx-wrapper>section{position:relative}.page-caption{font:12px sans-serif;color:#7b8d96;text-align:center;margin-bottom:8px}.docx-wrapper a{pointer-events:none}`;doc.head.querySelectorAll('style').forEach(s=>s.remove());doc.head.append(style);
+ doc.body.innerHTML=safe;const style=doc.createElement('style');style.textContent=css+`\nhtml{background:#e9eef2}body{margin:0}.docx-wrapper{padding:20px!important;background:#e9eef2!important;zoom:var(--scale,.85)}mark[data-remark-ids]{background:#ffd9d3;color:inherit;box-shadow:inset 0 -2px 0 #c62828;border-radius:2px;padding:0 1px;cursor:pointer}mark[data-remark-ids]:hover{background:#ffc4ba}mark[data-remark-ids]:focus{outline:2px solid #c62828;outline-offset:1px}.jump-hit{background:#fff1b8!important;box-shadow:0 0 0 4px #fff1b8;transition:background .4s}.check-hit{background:#ffe7a3;box-shadow:0 0 0 3px #ffe7a3;border-radius:2px}.search-hit{outline:3px solid #d7a82e}.docx-wrapper>section{position:relative}.page-caption{font:12px sans-serif;color:#7b8d96;text-align:center;margin-bottom:8px}.docx-wrapper a{pointer-events:none}`;doc.head.querySelectorAll('style').forEach(s=>s.remove());doc.head.append(style);
  for(const el of doc.body.querySelectorAll<HTMLElement>('[style]')){if(/url\s*\(/i.test(el.getAttribute('style')??''))el.removeAttribute('style');}
  const paragraphs=doc.body.querySelectorAll<HTMLElement>('article p,header p,footer p');for(const p of paragraphs){const part=p.closest('header')?'header':p.closest('footer')?'footer':'document';const candidates=model.blocks.filter((b:Row)=>b.part.includes('/'+part)&&b.text===p.textContent&&b.text.length);if(candidates.length===1){p.dataset.blockId=candidates[0].id;p.dataset.blockHash=candidates[0].sha256;}}
  const sections=Array.from(doc.querySelectorAll<HTMLElement>('section.docx'));sections.forEach((s,i)=>{s.id=`preview-page-${i+1}`;const caption=doc.createElement('div');caption.className='page-caption';caption.textContent=`Страница предпросмотра ${i+1}`;s.before(caption);});setPages(sections.length);setPage(1);
