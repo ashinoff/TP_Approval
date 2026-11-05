@@ -19,6 +19,7 @@ import {preview,createRemark,compareVersions} from './documents.js';
 import {documentKinds,documentFilename,contractDocuments,registerDocument,selectTechnicalConditions,tuPreview} from './contract-documents.js';
 import {checkTechnicalConditions,confirmTuFinding,enforceTechnicalConditions} from './tu-validation.js';
 import {currentRulesVersion,referenceBooks,saveReferenceBook} from './references.js';
+import {renderVector} from './vector.js';
 import {adminDocuments,applyRestoreFiles,backupPath,createBackup,deleteBackup,listBackups,purge,readBackup,recordServerError,removeFiles,serviceCleanup,serviceHealth,stageRestoreFiles} from './admin-service.js';
 import {extractTuMetadata} from './tu-import.js';
 import {requireContractNumber} from './contract-number.js';
@@ -109,6 +110,12 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   });
   const calendarAdmin=async(db:DB)=>{if(!(await db.query("SELECT app.has_role('PROCESS_ADMIN') OR app.has_role('TECH_ADMIN') AS yes")).rows[0].yes)throw new HttpError(403,'ROLE_REQUIRED');};
   get('/api/v1/references',async db=>referenceBooks(db));
+  // Рисунки EMF/WMF (схемы Visio) → PNG для просмотра; кэш по sha256, любой вошедший пользователь.
+  app.post('/api/v1/render/vector',express.raw({type:'application/octet-stream',limit:'10mb'}),async(req,res)=>{
+   if(!res.locals.userId)throw new HttpError(401,'UNAUTHENTICATED');
+   const png=await renderVector(config.storagePath,Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0));
+   res.type('image/png').set('Cache-Control','private, max-age=86400').send(png);
+  });
   // Сервисное меню (TECH_ADMIN): удаление насовсем, состояние, очистка, резервные копии. Файлы с диска — после фиксации транзакции.
   const techAdmin=(db:DB)=>role(db,'TECH_ADMIN');
   const adminName=async(db:DB)=>(await db.query('SELECT app.my_profile() AS p')).rows[0].p?.name as string|undefined;

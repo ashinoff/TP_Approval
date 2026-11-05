@@ -13,7 +13,9 @@ RUN npm prune --omit=dev
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production AUTH_MODE=local HOST=0.0.0.0 PORT=3000 WEB_PATH=/app/dist/web STORAGE_PATH=/data/storage TRUST_PROXY_HOPS=1 CLAMAV_HOST=127.0.0.1 CLAMAV_PORT=3310
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends gosu ca-certificates clamav-daemon clamav-freshclam && rm -rf /var/lib/apt/lists/*
+# LibreOffice Draw (без интерфейса) переводит рисунки EMF/WMF схем Visio в PNG для просмотра; шрифты, метрически
+# совместимые с Times New Roman/Arial, — чтобы подписи на схемах не «разъезжались».
+RUN apt-get update && apt-get install -y --no-install-recommends gosu ca-certificates clamav-daemon clamav-freshclam     libreoffice-draw-nogui fonts-liberation2 fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
 COPY infra/clamav-embedded/clamd.conf infra/clamav-embedded/freshclam.conf /etc/clamav/
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules

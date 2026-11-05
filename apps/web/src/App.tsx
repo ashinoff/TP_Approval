@@ -11,6 +11,7 @@ import CalendarAdmin from './CalendarAdmin.js';
 import CardFieldsAdmin from './CardFieldsAdmin.js';
 import ReferenceBooks from './ReferenceBooks.js';
 import ServiceMenu from './ServiceMenu.js';
+import {setVectorRenderer} from './vector-preview.js';
 import ProfilePage,{profileSubtitle} from './ProfilePage.js';
 import {Icon,dateTime} from './Ui.js';
 import {defaultSection,parseLocation,actUrl,sectionNames,documentTabs,documentTabNames,registryView,type Section} from './workplace.js';
@@ -52,6 +53,8 @@ useEffect(()=>{if(!profile?.id)return;let pending=false;const tick=async()=>{if(
 useEffect(()=>{if(!route.id&&!listBusy&&restoreScroll.current){restoreScroll.current=false;requestAnimationFrame(()=>window.scrollTo(0,stateRef.current.lists[stateRef.current.section].scroll));}},[route.id,querySignature,listBusy,registry]);
 const action=useCallback(async(fn:()=>Promise<unknown>)=>{if(busyRef.current)return;busyRef.current=true;setBusy(true);setError('');try{await fn();}catch(e){setError((e as Error).message);}finally{try{await refresh();const id=stateRef.current.route.id;if(id)await loadDetail(id);}catch(e){setError((e as Error).message);}busyRef.current=false;setBusy(false);}},[refresh,loadDetail]);
 const loadFile=useCallback(async(id:string)=>{const r=await fetch('/api/v1/files/'+id+'/download',{headers:authModeRef.current==='local'?{}:{Authorization:'Bearer '+tokenRef.current}});if(!r.ok)throw new Error('Документ недоступен');return r.arrayBuffer();},[]);
+// Схемы Visio (EMF) переводятся в PNG на сервере для просмотра — с теми же правами, что и остальные запросы.
+useEffect(()=>{setVectorRenderer(token?async bytes=>{const r=await fetch('/api/v1/render/vector',{method:'POST',headers:{...(authModeRef.current==='local'?{'X-CSRF-Token':tokenRef.current}:{Authorization:'Bearer '+tokenRef.current}),'Content-Type':'application/octet-stream'},body:bytes as BodyInit});return r.ok?r.blob():null;}:undefined);},[token]);
 const downloadPath=async(path:string,name:string)=>{const r=await fetch(path,{headers:authModeRef.current==='local'?{}:{Authorization:'Bearer '+tokenRef.current}});if(!r.ok)throw new Error('Файл недоступен');const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 const download=async(id:string,n:number)=>{const r=await fetch('/api/v1/files/'+id+'/download',{headers:authModeRef.current==='local'?{}:{Authorization:'Bearer '+tokenRef.current}});if(!r.ok)throw new Error('Документ недоступен');const disposition=r.headers.get('Content-Disposition')??'';const encoded=/filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];const plain=/filename="([^"]+)"/i.exec(disposition)?.[1];const filename=encoded?decodeURIComponent(encoded):plain??('акт-v'+n+'.docx');const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 const demoLogin=async()=>{try{const r=await fetch(demoOrigin+'/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subject:demoUser})});if(!r.ok)throw new Error('Вход недоступен');setToken((await r.json()).token);}catch(e){setError((e as Error).message);}};
