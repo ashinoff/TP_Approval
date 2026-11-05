@@ -6,7 +6,7 @@ import TuPreflight from './TuPreflight.js';
 import DecisionDialog from './DecisionDialog.js';
 import {SendButton,checkFor,isPreparing,openBlockers} from './ActDocument.js';
 import {initialVersion,remarkBlockReason,type Section} from './workplace.js';
-import {checkMarks,changedMarks,pairedBlock} from './review-marks.js';
+import {checkMarks,changedMarks,pairedBlock,findingTone} from './review-marks.js';
 import './review.css';
 
 type Row=Record<string,any>;
@@ -69,7 +69,7 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  const leftMarks=useMemo(()=>!showMarks?[]:rightVersion?changedMarks(leftDoc.data?.model,rightDoc.data?.model,`версии ${rightVersion.number}`):checkMarks(check,'act'),[showMarks,rightVersion,leftDoc.data,rightDoc.data,check]);
  const rightMarks=useMemo(()=>!showMarks?[]:rightVersion?changedMarks(rightDoc.data?.model,leftDoc.data?.model,`версии ${version?.number}`):pairedTu?checkMarks(check,'tu'):[],[showMarks,rightVersion,leftDoc.data,rightDoc.data,check,pairedTu,version]);
  const [nav,setNav]=useState(-1);
- const goFlag=(step:number)=>{if(!flagged.length)return;const i=(nav+step+flagged.length)%flagged.length;setNav(i);const f=flagged[i];if(f.act?.[0]?.blockId)left.current?.scrollToBlock(f.act[0].blockId);if(pairedTu&&f.tu?.[0]?.blockId)right.current?.scrollToBlock(f.tu[0].blockId);};
+ const goFlag=(step:number)=>{if(!flagged.length)return;const i=(nav+step+flagged.length)%flagged.length;setNav(i);const f=flagged[i];const tone=findingTone(check,f);if(f.act?.[0]?.blockId)left.current?.scrollToBlock(f.act[0].blockId,{text:f.act[0].shown??f.act[0].value,tone});if(pairedTu&&f.tu?.[0]?.blockId)right.current?.scrollToBlock(f.tu[0].blockId,{text:f.tu[0].shown??f.tu[0].value,tone});};
  const blocked=remarkBlockReason(detail,tasks,profile,versionId);
  const addRemark=()=>{if(blocked){setError(blocked);return;}if(selection){setForm(selection);setPanel(true);setTab('remarks');}else setError('Выделите текст внутри одного абзаца, затем нажмите «＋ Замечание».');};
 
@@ -78,10 +78,10 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  const openNotes=notes.filter(c=>statusOf(c)!=='VERIFIED'),resolvedNotes=notes.filter(c=>statusOf(c)==='VERIFIED');
  const versionNotes=useMemo(()=>notes.filter(c=>c.version_id===versionId),[notes,versionId]);
  const goToNote=(c:Row)=>{if(c.version_id!==versionId){setVersionId(c.version_id);}setFocused(c.id);setFocusRequest(n=>n+1);};
- const jump=(blockId:string,side:'act'|'tu')=>{if(side==='act')left.current?.scrollToBlock(blockId);else if(pairedTu)right.current?.scrollToBlock(blockId);};
+ const jump=(blockId:string,side:'act'|'tu',text?:string,tone?:'ok'|'bad'|'warn')=>{if(side==='act')left.current?.scrollToBlock(blockId,{text,tone});else if(pairedTu)right.current?.scrollToBlock(blockId,{text,tone});};
  // Клик по отмеченному реквизиту прокручивает второе окно к парному пункту.
- const pairFromLeft=(blockId:string)=>{const b=pairedTu&&pairedBlock(check,blockId,'act');if(b)right.current?.scrollToBlock(b);};
- const pairFromRight=(blockId:string)=>{const b=pairedTu&&pairedBlock(check,blockId,'tu');if(b)left.current?.scrollToBlock(b);};
+ const pairFromLeft=(blockId:string)=>{const b=pairedTu&&pairedBlock(check,blockId,'act');if(!b)return;left.current?.pointAt(blockId,b.own);right.current?.scrollToBlock(b.blockId,b);};
+ const pairFromRight=(blockId:string)=>{const b=pairedTu&&pairedBlock(check,blockId,'tu');if(!b)return;right.current?.pointAt(blockId,b.own);left.current?.scrollToBlock(b.blockId,b);};
  const runCheck=()=>void action(()=>api(`/api/v1/acts/${detail.id}/check-tu`,{versionId:newest.id,expectedRevision:detail.revision}));
  const confirm=(field:string,comment:string)=>void action(()=>api(`/api/v1/acts/${detail.id}/check-tu/${check!.id}/confirm`,{field,comment,expectedRevision:detail.revision}));
  const event=async(c:Row,type:string)=>{const explanation=explanations.current[c.id]?.trim();if(!explanation){setError('Опишите результат проверки исправления.');return;}setError('');await action(async()=>{await api(`/api/v1/comments/${c.id}/events`,{versionId,type,explanation});explanations.current[c.id]='';});};

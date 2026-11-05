@@ -208,3 +208,11 @@ p.tu-confirmed{margin:6px 0 0;padding:5px 7px;border-radius:5px;background:var(-
 .simple-registry .mini-route{row-gap:12px;margin-top:10px}
 .tu-evidence.tu-norm>span{width:auto;font-weight:600;color:var(--brand,#3156a3)}
 .tu-evidence.tu-norm{color:var(--ink,#202c3d);font-size:12.5px}
+.tu-verdict{display:flex;align-items:center;gap:8px;margin-top:8px}
+.tu-verdict button.tu-verdict-ok,.tu-verdict button.tu-verdict-bad{width:34px;height:34px;padding:0!important;border-radius:50%!important;font-size:17px;font-weight:700;line-height:1;display:inline-grid;place-items:center;background:#fff!important;cursor:pointer}
+.tu-verdict button.tu-verdict-ok{border:2px solid #2e9d5b!important;color:#2e9d5b!important}
+.tu-verdict button.tu-verdict-ok:hover:not(:disabled){background:#2e9d5b!important;color:#fff!important}
+.tu-verdict button.tu-verdict-bad{border:2px solid #d93a2f!important;color:#d93a2f!important}
+.tu-verdict button.tu-verdict-bad:hover:not(:disabled){background:#d93a2f!important;color:#fff!important}
+.tu-verdict-note{font-size:12px}
+.tu-rejected{margin:8px 0 0;color:#b3261e;font-size:12.5px}

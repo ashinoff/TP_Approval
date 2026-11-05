@@ -35,9 +35,24 @@ export function changedMarks(model:Row|undefined,other:Row|undefined,otherLabel:
   .map(b=>({blockId:b.id,tone:'changed' as const,title:`Отличается от ${otherLabel}`}));
 }
 
-/** Парный абзац в другом документе для клика по отмеченному реквизиту. */
+/** Цвет статуса реквизита для подсветки «куда смотреть». */
+export function findingTone(check:Row|undefined,f:Row):'ok'|'bad'|'warn'{
+ const confirmed=(check?.confirmations??[]).some((c:Row)=>c.field===f.field);
+ return f.status==='MATCH'||confirmed?'ok':f.status==='DIFFERENCE'?'bad':'warn';
+}
+/** Значение для маркера внутри абзаца: «30 кВт», «ВА-80А» (человеческая форма, иначе сырое значение). */
+const valueText=(v?:Row)=>v?String(v.shown??v.value??''):'';
+
+/**
+ * Пара для клика по отмеченному реквизиту: абзац в другом документе и значения на обеих сторонах.
+ * Самый важный реквизит абзаца — расхождение, затем «проверить», затем совпадение.
+ */
 export function pairedBlock(check:Row|undefined,blockId:string,from:'act'|'tu'){
  const to=from==='act'?'tu':'act';
- const f=(check?.findings??[] as Row[]).find((x:Row)=>(x[from]??[]).some((v:Row)=>v.blockId===blockId)&&x[to]?.[0]?.blockId);
- return f?.[to][0].blockId as string|undefined;
+ const rank:Record<string,number>={bad:0,warn:1,ok:2};
+ const found=(check?.findings??[] as Row[]).filter((x:Row)=>x.status!=='INFO'&&(x[from]??[]).some((v:Row)=>v.blockId===blockId)&&x[to]?.[0]?.blockId)
+  .sort((a:Row,b:Row)=>rank[findingTone(check,a)]-rank[findingTone(check,b)]);
+ const f=found[0];if(!f)return undefined;
+ const tone=findingTone(check,f);
+ return {blockId:f[to][0].blockId as string,text:valueText(f[to][0]),tone,own:{text:valueText((f[from] as Row[]).find(v=>v.blockId===blockId)),tone}};
 }

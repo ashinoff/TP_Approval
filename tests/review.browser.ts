@@ -63,6 +63,12 @@ try{
  const frames=review.locator('iframe');const actFrame=frames.nth(0).contentFrame(),tuFrame=frames.nth(1).contentFrame();
  await actFrame.locator('p[data-mark=bad]').filter({hasText:'150 кВт'}).waitFor({timeout:15000});await tuFrame.locator('p[data-mark=bad]').filter({hasText:'15 кВт'}).waitFor({timeout:15000});
  assert.ok(await actFrame.locator('p[data-mark=ok]').count()>=3,'Matching requisites are marked green');
+ // Клик по красному пункту акта: парный пункт ТУ обведён красным, значение выделено маркером — «куда смотреть».
+ await actFrame.locator('p[data-mark=bad]').filter({hasText:'150 кВт'}).click();
+ await tuFrame.locator('p.jump-hit[data-jump=bad]').filter({hasText:'15 кВт'}).waitFor();
+ await actFrame.locator('p.jump-hit[data-jump=bad]').filter({hasText:'150 кВт'}).waitFor();
+ assert.equal(await tuFrame.locator('body').evaluate((b:Element)=>{const h=(b.ownerDocument.defaultView as any).CSS.highlights.get('jump-value');return h?[...h][0].toString():'';}),'15 кВт','Value inside the paired paragraph is highlighted');
+ await shot('02b-jump');
  // Абзацы с табуляцией и переносом строки (как в реальных документах) тоже размечаются.
  await tuFrame.locator('p[data-mark=ok]').filter({hasText:'д. 15/31'}).waitFor();await actFrame.locator('p[data-mark=ok]').filter({hasText:'д. 15/31'}).waitFor();assert.match(await actFrame.locator('p[data-mark=bad]').first().getAttribute('title')??'',/расхождение — в акте 150 кВт, в ТУ 15 кВт/);
  // Увеличение: при прокрутке до упора влево страница видна целиком (раньше левая часть «съедалась»).

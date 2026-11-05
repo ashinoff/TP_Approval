@@ -116,6 +116,8 @@ function totalPower(blocks:Block[]):Extracted{
    const digit=segment.search(/\d/);
    const qualifier=digit<0?segment:segment.slice(0,digit);
    if(NOT_TOTAL.test(qualifier))continue;
+   // Ссылка вместо значения: «…с учетом максимальной мощности объекта …, указанной в п. 3 настоящих ТУ».
+   if(/указанн\p{L}*\s+в\s+(?:п\.|пункт)|(?:^|\s)(?:п\.|пункт\p{L}*)\s*$/iu.test(qualifier))continue;
    const result=firstQuantity(segment,powerAt);
    if(result!==undefined)values.push(value(result,b,result?shownQuantity(result,'кВт','Вт'):undefined));
   }
