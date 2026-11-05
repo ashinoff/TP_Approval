@@ -91,6 +91,10 @@ try{
  const books=page.getByRole('region',{name:'Справочники'});await books.getByRole('cell',{name:'100/5'}).first().waitFor();
  assert.equal(await books.getByRole('button',{name:'Редактировать'}).count(),0,'Engineer must not edit reference books');
  await books.getByRole('button',{name:'Сечения провода'}).click();await books.getByText('Применяется к маркам').waitFor();await page.waitForTimeout(400);await shot('03c-references');
+ // Ссылка на недоступный документ (как у администратора со старой вкладкой): один раз сообщение и переход к списку.
+ await page.evaluate(()=>{location.hash='#/acts/00000000-0000-4000-8000-000000000000?section=documents';});
+ await page.getByRole('alert').filter({hasText:'Документ по ссылке не найден'}).waitFor();
+ await page.waitForFunction(()=>!location.hash.includes('/acts/'));
  await page.getByRole('button',{name:'Все документы',exact:true}).click();await page.getByRole('button',{name:'На согласовании: 1'}).click();await page.locator('[data-testid^="registry-row-"]').first().waitFor();await shot('03b-tabs');
  console.log('OK 3: corrected version passes check and is sent from review mode; author gets an explanation instead of a silent selection');
  // 4. Начальник РИРУ: замечание к выделенному фрагменту в режиме проверки.
