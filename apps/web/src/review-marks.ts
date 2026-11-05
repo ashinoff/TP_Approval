@@ -14,7 +14,10 @@ export function checkMarks(check:Row|undefined,side:'act'|'tu'):BlockMark[]{
   if(f.status==='INFO')continue;
   const values:Row[]=f[side]??[];
   const pair=`в акте ${shown(f.act?.[0])}, в ТУ ${shown(f.tu?.[0])}`;
-  const [tone,title]:[BlockMark['tone'],string]=f.status==='MATCH'?['ok',`✓ ${f.label}: совпадает с ТУ (${shown(values[0])})`]
+  const [tone,title]:[BlockMark['tone'],string]=f.norm&&side==='act'?(f.status==='MATCH'?['ok',`✓ ${f.label}: по справочнику (${shown(values[0])}). ${f.norm}`]
+   :confirmed.has(f.field)?['ok',`✓ ${f.label}: подтверждено вручную`]
+   :[f.status==='DIFFERENCE'?'bad':'warn',`${f.status==='DIFFERENCE'?'✗':'?'} ${f.label}: ${f.reason} ${f.norm}`])
+   :f.status==='MATCH'?['ok',`✓ ${f.label}: совпадает с ТУ (${shown(values[0])})`]
    :confirmed.has(f.field)?['ok',`✓ ${f.label}: подтверждено вручную`]
    :f.status==='DIFFERENCE'?['bad',`✗ ${f.label}: расхождение — ${pair}`]
    :['warn',`? ${f.label}: проверьте вручную — ${f.reason??pair}`];

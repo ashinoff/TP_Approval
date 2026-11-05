@@ -5,3 +5,13 @@
 @media(max-width:1100px){.calendar-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.calendar-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.calendar-legend{margin-left:0}}@media(max-width:480px){.calendar-grid{grid-template-columns:1fr}}
 .card-fields-admin{padding:18px}.card-fields-table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0 18px}.card-fields-table th,.card-fields-table td{text-align:left;padding:9px;border-bottom:1px solid #e5ebf1;vertical-align:top}.card-fields-table tr.inactive{color:#9aa8b2}.card-options{display:block;color:#5d6a78}.card-row-actions{display:flex;gap:6px;justify-content:flex-end}.card-field-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end}.card-field-form label{display:grid;gap:5px;font-size:12px}.card-field-form .wide{grid-column:1/-1}.card-field-form input,.card-field-form select,.card-field-form textarea{padding:8px;border:1px solid #d5e1e9;border-radius:6px}.card-field-form .inline-check{display:flex;align-items:center;gap:6px}.card-field-form .card-actions{grid-column:1/-1}
 @media(max-width:760px){.card-field-form{grid-template-columns:1fr 1fr}.card-fields-table{display:block;overflow-x:auto}}
+.reference-books{padding:18px}.reference-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.reference-brands{display:grid;gap:5px;font-size:13px;margin:8px 0}.reference-brands input{padding:8px;border:1px solid var(--line,#dfe5ed);border-radius:6px;max-width:420px}
+.reference-table-wrap{overflow-x:auto;margin:10px 0 14px}
+.reference-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.reference-table th,.reference-table td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line,#dfe5ed);white-space:nowrap}
+.reference-table th{color:var(--muted,#5d6a78);font-weight:600;background:var(--paper,#f3f5f9)}
+.reference-table tr.group-start td{border-top:2px solid var(--menu-active,#253b59)}
+.reference-table input,.reference-table select{width:100%;min-width:70px;padding:6px;border:1px solid var(--line,#dfe5ed);border-radius:6px}
+.reference-meta{margin-top:10px}
+.reference-brands-note{font-size:13px;margin:8px 0}

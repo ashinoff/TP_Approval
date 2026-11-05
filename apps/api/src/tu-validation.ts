@@ -4,7 +4,9 @@ import {resolve} from 'node:path';
 import {type DB,HttpError,requireValue} from './db.js';
 import {audit,lockAct,role,revision} from './workflow.js';
 import {documentModel} from './documents.js';
-import {compareRequisites,findingsPass,RULES_VERSION,BLOCKING_STATUSES,CONFIRMABLE_STATUSES} from './tu-rules.js';
+import {compareRequisites,findingsPass,BLOCKING_STATUSES,CONFIRMABLE_STATUSES} from './tu-rules.js';
+import {nominalFindings} from './nominal-rules.js';
+import {currentRulesVersion,loadReferences,rulesVersion} from './references.js';
 
 const PREPARATION_STATES=['DRAFT','RETURNED','REVISING'];
 
@@ -25,9 +27,12 @@ export async function checkTechnicalConditions(db:DB,storage:string,actId:string
  const s=await sources(db,storage,a,versionId);
  const models=await Promise.all(s.bytes.map(b=>documentModel(b)));
  if(models.some(m=>m.blocks.reduce((sum,b)=>sum+b.text.length,0)>200000))throw new HttpError(422,'TU_TEXT_TOO_LARGE','Документ слишком большой для текущих правил сверки.');
- const findings=compareRequisites(models[0].blocks,models[1].blocks,a.contract_number);
+ // Номиналы (ВА, ТТ, сечение) — по справочникам администратора; фазность и мощность из карточки, если заполнены.
+ const refs=await loadReferences(db);
+ const card=Object.fromEntries((await db.query('SELECT field_code,value FROM app.card_values WHERE act_id=$1',[a.id])).rows.map(r=>[r.field_code,r.value]));
+ const findings=[...compareRequisites(models[0].blocks,models[1].blocks,a.contract_number),...nominalFindings(models[0].blocks,models[1].blocks,refs,{phases:card.phases,powerKw:card.power_kw})];
  const status=findingsPass(findings)?'PASS':'BLOCKED';
- const result=(await db.query('INSERT INTO app.tu_checks(act_id,version_id,technical_conditions_id,act_hash,tu_hash,rules_version,status,findings,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,app.uid()) RETURNING *',[a.id,versionId,s.tu.id,s.version.sha256,s.tu.sha256,RULES_VERSION,status,JSON.stringify(findings)])).rows[0];
+ const result=(await db.query('INSERT INTO app.tu_checks(act_id,version_id,technical_conditions_id,act_hash,tu_hash,rules_version,status,findings,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,app.uid()) RETURNING *',[a.id,versionId,s.tu.id,s.version.sha256,s.tu.sha256,rulesVersion(refs),status,JSON.stringify(findings)])).rows[0];
  await audit(db,a.id,'TU_CHECKED',{checkId:result.id,versionId,technicalConditionsId:s.tu.id,status});
  return {...result,confirmations:[]};
 }
@@ -48,7 +53,7 @@ export async function confirmTuFinding(db:DB,storage:string,actId:string,checkId
  if(!check)throw new HttpError(404,'NOT_FOUND');
  const latestVersion=(await db.query('SELECT id FROM app.versions WHERE act_id=$1 ORDER BY number DESC LIMIT 1',[a.id])).rows[0];
  const latestCheck=(await db.query('SELECT id FROM app.tu_checks WHERE act_id=$1 AND version_id=$2 AND technical_conditions_id=$3 ORDER BY created_at DESC,id DESC LIMIT 1',[a.id,check.version_id,check.technical_conditions_id])).rows[0];
- if(check.version_id!==latestVersion?.id||check.technical_conditions_id!==a.technical_conditions_id||check.rules_version!==RULES_VERSION||latestCheck?.id!==check.id){
+ if(check.version_id!==latestVersion?.id||check.technical_conditions_id!==a.technical_conditions_id||check.rules_version!==await currentRulesVersion(db)||latestCheck?.id!==check.id){
   throw new HttpError(409,'TU_CHECK_STALE','Отчёт сверки устарел. Выполните проверку текущей версии заново.');
  }
  const s=await sources(db,storage,a,check.version_id);
@@ -68,7 +73,7 @@ export async function enforceTechnicalConditions(db:DB,storage:string,actId:stri
  if(!a.tu_check_required)return;
  const s=await sources(db,storage,a,versionId);
  const check=(await db.query('SELECT * FROM app.tu_checks WHERE act_id=$1 AND version_id=$2 AND technical_conditions_id=$3 ORDER BY created_at DESC,id DESC LIMIT 1',[a.id,versionId,s.tu.id])).rows[0];
- const fresh=check&&check.act_hash===s.version.sha256&&check.tu_hash===s.tu.sha256&&check.rules_version===RULES_VERSION;
+ const fresh=check&&check.act_hash===s.version.sha256&&check.tu_hash===s.tu.sha256&&check.rules_version===await currentRulesVersion(db);
  const refuse=()=>new HttpError(409,'TU_CHECK_REQUIRED','Отправка запрещена: выполните проверку текущего акта по выбранной редакции ТУ, устраните расхождения и подтвердите спорные пункты. Нераспознанные реквизиты без подтверждения не считаются проверенными.');
  if(!fresh)throw refuse();
  if(check.status!=='PASS'){

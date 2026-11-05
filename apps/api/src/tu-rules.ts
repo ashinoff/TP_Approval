@@ -8,7 +8,8 @@ import type {Block} from './documents.js';
  * table columns of «Перечень точек присоединения», «(всего) 15,0 (пятнадцать) кВт», existing/new power,
  * the TU number, the applicant, the supply centre, the TU sub-item ranges and the reliability category.
  */
-export const RULES_VERSION='DOCX_CONTEXT_V4';
+export const RULES_VERSION='DOCX_CONTEXT_V5';
+// V5: проверка номиналов ВА/ТТ/сечения по справочникам (nominal-rules.ts); версия отчёта дополняется ревизиями справочников.
 
 export type FindingStatus='MATCH'|'DIFFERENCE'|'MANUAL_REVIEW'|'UNKNOWN'|'INFO';
 /** Statuses that block submission unless an engineer confirms them (DIFFERENCE can never be confirmed). */

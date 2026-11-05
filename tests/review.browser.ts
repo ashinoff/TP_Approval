@@ -77,12 +77,20 @@ try{
  await page.getByLabel('Новая версия DOCX').setInputFiles(docs+'engineer-act-good.docx');await page.locator('.word-heading select option').filter({hasText:'Версия 2'}).waitFor({state:'attached',timeout:20000});
  await page.getByRole('button',{name:'Режим проверки'}).click();await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();
  await review.getByText('Проверенные реквизиты совпали. Можно отправить на согласование.',{exact:true}).waitFor({timeout:20000});
+// Номиналы акта проверены по справочникам: ВА-25А для 15 кВт (3ф) и СИП 4х16.
+ const norms=review.locator('details.tu-matches');await norms.evaluate((el:Element)=>{(el as HTMLDetailsElement).open=true;});
+ for(const label of ['Номинал вводного автомата (ВА)','Сечение провода / кабеля'])await norms.getByText('✓ '+label,{exact:true}).waitFor();
  await review.getByRole('button',{name:'Отправить на согласование',exact:true}).click();await page.waitForTimeout(1500);await shot('03-sent');
  // Автор не может оставлять замечания — кнопка у выделения объясняет причину, а не молчит.
  const own=review.locator('iframe').nth(0).contentFrame().locator('p[data-block-id]').filter({hasText:'Класс напряжения'}).first();
  await own.evaluate((el:Element)=>{const doc=el.ownerDocument,r=doc.createRange();r.selectNodeContents(el);doc.getSelection()!.removeAllRanges();doc.getSelection()!.addRange(r);el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));});
  await review.getByRole('button',{name:'＋ Замечание'}).click();await review.getByRole('alert').filter({hasText:'Вы автор этого документа'}).waitFor();
  await review.getByRole('button',{name:'Завершить проверку'}).click();
+ // Справочники номиналов видны инженеру только для чтения.
+ await page.getByRole('button',{name:'Справочники'}).click();
+ const books=page.getByRole('region',{name:'Справочники'});await books.getByRole('cell',{name:'100/5'}).first().waitFor();
+ assert.equal(await books.getByRole('button',{name:'Редактировать'}).count(),0,'Engineer must not edit reference books');
+ await books.getByRole('button',{name:'Сечения провода'}).click();await books.getByText('Применяется к маркам').waitFor();await page.waitForTimeout(400);await shot('03c-references');
  await page.getByRole('button',{name:'Все документы',exact:true}).click();await page.getByRole('button',{name:'На согласовании: 1'}).click();await page.locator('[data-testid^="registry-row-"]').first().waitFor();await shot('03b-tabs');
  console.log('OK 3: corrected version passes check and is sent from review mode; author gets an explanation instead of a silent selection');
  // 4. Начальник РИРУ: замечание к выделенному фрагменту в режиме проверки.

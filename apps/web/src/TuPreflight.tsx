@@ -6,7 +6,7 @@ type Row=Record<string,any>;
 
 const statusText:Record<string,string>={MATCH:'✓ Совпадает',DIFFERENCE:'⚠ Расхождение',MANUAL_REVIEW:'? Проверить вручную',UNKNOWN:'? Не распознано',INFO:'i Для сведения'};
 const CONFIRMABLE=['MANUAL_REVIEW','UNKNOWN'];
-const RULES_HINT='Сверка выполняется локально по правилам, без ИИ: договор, заявитель, номер ТУ, мощность, напряжение, питающий центр, адрес, точка присоединения и пункты ТУ. Это помощь инженеру, а не инженерная экспертиза: спорные пункты проверяет человек.';
+const RULES_HINT='Сверка выполняется локально по правилам, без ИИ: договор, заявитель, номер ТУ, мощность, напряжение, питающий центр, адрес, точка присоединения и пункты ТУ, а также номиналы ВА, трансформаторов тока и сечение провода по справочникам. Это помощь инженеру, а не инженерная экспертиза: спорные пункты проверяет человек.';
 
 /** Shown value: the human form if the rule supplied one, otherwise the paragraph text. */
 const shown=(v:Row)=>v.shown??v.quote;
@@ -73,7 +73,8 @@ export default function TuPreflight({check,required,busy,editable=true,onCheck,o
      </div>
      {f.status!=='MATCH'&&<p className="tu-reason">{f.reason}</p>}
      <Evidence side="Акт" values={f.act} onJump={onJump}/>
-     <Evidence side="ТУ" values={f.tu} onJump={onTuJump}/>
+     {(!f.norm||f.tu?.length>0)&&<Evidence side="ТУ" values={f.tu} onJump={onTuJump}/>}
+     {f.norm&&<p className="tu-evidence tu-norm"><span>Норма</span>{f.norm}</p>}
      {confirmation&&<p className="tu-confirmed">Подтверждено вручную: {confirmation.actorName}, {dateTime(confirmation.createdAt)}. «{confirmation.comment}»</p>}
      {!confirmation&&editable&&onConfirm&&CONFIRMABLE.includes(f.status)&&<ConfirmForm field={f} busy={busy} onConfirm={onConfirm}/>}
     </li>;
@@ -83,7 +84,7 @@ export default function TuPreflight({check,required,busy,editable=true,onCheck,o
    <summary>Совпадает: {count('MATCH')}</summary>
    <ul>
     {findings.filter(f=>f.status==='MATCH').map(f=><li key={f.field} className="tu-match">
-     <span className="tu-match-label">✓ {f.label}</span>
+     <span className="tu-match-label" title={f.norm}>✓ {f.label}</span>
      <span className="tu-match-value" title={f.act[0]?.quote}>{f.act[0]?(onJump?<button type="button" className="tu-quote" onClick={()=>onJump(f.act[0].blockId,'act')}>{shown(f.act[0])}</button>:shown(f.act[0])):''}</span>
     </li>)}
    </ul>
