@@ -19,6 +19,7 @@ import {preview,createRemark,compareVersions} from './documents.js';
 import {documentKinds,documentFilename,contractDocuments,registerDocument,selectTechnicalConditions,tuPreview} from './contract-documents.js';
 import {checkTechnicalConditions,confirmTuFinding,enforceTechnicalConditions} from './tu-validation.js';
 import {currentRulesVersion,referenceBooks,saveReferenceBook} from './references.js';
+import {adminDocuments,applyRestoreFiles,backupPath,createBackup,deleteBackup,listBackups,purge,readBackup,recordServerError,removeFiles,serviceCleanup,serviceHealth,stageRestoreFiles} from './admin-service.js';
 import {extractTuMetadata} from './tu-import.js';
 import {requireContractNumber} from './contract-number.js';
 import {cardFields,cardValues,saveCard,cardFromTu,createCardField,updateCardField} from './card.js';
@@ -108,6 +109,49 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   });
   const calendarAdmin=async(db:DB)=>{if(!(await db.query("SELECT app.has_role('PROCESS_ADMIN') OR app.has_role('TECH_ADMIN') AS yes")).rows[0].yes)throw new HttpError(403,'ROLE_REQUIRED');};
   get('/api/v1/references',async db=>referenceBooks(db));
+  // Сервисное меню (TECH_ADMIN): удаление насовсем, состояние, очистка, резервные копии. Файлы с диска — после фиксации транзакции.
+  const techAdmin=(db:DB)=>role(db,'TECH_ADMIN');
+  const adminName=async(db:DB)=>(await db.query('SELECT app.my_profile() AS p')).rows[0].p?.name as string|undefined;
+  get('/api/v1/admin/service/health',async db=>{await techAdmin(db);return serviceHealth(db,config);});
+  get('/api/v1/admin/service/documents',async(db,req)=>{await techAdmin(db);return adminDocuments(db,String(req.query.q??''));});
+  app.post('/api/v1/admin/service/purge',async(req,res)=>{
+   const b=z.object({kind:z.enum(['document','tu','version']),id,confirm:z.literal('УДАЛИТЬ')}).strict().parse(req.body);
+   const result=await transaction(pool,res.locals.userId,async db=>{await techAdmin(db);return purge(db,b.kind,b.id);});
+   await removeFiles(config.storagePath,result.files);res.json({deleted:b.kind,files:result.files.length});
+  });
+  app.post('/api/v1/admin/service/cleanup',async(_req,res)=>{
+   const result=await transaction(pool,res.locals.userId,async db=>{await techAdmin(db);return serviceCleanup(db,config.storagePath);});
+   await removeFiles(config.storagePath,[...result.dbFiles,...result.orphans]);res.json({files:result.dbFiles.length,orphans:result.orphans.length,sessions:result.sessions});
+  });
+  get('/api/v1/admin/service/backups',async db=>{await techAdmin(db);return listBackups(config.storagePath);});
+  app.post('/api/v1/admin/service/backups',async(_req,res)=>{
+   res.json(await transaction(pool,res.locals.userId,async db=>{await techAdmin(db);return createBackup(db,config.storagePath,undefined,await adminName(db));},true));
+  });
+  app.get('/api/v1/admin/service/backups/:name/download',async(req,res)=>{
+   await transaction(pool,res.locals.userId,techAdmin,true);
+   const path=resolve(backupPath(config.storagePath,String(req.params.name)));
+   res.download(path,String(req.params.name),e=>{if(e&&!res.headersSent)res.status(404).json({error:{code:'NOT_FOUND',message:'NOT_FOUND'}});});
+  });
+  app.post('/api/v1/admin/service/backups/:name/delete',async(req,res)=>{
+   await transaction(pool,res.locals.userId,techAdmin,true);await deleteBackup(config.storagePath,String(req.params.name));res.json({deleted:true});
+  });
+  // Восстановление: копия с диска сервера (name) или загруженный архив. Перед заменой — автоматическая копия текущего состояния.
+  const backupUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:500*1024*1024,files:1,fields:4}});
+  app.post('/api/v1/admin/service/restore',backupUpload.single('file'),async(req,res)=>{
+   const b=z.object({name:z.string().max(80).optional(),confirm:z.literal('ВОССТАНОВИТЬ')}).strict().parse(req.body);
+   await transaction(pool,res.locals.userId,techAdmin,true);
+   const bytes=req.file?.buffer??(b.name?await readFile(backupPath(config.storagePath,b.name)).catch(()=>{throw new HttpError(404,'NOT_FOUND');}):undefined);
+   if(!bytes)throw new HttpError(422,'BACKUP_REQUIRED','Выберите копию или загрузите архив.');
+   const backup=await readBackup(bytes);
+   const safety=await transaction(pool,res.locals.userId,async db=>createBackup(db,config.storagePath,'before',await adminName(db)),true);
+   const staged=await stageRestoreFiles(config.storagePath,backup.files);
+   const counts=await transaction(pool,res.locals.userId,async db=>{
+    try{return (await db.query('SELECT app.admin_restore($1) AS c',[JSON.stringify(backup.data)])).rows[0].c;}
+    catch(e){if((e as {code?:string}).code==='55006')throw new HttpError(409,'BACKUP_SCHEMA_MISMATCH','Копия сделана на другой версии программы (другой набор миграций) — восстановление невозможно.');throw e;}
+   });
+   await applyRestoreFiles(config.storagePath,staged);
+   res.json({restored:true,counts,safetyBackup:safety.name,createdAt:backup.manifest.createdAt});
+  });
   post('/api/v1/admin/references/:code',async(db,req)=>{await calendarAdmin(db);return saveReferenceBook(db,z.string().max(20).parse(req.params.code),req.body);});
   get('/api/v1/card-fields',async(db,req)=>{const all=req.query.all==='1';if(all)await calendarAdmin(db);return cardFields(db,all);});
   post('/api/v1/admin/card-fields',async(db,req)=>{await calendarAdmin(db);return createCardField(db,req.body);});
@@ -260,6 +304,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
     const status=error instanceof HttpError?error.status:error instanceof z.ZodError?422:error instanceof multer.MulterError?413:sqlCode==='42501'?403:sqlCode==='22023'||sqlCode==='23505'||sqlCode==='23514'?409:inputStatus===400?400:500;
     const code=error instanceof HttpError?error.code:error instanceof z.ZodError?'VALIDATION_ERROR':error instanceof multer.MulterError?'UPLOAD_LIMIT':status===403?'FORBIDDEN':status===409?'CONFLICT':status===400?'INVALID_JSON':'INTERNAL_ERROR';
     if(status===500)console.error({requestId:res.locals.requestId,code:(error as {code?:string}).code??'UNEXPECTED'});
+    if(status>=500||code==='FILE_INTEGRITY_FAILURE')recordServerError({at:new Date().toISOString(),requestId:res.locals.requestId,method:_req.method,path:_req.path.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g,':id'),status,code,detail:(error as {code?:string}).code??(error instanceof Error?error.name:undefined)});
     res.status(status).json({error:{code,message:error instanceof HttpError?error.message:error instanceof z.ZodError?'Некорректные данные запроса':code,requestId:res.locals.requestId}});
   });return app;
 }

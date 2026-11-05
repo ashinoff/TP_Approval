@@ -93,6 +93,15 @@ export async function runIntegration(ownerUrl:string,runtimeUrl:string,root:stri
     assert.equal((await post('process',`/api/v1/acts/${actId}/close-collection`,{reason:'Срок истёк'})).status,200);
     assert.equal((await owner.query("SELECT count(*) FROM app.tasks WHERE act_id=$1 AND status='CANCELLED'",[actId])).rows[0].count,'3');pass('Only scoped process admin closes expired collection, missing decisions stay missing');
     const notes=(await get('riru','/api/v1/notifications')).body;assert.ok(notes.length>0);await post('riru',`/api/v1/notifications/${notes[0].id}/read`,{});assert.equal((await get('riru','/api/platform/badge')).body.count,1);pass('Unread notifications and action badge are independent');
+    // Удаление насовсем документов с полной историей (циклы, решения, неизменяемые замечания, публикации): ничего не остаётся.
+    const everything=(await owner.query('SELECT id FROM app.acts')).rows.map(r=>r.id as string);assert.ok(everything.length>0);
+    const withRemarks=Number((await owner.query('SELECT count(*) FROM app.comments')).rows[0].count);assert.ok(withRemarks>0,'Fixture has immutable remarks');
+    for(const target of everything){const r=await post('tech','/api/v1/admin/service/purge',{kind:'document',id:target,confirm:'УДАЛИТЬ'});assert.equal(r.status,200,JSON.stringify(r.body));}
+    for(const table of ['acts','versions','files','cycles','tasks','decisions','comments','comment_events','releases','notifications','technical_conditions','contracts'])
+     assert.equal(Number((await owner.query(`SELECT count(*) FROM app.${table}`)).rows[0].count),0,`${table} is empty after purge`);
+    assert.equal(Number((await owner.query("SELECT count(*) FROM app.audit_events WHERE action='ADMIN_PURGE_DOCUMENT'")).rows[0].count),everything.length);
+    assert.equal((await post('process','/api/v1/admin/service/purge',{kind:'document',id:everything[0],confirm:'УДАЛИТЬ'})).status,403);
+    pass('TECH_ADMIN purges documents with full history; immutable history is removed only by the audited purge; PROCESS_ADMIN cannot');
     console.log(`PASS: ${checks} интеграционных групп; PostgreSQL ${(await owner.query('SHOW server_version')).rows[0].server_version}`);
   } finally {await runtime.end();await owner.end();}
 }

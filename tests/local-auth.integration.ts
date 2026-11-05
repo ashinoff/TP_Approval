@@ -230,5 +230,31 @@ export async function runLocalAuthIntegration(ownerUrl:string,runtimeUrl:string,
     const moved=await post(adminClient,`/api/v1/admin/local-users/${positioned.id}/profile`,{login:'positioned',name:positioned.name,email:positioned.email,position:'Заместитель начальника РИРУ',expectedRevision:positioned.revision,assignments:positioned.roles});assert.equal(moved.status,200,JSON.stringify(moved.body));
     positioned=(await get(adminClient,'/api/v1/admin/local-users')).body.find((u:any)=>u.login==='positioned');assert.equal(positioned.position,'Заместитель начальника РИРУ');
     pass('Administrator sets and edits employee position; it is returned with the account');
+    // Сервисное меню: состояние, список документов (только реквизиты), копия, удаление насовсем, восстановление.
+    const service=await get(adminClient,'/api/v1/admin/service/health');assert.equal(service.status,200,JSON.stringify(service.body));
+    assert.ok(service.body.counts.documents>=1);assert.ok(service.body.issues.some((i:any)=>i.code==='missing_on_disk'));assert.ok(service.body.migrations.includes('022_admin_service.sql'));
+    const svcUser=await post(adminClient,'/api/v1/admin/local-users',{login:'svc.engineer',name:'Синтетический инженер сервиса',email:'svc.engineer@example.test',password:'Synthetic-initial-123',assignment:{role:'RIRU_ENGINEER',resId:someRes}});assert.equal(svcUser.status,200,JSON.stringify(svcUser.body));
+    const plain=await change(await login('svc.engineer'));
+    assert.equal((await get(plain,'/api/v1/admin/service/health')).status,403);
+    const serviceDocs=(await get(adminClient,'/api/v1/admin/service/documents?q=00000006')).body;assert.ok(serviceDocs.some((d:any)=>d.id===actId));
+    assert.equal(JSON.stringify(serviceDocs).includes('Учебный адрес'),false,'Service list shows requisites only, not document content');
+    const backup=await request(app).post('/api/v1/admin/service/backups').set('Host','app.test').set('Origin','https://app.test').set('Cookie',adminClient.cookie).set('X-CSRF-Token',adminClient.csrf).send({});
+    assert.equal(backup.status,200,JSON.stringify(backup.body));assert.match(backup.body.name,/^backup-\d{8}-\d{6}\.zip$/);
+    const downloaded=await get(adminClient,`/api/v1/admin/service/backups/${backup.body.name}/download`).buffer(true).parse((r,cb)=>{const chunks:Buffer[]=[];r.on('data',(c:Buffer)=>chunks.push(c));r.on('end',()=>cb(null,Buffer.concat(chunks)));});
+    assert.equal(downloaded.status,200);assert.equal((downloaded.body as Buffer).subarray(0,2).toString(),'PK');
+    assert.equal((await get(plain,`/api/v1/admin/service/backups/${backup.body.name}/download`)).status,403);
+    const unconfirmed=await post(adminClient,'/api/v1/admin/service/purge',{kind:'document',id:actId,confirm:'да'});assert.equal(unconfirmed.status,422);
+    const purged=await post(adminClient,'/api/v1/admin/service/purge',{kind:'document',id:actId,confirm:'УДАЛИТЬ'});assert.equal(purged.status,200,JSON.stringify(purged.body));
+    assert.equal(Number((await owner.query('SELECT count(*) FROM app.acts WHERE id=$1',[actId])).rows[0].count),0);
+    assert.equal(Number((await owner.query("SELECT count(*) FROM app.audit_events WHERE action='ADMIN_PURGE_DOCUMENT' AND details->>'actId'=$1",[actId])).rows[0].count),1);
+    assert.equal((await post(plain,'/api/v1/admin/service/purge',{kind:'document',id:actId,confirm:'УДАЛИТЬ'})).status,403);
+    await assert.rejects(runtime.query('SELECT app.admin_backup()'),{code:'42501'});
+    pass('Service menu: health and integrity checks, requisites-only document list, backup archive download, permanent purge with confirmation word and audit; TECH_ADMIN only');
+    const restored=await post(adminClient,'/api/v1/admin/service/restore',{name:backup.body.name,confirm:'ВОССТАНОВИТЬ'});assert.equal(restored.status,200,JSON.stringify(restored.body));
+    assert.match(restored.body.safetyBackup,/-before\.zip$/);
+    assert.equal(Number((await owner.query('SELECT count(*) FROM app.acts WHERE id=$1',[actId])).rows[0].count),1,'Purged document is back after restore');
+    assert.equal((await get(adminClient,'/api/v1/me')).status,401,'Sessions are reset by restore');
+    const again=await request(app).post('/auth/login').set('Host','app.test').set('Origin','https://app.test').send({login:'admin',password:'1191'});assert.equal(again.status,200,JSON.stringify(again.body));
+    pass('Restore replaces data from the backup in one transaction, keeps a safety copy of the previous state and signs everyone out');
   }finally{await runtime.end();await owner.end();}
 }

@@ -37,6 +37,15 @@ export async function runStandaloneBrowser(options:{url:string;initialPassword:s
     await page.getByRole('status').filter({hasText:'Сотрудник добавлен'}).waitFor();
     await page.screenshot({path:options.output+'/users.png',fullPage:true});
     pass('Admin creates an employee with email, a real stored password and RES assignment');
+    // Сервисное меню администратора: состояние базы и проверки, резервная копия.
+    await page.getByRole('button',{name:'Сервис',exact:true}).click();
+    const service=page.getByRole('region',{name:'Сервисное меню'});await service.getByText('Проверки',{exact:true}).waitFor();await service.getByText('Антивирус',{exact:true}).waitFor();
+    await service.getByRole('button',{name:'Резервные копии'}).click();await service.getByRole('button',{name:'Создать копию'}).click();
+    await service.getByRole('status').filter({hasText:'Копия создана'}).waitFor({timeout:20000});await service.getByRole('cell',{name:/^backup-/}).first().waitFor();
+    await service.getByRole('button',{name:'Состояние'}).click();await service.getByText('Проверки',{exact:true}).waitFor();await page.waitForTimeout(300);
+    await page.screenshot({path:options.output+'/service.png',fullPage:true});
+    await page.getByRole('button',{name:'Пользователи',exact:true}).click();
+    pass('Admin service menu shows database health and creates a backup');
 
     await form.getByLabel('ФИО',{exact:true}).fill('Учебный второй сотрудник');await form.getByLabel('Логин',{exact:true}).fill('browser.other');
     await form.getByLabel('Email',{exact:true}).fill('BROWSER.ENGINEER@example.test');
