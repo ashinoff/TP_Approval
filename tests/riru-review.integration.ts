@@ -8,7 +8,7 @@ export async function runRiruChecks({app,owner,tokens,users,area}:{app:any;owner
  const get=(u:string,p:string)=>request(app).get(p).set('Authorization','Bearer '+tokens[u]);const post=(u:string,p:string,b:object,key=randomUUID())=>request(app).post(p).set('Authorization','Bearer '+tokens[u]).set('Idempotency-Key',key).send(b);const ok=(r:request.Response)=>{assert.equal(r.status,200,JSON.stringify(r.body));return r.body;};
  const body={resId:area,contractNumber:'00001-26-00000009-1',contractDate:'2026-11-02',actNumber:'SYNTH-RIRU-001',applicant:'Учебный заявитель',address:'Синтетический адрес'};
  assert.equal((await post('riru-head','/api/v1/acts',body)).status,403);const a=ok(await post('riru','/api/v1/acts',body)),path=`/api/v1/acts/${a.id}`;
- await owner.query('UPDATE app.acts SET tu_check_required=false WHERE id=$1',[a.id]);assert.equal((await get('other',path)).status,404);assert.equal((await get('tech',path)).status,404);
+ await owner.query('UPDATE app.acts SET tu_check_required=false WHERE id=$1',[a.id]);assert.equal((await get('other',path)).status,404);assert.equal((await get('tech',path)).status,200);
  const up=async()=>{const r=await request(app).post(path+'/files').set('Authorization','Bearer '+tokens.riru).attach('file',zip(docxParts),'synthetic.docx');assert.equal(r.status,201);return r.body;};
  const file=await up();const card=()=>get('riru',path).then(ok);const version=async()=>ok(await post('riru',path+'/versions',{fileId:file.id,expectedRevision:(await card()).revision}));const v1=await version();
  assert.equal((await request(app).post(path+'/files').set('Authorization','Bearer '+tokens['riru-head']).attach('file',zip(docxParts),'forbidden.docx')).status,403);

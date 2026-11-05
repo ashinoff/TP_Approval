@@ -216,3 +216,4 @@ p.tu-confirmed{margin:6px 0 0;padding:5px 7px;border-radius:5px;background:var(-
 .tu-verdict button.tu-verdict-bad:hover:not(:disabled){background:#d93a2f!important;color:#fff!important}
 .tu-verdict-note{font-size:12px}
 .tu-rejected{margin:8px 0 0;color:#b3261e;font-size:12.5px}
+.act-delete{margin-left:auto}

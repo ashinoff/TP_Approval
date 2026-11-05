@@ -60,10 +60,11 @@ export async function runLocalAuthIntegration(ownerUrl:string,runtimeUrl:string,
     const created=await post(engineer,'/api/v1/acts',body);assert.equal(created.status,200,JSON.stringify(created.body));
     const actId=created.body.id;
     assert.equal((await get(stranger,'/api/v1/acts/'+actId)).status,404);
-    assert.equal((await get(admin,'/api/v1/acts/'+actId)).status,404);
+    assert.equal((await get(admin,'/api/v1/acts/'+actId)).status,200,'TECH_ADMIN reads every document (owner decision 05.11.2026)');
+    assert.equal((await post(admin,'/api/v1/acts',body)).status,403,'…but cannot create documents');
     assert.equal((await post(stranger,'/api/v1/acts',body)).status,403);
     assert.equal(Number((await runtime.query('SELECT count(*) FROM app.acts')).rows[0].count),0);
-    pass('CSRF, RLS, RES isolation and no document access for TECH_ADMIN');
+    pass('CSRF, RLS, RES isolation; TECH_ADMIN reads but cannot create documents');
 
     for(const path of ['/api/v1/acts/'+actId+'/files','/api/v1/documents/extract-tu']){
       const upload=request(app).post(path).set('Host','app.test').set('Origin','https://app.test').set('Cookie',engineer.cookie).set('X-CSRF-Token',engineer.csrf);

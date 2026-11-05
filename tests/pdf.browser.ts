@@ -39,6 +39,8 @@ try{
   await db.query('INSERT INTO app.local_credentials(user_id,login,password_hash,must_change) VALUES($1,$2,$3,false)',[id,login,hash]);
   await db.query('UPDATE app.users SET position=$2 WHERE id=$1',[id,role==='RIRU_HEAD'?'Начальник РИРУ (тест)':'Инженер РИРУ (тест)']);
  }
+ {const id=(await db.query("INSERT INTO app.users(issuer,subject,name) VALUES('urn:tp-approval:local',$1,'Администратор · синтетический') RETURNING id",[randomUUID()])).rows[0].id;
+  await db.query("INSERT INTO app.roles(user_id,role,res_id) VALUES($1,'TECH_ADMIN',NULL)",[id]);await db.query('INSERT INTO app.local_credentials(user_id,login,password_hash,must_change) VALUES($1,$2,$3,false)',[id,'adm',hash]);}
  await db.end();
  const pool=new pg.Pool({connectionString:runtime});
  let handler:any=null;server=httpServer((q:any,r:any)=>handler(q,r));
@@ -82,6 +84,13 @@ try{
  await review.getByRole('button',{name:'Сохранить замечание',exact:true}).click();await review.locator('.review-note').first().waitFor({timeout:15000});await left.locator('.pdf-remark').first().waitFor({timeout:15000});
  assert.match(await left.locator('.pdf-remark').first().getAttribute('aria-label')??'',/Замечание: 15 кВт$/);
  await page.waitForTimeout(400);await shot('03-remark-pdf');console.log('OK 4: reviewer selects words in the PDF text layer; the remark is anchored to exactly those words');
+ // 5. Администратор: «Все документы» всех РЭС с фильтром по РЭС, просмотр без права действий, кнопка удаления.
+ await review.getByRole('button',{name:'Завершить проверку'}).click();await page.getByRole('button',{name:'Выйти',exact:true}).click();await login('adm');await page.getByRole('button',{name:'Все документы',exact:true}).click();
+ await page.getByRole('heading',{name:'Все документы'}).waitFor();await page.locator('[data-testid^="registry-row-"]').first().waitFor({timeout:15000});
+ await page.getByLabel('РЭС').first().waitFor();await shot('05-admin-all');
+ await page.locator('[data-testid^="registry-row-"]').first().click();await page.locator('.pdf-page canvas').first().waitFor({timeout:20000});
+ await page.getByRole('button',{name:'Удалить документ'}).waitFor();assert.equal(await page.getByRole('button',{name:'Согласовать'}).count(),0);
+ await shot('06-admin-document');console.log('OK 5: admin sees all documents with a RES filter, opens them read-only and has the delete button');
  assert.deepEqual(errors,[]);console.log('PASS: PDF documents e2e');
 }catch(e){const p=browser?.contexts()[0]?.pages()[0];if(p){await p.screenshot({path:out+'/failure.png'});console.log('ALERTS:',await p.locator('[role=alert]').allTextContents());}console.log('FAIL:',(e as Error).message.slice(0,600));throw e;}finally{await browser?.close();server?.close();await control(['-D',resolve(root,'pg'),'-m','fast','-w','stop']).catch(()=>{});}
 process.exit(0);

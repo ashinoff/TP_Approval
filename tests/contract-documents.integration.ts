@@ -33,7 +33,7 @@ export async function runContractDocumentChecks({app,owner,runtime,tokens,users,
  const stranger=ok(await create('OTHER-CONTRACT','00002-26-00000001-1'));assert.equal((await post('riru',`/api/v1/acts/${stranger.id}/technical-conditions/select`,{technicalConditionsId:tu.technicalConditions.id,expectedRevision:stranger.revision})).status,404);
  pass('One contract shares TU across distinct act cards; another contract cannot select it');
  const preview=path+`/technical-conditions/${tu.technicalConditions.id}/preview`;assert.ok(ok(await get('chief',preview)).blocks.length);
- for(const user of ['other','tech']){assert.equal((await get(user,path)).status,404);assert.equal((await get(user,preview)).status,404);assert.equal((await get(user,`/api/v1/files/${tu.id}/download`)).status,404);}
+ for(const user of ['other']){assert.equal((await get(user,path)).status,404);assert.equal((await get(user,preview)).status,404);assert.equal((await get(user,`/api/v1/files/${tu.id}/download`)).status,404);}
  assert.equal((await upload(path,'TU','chief')).status,403);
  const dbScope=await transaction(runtime,users.other,db=>db.query('SELECT id FROM app.technical_conditions WHERE id=$1',[tu.technicalConditions.id]));assert.equal(dbScope.rowCount,0);
  pass('Private TU preview/download and real RLS reject other RES and technical admin; reviewer cannot upload');

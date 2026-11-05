@@ -17,7 +17,7 @@ function stageCaption(detail:Row,presentation:Row){
  */
 type Panel='document'|'details'|'matrix'|'history';
 const panels:[Panel,string][]=[['document','Документ'],['details','Реквизиты'],['matrix','Матрица'],['history','История']];
-export default function ActHeader({detail,profile,panel='document',onPanel}:{detail:Row;profile?:Row;panel?:string;onPanel:(panel:Panel)=>void}){
+export default function ActHeader({detail,profile,panel='document',onPanel,onDelete}:{detail:Row;profile?:Row;panel?:string;onPanel:(panel:Panel)=>void;onDelete?:()=>void}){
  const presentation=detail.presentation;
  const kind=detail.act_type==='AVTU'?'АВТУ':'Акт';
  const showContractNumber=detail.contract_number&&detail.contract_number!==detail.act_number;
@@ -29,6 +29,7 @@ export default function ActHeader({detail,profile,panel='document',onPanel}:{det
    <div className="card-tools act-panels" role="group" aria-label="Разделы документа">
     {panels.map(([key,label])=><button key={key} type="button" aria-pressed={panel===key} onClick={()=>onPanel(key)}>{label}</button>)}
    </div>
+   {onDelete&&<button type="button" className="danger-button act-delete" onClick={onDelete} title="Только администратор: удалить документ насовсем">Удалить документ</button>}
   </div>
   <dl className="act-facts">
    <div><dt>Заявитель</dt><dd>{detail.applicant||'не указан'}</dd></div>

@@ -91,12 +91,13 @@ try{
   const downloaded=resolve(reportDir,'downloaded-v2.docx');await download.saveAs(downloaded);
   const hash=(data:Buffer)=>createHash('sha256').update(data).digest('hex');assert.equal(hash(await readFile(downloaded)),hash(await readFile('.local/demo-documents/act-v2.docx')));check('Скачанная через браузер версия DOCX побайтно совпадает с загруженной');
   const privateFile=final.versions[0].file_id;
-  for(const subject of ['riru-hosta','chief-hosta','tech']){
+  for(const subject of ['riru-hosta','chief-hosta']){
     assert.equal((await request(subject,`/api/v1/acts/${act.id}`)).status,404);assert.equal((await request(subject,`/api/v1/files/${privateFile}/download`)).status,404);
     assert.ok(!(await request(subject,'/api/v1/acts')).data.some((a:any)=>a.id===act.id));
     await reloadData(pages[subject]);assert.equal(await pages[subject].getByText(number,{exact:true}).count(),0);
   }
-  check('Хостинский РЭС и TECH_ADMIN не видят акт/файл в UI и при прямом API-запросе (404)');
+  assert.equal((await request('tech',`/api/v1/acts/${act.id}`)).status,200);
+  check('Хостинский РЭС не видит акт/файл (404); TECH_ADMIN видит все документы (решение владельца 05.11.2026)');
   for(const u of demoUsers){const badge=await request(u.subject,'/api/platform/badge');const notifications=await request(u.subject,'/api/v1/notifications');assert.equal(badge.status,200);assert.equal(badge.data.count,baseline[u.subject]);assert.equal(notifications.status,200);const count=notifications.data.filter((n:any)=>n.act_id===act.id).length;assert.equal(count,['riru-adler','riru-head-adler','chief-adler','sue','stp','gi'].includes(u.subject)?2:0);}
   const notes=(await request('riru-adler','/api/v1/notifications')).data.filter((n:any)=>n.act_id===act.id);assert.ok(notes.some((n:any)=>n.type==='RETURNED'));assert.ok(notes.some((n:any)=>n.type==='APPROVED'));
   assert.equal((await request('riru-hosta',`/api/v1/notifications/${notes[0].id}/read`,{})).status,404);

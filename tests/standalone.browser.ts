@@ -44,8 +44,10 @@ export async function runStandaloneBrowser(options:{url:string;initialPassword:s
     await service.getByRole('status').filter({hasText:'Копия создана'}).waitFor({timeout:20000});await service.getByRole('cell',{name:/^backup-/}).first().waitFor();
     await service.getByRole('button',{name:'Состояние'}).click();await service.getByText('Проверки',{exact:true}).waitFor();await page.waitForTimeout(300);
     await page.screenshot({path:options.output+'/service.png',fullPage:true});
+    // Все документы всех РЭС — у администратора, с фильтром по РЭС.
+    await page.getByRole('button',{name:'Все документы',exact:true}).click();await page.getByRole('heading',{name:'Все документы'}).waitFor();
     await page.getByRole('button',{name:'Пользователи',exact:true}).click();
-    pass('Admin service menu shows database health and creates a backup');
+    pass('Admin service menu shows database health and creates a backup; admin has «Все документы»');
 
     await form.getByLabel('ФИО',{exact:true}).fill('Учебный второй сотрудник');await form.getByLabel('Логин',{exact:true}).fill('browser.other');
     await form.getByLabel('Email',{exact:true}).fill('BROWSER.ENGINEER@example.test');

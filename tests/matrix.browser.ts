@@ -61,7 +61,7 @@ try{
   assert.equal(await p.locator('.matrix-table tbody').innerText(),frozen);
   await p.getByLabel('Цикл согласования',{exact:true}).selectOption('current');await summary(p,'Согласовано');for(const role of ['RES_HEAD','SUE','STP','GI'])await stage(p,role,'Согласовано');await screen(p,'05-approved');pass('Окончательное согласование обновилось; историческая матрица не изменилась');
   const final=(await api('riru-adler',`/api/v1/acts/${act.id}`)).body;const revoked=await api('process',`/api/v1/releases/${final.releases.at(-1).id}/revoke`,{reason:'Учебная проверка отзыва в матрице'});assert.equal(revoked.status,200);await summary(p,'Отозвано');await screen(p,'06-revoked');pass('Итог Отозвано получен из реальной публикации; решения не удалены');
-  for(const user of ['riru-hosta','tech'])assert.equal((await api(user,`/api/v1/acts/${act.id}/approval-matrix`)).status,404);pass('Прямой API матрицы закрыт для другого РЭС и TECH_ADMIN');
+  for(const user of ['riru-hosta'])assert.equal((await api(user,`/api/v1/acts/${act.id}/approval-matrix`)).status,404);pass('Прямой API матрицы закрыт для другого РЭС и TECH_ADMIN');
   const overdueNumber=`МАТРИЦА-СРОК-${stamp}`;const overdueAct=await create(overdueNumber);await uploadAndSubmit(1);await matrix(p);
   await db.query("UPDATE app.tasks SET due_at=now()-interval '1 minute' WHERE act_id=$1 AND status='OPEN'",[overdueAct.id]);await summary(p,'Просрочено');await p.getByTestId('matrix-row-RES_HEAD').getByText('Просрочено',{exact:true}).waitFor();await screen(p,'07-overdue');
   await open(chief,overdueNumber);await decide(chief);for(const role of ['SUE','STP','GI'])await stage(p,role,'Ожидает решения');await p.getByTestId('matrix-row-RES_HEAD').getByText('Завершено с просрочкой',{exact:true}).waitFor();

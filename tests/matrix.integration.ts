@@ -39,7 +39,7 @@ export async function runMatrixIntegration(ownerUrl:string,runtimeUrl:string,roo
     const a=await create('MATRIX-1');const path=`/api/v1/acts/${a.id}/approval-matrix`;
     const matrix=async(cycleId?:string)=>ensure(await get('riru',`${path}${cycleId?`?cycleId=${cycleId}`:''}`));
     const blank=await matrix();assert.equal(blank.rows.length,5);assert.ok(blank.rows.every((r:any)=>r.status==='NOT_STARTED'));assert.equal(blank.version,null);
-    assert.equal((await get('other',path)).status,404);assert.equal((await get('tech',path)).status,404);assert.equal((await request(app).get(path)).status,401);assert.equal((await get('riru',`${path}?cycleId=${randomUUID()}`)).status,404);
+    assert.equal((await get('other',path)).status,404);assert.equal((await get('tech',path)).status,200);assert.equal((await request(app).get(path)).status,401);assert.equal((await get('riru',`${path}?cycleId=${randomUUID()}`)).status,404);
     pass('initial draft, all five stages unstarted, API and RLS access restrictions');
     async function version(actId=a.id){const uploaded=await request(app).post(`/api/v1/acts/${actId}/files`).set('Authorization',`Bearer ${tokens.riru}`).attach('file',zip(docxParts),'matrix.docx');assert.equal(uploaded.status,201);const act=ensure(await get('riru',`/api/v1/acts/${actId}`));return ensure(await post('riru',`/api/v1/acts/${actId}/versions`,{fileId:uploaded.body.id,expectedRevision:act.revision}));}
     async function submitVersion(v:any,actId=a.id){const act=ensure(await get('riru',`/api/v1/acts/${actId}`));return ensure(await post('riru',`/api/v1/acts/${actId}/submit`,{versionId:v.id,expectedRevision:act.revision}));}

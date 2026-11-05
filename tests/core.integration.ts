@@ -33,8 +33,8 @@ export async function runIntegration(ownerUrl:string,runtimeUrl:string,root:stri
     const badNumber=await post('riru','/api/v1/acts',{...body,contractNumber:'0001/ТП',actNumber:'0001/ТП'});assert.equal(badNumber.status,422);assert.equal(badNumber.body.error.code,'CONTRACT_NUMBER_FORMAT');
     const created=await post('riru','/api/v1/acts',body);assert.equal(created.status,200,JSON.stringify(created.body));const actId=created.body.id;
     assert.equal((await post('other','/api/v1/acts',body)).status,403);
-    assert.equal((await get('other',`/api/v1/acts/${actId}`)).status,404);assert.equal((await get('tech',`/api/v1/acts/${actId}`)).status,404);
-    assert.deepEqual((await get('other','/api/v1/acts')).body,[]);pass('RES isolation and TECH_ADMIN content denial');
+    assert.equal((await get('other',`/api/v1/acts/${actId}`)).status,404);assert.equal((await get('tech',`/api/v1/acts/${actId}`)).status,200,'TECH_ADMIN reads every document (owner decision 05.11.2026)');
+    assert.deepEqual((await get('other','/api/v1/acts')).body,[]);pass('RES isolation; TECH_ADMIN reads documents of every RES');
     assert.equal((await runtime.query('SELECT count(*) FROM app.acts')).rows[0].count,'0');
     await transaction(runtime,users.other,async db=>assert.equal((await db.query('SELECT count(*) FROM app.acts')).rows[0].count,'0'));
     await transaction(runtime,users.riru,async db=>assert.equal((await db.query('SELECT count(*) FROM app.acts')).rows[0].count,'1'));
@@ -89,7 +89,7 @@ export async function runIntegration(ownerUrl:string,runtimeUrl:string,root:stri
     await owner.query("UPDATE app.tasks SET due_at=now()-interval '1 minute' WHERE act_id=$1 AND status='OPEN'",[actId]);
     const deadlineRun=await post('process','/api/v1/admin/run-deadlines',{});assert.equal(deadlineRun.status,200,JSON.stringify(deadlineRun.body));assert.ok(deadlineRun.body.emitted>=6);
     assert.equal((await post('process','/api/v1/admin/run-deadlines',{})).body.emitted,0);pass('Overdue notifications and escalation journal are deduplicated');
-    assert.equal((await post('tech',`/api/v1/acts/${actId}/close-collection`,{reason:'Попытка'})).status,404);
+    assert.equal((await post('tech',`/api/v1/acts/${actId}/close-collection`,{reason:'Попытка'})).status,403,'Read access does not let TECH_ADMIN act on the workflow');
     assert.equal((await post('process',`/api/v1/acts/${actId}/close-collection`,{reason:'Срок истёк'})).status,200);
     assert.equal((await owner.query("SELECT count(*) FROM app.tasks WHERE act_id=$1 AND status='CANCELLED'",[actId])).rows[0].count,'3');pass('Only scoped process admin closes expired collection, missing decisions stay missing');
     const notes=(await get('riru','/api/v1/notifications')).body;assert.ok(notes.length>0);await post('riru',`/api/v1/notifications/${notes[0].id}/read`,{});assert.equal((await get('riru','/api/platform/badge')).body.count,1);pass('Unread notifications and action badge are independent');

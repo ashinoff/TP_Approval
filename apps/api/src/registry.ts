@@ -4,7 +4,7 @@ type Row=Record<string,any>;
 const boolean=z.enum(['true','false']).transform(v=>v==='true').optional();
 export const registryFilters=z.object({q:z.string().trim().max(200).default(''),resId:z.string().uuid().optional(),
   status:z.enum(['DRAFT','IN_REVIEW','COLLECTING','REVISING','REWORK','APPROVED','OVERDUE','REVOKED']).optional(),
-  view:z.enum(['queue','work','preparation','approved','upload','progress','corrections','documents']).optional(),dateField:z.enum(['created','contract']).default('created'),
+  view:z.enum(['queue','work','preparation','approved','upload','progress','corrections','documents','all']).optional(),dateField:z.enum(['created','contract']).default('created'),
   stage:z.enum(['RIRU','RIRU_HEAD','RES_HEAD','PARALLEL','SUE','STP','GI','COMPLETED']).optional(),
   from:z.iso.date().optional(),to:z.iso.date().optional(),comments:z.enum(['with','without']).optional(),
   overdue:boolean,mine:boolean,action:boolean,page:z.coerce.number().int().min(1).max(100000).default(1),limit:z.coerce.number().int().min(1).max(100).default(25)
@@ -77,6 +77,7 @@ export async function registry(db:DB,input:unknown){
     WHEN 'corrections' THEN can_prepare AND (state IN ('RETURNED','REVISING') OR display_status='REVOKED')
     WHEN 'approved' THEN active_publication IS NOT NULL
     WHEN 'documents' THEN can_prepare OR active_publication IS NOT NULL
+    WHEN 'all' THEN true
     WHEN 'work' THEN state<>'APPROVED' OR active_publication IS NULL
     WHEN 'preparation' THEN can_prepare AND (state<>'APPROVED' OR active_publication IS NULL) ELSE true END`;
   const dateFrom=f.dateField==='contract'?'contract_date >= $5::date':"created_at>=($5::date::timestamp AT TIME ZONE 'Europe/Moscow')";
@@ -102,5 +103,6 @@ export async function registryCounts(db:DB){return (await db.query(`WITH d AS ($
  count(*) FILTER(WHERE can_prepare AND (state<>'APPROVED' OR active_publication IS NULL))::int AS preparation,
  count(*) FILTER(WHERE can_prepare AND state='DRAFT')::int AS upload,
  count(*) FILTER(WHERE can_prepare OR active_publication IS NOT NULL)::int AS documents,
+ count(*)::int AS all,
  count(*) FILTER(WHERE can_prepare AND state IN ('RIRU_REVIEW','RES_REVIEW','CENTRAL_REVIEW','CENTRAL_COLLECTING'))::int AS progress,
  count(*) FILTER(WHERE can_prepare AND (state IN ('RETURNED','REVISING') OR display_status='REVOKED'))::int AS corrections FROM d`)).rows[0];}
