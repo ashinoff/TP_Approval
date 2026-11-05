@@ -32,8 +32,12 @@ test('ВА выше номинала и тонкий СИП — расхожде
  assert.equal(byField(nominalFindings(act('15',['ВА-25А']),strict,refs)).normBreaker.status,'MATCH');
 });
 
-test('с 50 кВт справочник требует ТТ: без них — проверить вручную, ниже нормы — расхождение',()=>{
- assert.equal(byField(nominalFindings(act('50',['ВА-80А']),tu,refs)).normCt.status,'MANUAL_REVIEW');
+test('ТТ: 50 кВт без ТТ — прямое включение (для сведения), с ТТ — по току; выше 100 А без ТТ — проверить',()=>{
+ assert.equal(byField(nominalFindings(act('50',['ВА-80А']),tu,refs)).normCt.status,'INFO');
+ assert.equal(byField(nominalFindings(act('50',['ВА-80А','ТТ 100/5']),tu,refs)).normCt.status,'MATCH');
+ assert.equal(byField(nominalFindings(act('50',['ВА-100А','ТТ 75/5']),tu,refs)).normCt.status,'DIFFERENCE');
+ assert.equal(byField(nominalFindings(act('70',['ВА-125А']),tu,refs)).normCt.status,'MANUAL_REVIEW');
+ assert.equal(byField(nominalFindings(act('40',['ВА-63А','ТТ 50/5']),tu,refs)).normCt.status,'DIFFERENCE');
  assert.equal(byField(nominalFindings(act('70',['ВА-125А','ТТ 100/5']),tu,refs)).normCt.status,'DIFFERENCE');
  assert.equal(byField(nominalFindings(act('70',['ВА-125А','ТТ 200/5']),tu,refs)).normCt.status,'MATCH');
 });

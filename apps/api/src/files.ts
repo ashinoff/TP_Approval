@@ -1,9 +1,9 @@
 import yauzl from 'yauzl';
-import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { XMLValidator } from 'fast-xml-parser';
 import { connect } from 'node:net';
 import { HttpError } from './db.js';
 
-export async function validateDocx(buffer:Buffer,options:{prepareLocalTemplate?:boolean}={}) {
+export async function validateDocx(buffer:Buffer,_options:{prepareLocalTemplate?:boolean}={}) {
   const entries=new Map<string,Buffer>(); let total=0;let entryCount=0;
   await new Promise<void>((resolve,reject)=>yauzl.fromBuffer(buffer,{lazyEntries:true,validateEntrySizes:true},(error,zip)=>{
     if(error||!zip) {reject(new HttpError(415,'INVALID_DOCX'));return;}
@@ -11,7 +11,10 @@ export async function validateDocx(buffer:Buffer,options:{prepareLocalTemplate?:
     zip.on('error',fail); zip.on('end',resolve);
     zip.on('entry',(entry:yauzl.Entry)=>{
       total+=entry.uncompressedSize;
-      if(++entryCount>2000||total>100*1024*1024||entry.generalPurposeBitFlag&1||entries.has(entry.fileName)||/(^|\/)(\.\.|embeddings|activeX)(\/|$)|vbaProject|\.exe$/i.test(entry.fileName)) {fail(new HttpError(415,'UNSAFE_DOCX'));return;}
+      // Встроенная схема Visio — обычная часть акта ТП (решение владельца 05.11.2026). Объект программой
+      // не открывается и не исполняется, весь файл проверяет антивирус. Прочие вложения и макросы запрещены.
+      const visio=/^word\/embeddings\/[^/]+\.(vsdx|vsd)$/i.test(entry.fileName);
+      if(++entryCount>2000||total>100*1024*1024||entry.generalPurposeBitFlag&1||entries.has(entry.fileName)||!visio&&/(^|\/)(\.\.|embeddings|activeX)(\/|$)|vbaProject|\.exe$/i.test(entry.fileName)) {fail(new HttpError(415,'UNSAFE_DOCX'));return;}
       if(entry.fileName.endsWith('/')) {zip.readEntry();return;}
       zip.openReadStream(entry,(err,stream)=>{
         if(err||!stream) {fail(new HttpError(415,'INVALID_DOCX'));return;}
@@ -26,15 +29,10 @@ export async function validateDocx(buffer:Buffer,options:{prepareLocalTemplate?:
   for(const [name,content] of entries) if(/\.(xml|rels)$/i.test(name)) {
     const xml=content.toString('utf8');
     if(/<!DOCTYPE|<!ENTITY/i.test(xml)||XMLValidator.validate(xml)!==true) throw new HttpError(415,'UNSAFE_XML');
-    if(name.endsWith('.rels')) {
-      const parsed=new XMLParser({ignoreAttributes:false}).parse(xml);
-      const relations=parsed.Relationships?.Relationship??[];
-      for(const rel of Array.isArray(relations)?relations:[relations]) if(rel['@_TargetMode']==='External') {
-        const preparable=options.prepareLocalTemplate&&name==='word/_rels/settings.xml.rels'&&rel['@_Type']==='http://schemas.openxmlformats.org/officeDocument/2006/relationships/attachedTemplate'&&typeof rel['@_Id']==='string'&&typeof rel['@_Target']==='string'&&/^file:/i.test(rel['@_Target']);
-        if(!preparable)throw new HttpError(415,'EXTERNAL_RELATIONSHIP');
-      }
-    }
   }
+  // Внешние связи (сайт в шапке ТУ, путь к шаблону Word, источник слияния на файловом сервере и т. п.) игнорируются —
+  // решение владельца 05.11.2026: программа по ним не обращается, просмотр берёт картинки только из самого файла.
+  // Связь с локальным шаблоном у ТУ по-прежнему удаляет prepare-tu.ts. Макросы, ActiveX и вложения, кроме схем Visio, запрещены.
   const types=entries.get('[Content_Types].xml')!.toString('utf8');
   if(!types.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml')||/macroEnabled/i.test(types)) throw new HttpError(415,'INVALID_DOCX_TYPE');
   return entries;

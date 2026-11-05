@@ -88,15 +88,21 @@ export function nominalFindings(actBlocks:Block[],tuBlocks:Block[],refs:Referenc
   else findings.push(result('normBreaker','Номинал вводного автомата (ВА)','MATCH',actSet.length>1?`Все номиналы ВА (${actSet.join(', ')} А) не выше ${bRow.breaker} А.`:`ВА ${actSet[0]} А — не выше ${bRow.breaker} А по справочнику.`,actBreakers,bNorm,tuBreakers));
  }
 
- // Трансформаторы тока: если справочник их требует — в акте должны быть не ниже указанных.
- if(bRow?.ct){
-  const norm=`Справочник: ${base} → трансформаторы тока не ниже ${bRow.ct}`;
-  const actSetCt=[...new Set(actCts.map(v=>Number(v.value)))];
-  if(!actSetCt.length)findings.push(result('normCt','Трансформаторы тока (ТТ)','MANUAL_REVIEW',`По справочнику для ${base} нужны ТТ не ниже ${bRow.ct}, в акте они не найдены. Проверьте схему учёта (прямое включение или через ТТ).`,[],norm));
-  else{const low=actSetCt.filter(c=>c<ctPrimary(bRow.ct!));
-   findings.push(result('normCt','Трансформаторы тока (ТТ)',low.length?'DIFFERENCE':'MATCH',low.length?`ТТ ${low.map(c=>c+'/5').join(', ')} ниже требуемых ${bRow.ct}.`:`ТТ не ниже ${bRow.ct}.`,actCts,norm));}
- }else if(bRow&&actCts.length){
-  findings.push(result('normCt','Трансформаторы тока (ТТ)','INFO',`По справочнику для ${base} ТТ не требуются, в акте указаны — для сведения.`,actCts,`Справочник: ${base} → ТТ не требуются`));
+ // Трансформаторы тока. Если ТТ в акте указаны — первичный ток не ниже нормы справочника и не ниже номинала ВА
+ // (учёт полукосвенного включения, например от РУ). Если не указаны — до ВА 100 А это может быть учёт прямого
+ // включения по решению (например, от опоры): только для сведения; выше 100 А прямое включение невозможно — проверить.
+ const actSetCt=[...new Set(actCts.map(v=>Number(v.value)))];
+ const maxBreaker=actSet.length?Math.max(...actSet):0;
+ const DIRECT_MAX=100;
+ if(bRow&&actSetCt.length){
+  const need=Math.max(bRow.ct?ctPrimary(bRow.ct):0,maxBreaker);
+  const norm=bRow.ct?`Справочник: ${base} → ТТ не ниже ${bRow.ct}${maxBreaker>ctPrimary(bRow.ct)?`; по ВА ${maxBreaker} А — не ниже ${maxBreaker}/5`:''}`:`Справочник: ${base} → ТТ не требуются; при установке — не ниже номинала ВА ${maxBreaker} А`;
+  const low=actSetCt.filter(c=>c<need);
+  findings.push(result('normCt','Трансформаторы тока (ТТ)',low.length?'DIFFERENCE':'MATCH',low.length?`ТТ ${low.map(c=>c+'/5').join(', ')} не проходят по току: нужно не ниже ${need}/5.`:`ТТ проходят по току (не ниже ${need}/5).`,actCts,norm));
+ }else if(bRow?.ct){
+  const norm=`Справочник: ${base} → с ТТ не ниже ${bRow.ct}; без ТТ — прямое включение до ${DIRECT_MAX} А`;
+  if(bRow.breaker<=DIRECT_MAX)findings.push(result('normCt','Трансформаторы тока (ТТ)','INFO',`ТТ в акте не указаны — учёт прямого включения (допустим по решению, например от опоры). Если учёт через ТТ, они должны быть не ниже ${bRow.ct}.`,[],norm));
+  else findings.push(result('normCt','Трансформаторы тока (ТТ)','MANUAL_REVIEW',`Для ${base} нужны ТТ не ниже ${bRow.ct} (ВА до ${bRow.breaker} А — прямое включение невозможно), в акте они не найдены. Проверьте схему учёта.`,[],norm));
  }
 
  // Сечение: справочник применяется к перечисленным маркам (по умолчанию СИП); ниже минимума — расхождение.

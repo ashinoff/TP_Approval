@@ -5,11 +5,16 @@ import { verifier } from '../apps/api/src/auth.js';
 import { validateDocx } from '../apps/api/src/files.js';
 import { zip,docxParts } from './zip.js';
 import { createServer } from 'node:http';
-test('DOCX: accepts synthetic OOXML and rejects invalid/active/external XML',async()=>{
+test('DOCX: accepts synthetic OOXML, embedded Visio and ignored external links; rejects invalid/active XML and other embeddings',async()=>{
   await validateDocx(zip(docxParts));
   await assert.rejects(validateDocx(Buffer.from('not zip')));
   await assert.rejects(validateDocx(zip({...docxParts,'word/vbaProject.bin':'macro'})));
-  await assert.rejects(validateDocx(zip({...docxParts,'_rels/.rels':'<Relationships><Relationship TargetMode="External" Target="http://127.0.0.1"/></Relationships>'})));
+  // Внешние связи бланков игнорируются (решение владельца 05.11.2026); схема Visio — обычная часть акта.
+  await validateDocx(zip({...docxParts,'word/_rels/document.xml.rels':'<Relationships><Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" TargetMode="External" Target="http://www.example.test"/></Relationships>'}));
+  await validateDocx(zip({...docxParts,'word/embeddings/scheme.vsdx':'synthetic visio'}));
+  await assert.rejects(validateDocx(zip({...docxParts,'word/embeddings/oleObject1.bin':'ole'})));
+  await assert.rejects(validateDocx(zip({...docxParts,'word/embeddings/scheme.vsdm':'macro visio'})));
+  await assert.rejects(validateDocx(zip({...docxParts,'word/activeX/activeX1.xml':'<ax/>'})));
   await assert.rejects(validateDocx(zip({...docxParts,'word/document.xml':'<!DOCTYPE x [<!ENTITY y SYSTEM "file:///secret">]><x>&y;</x>'})));
 });
 test('JWT: verifies signature, issuer, audience, expiry and platform role',async()=>{
