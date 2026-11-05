@@ -17,8 +17,10 @@ const usable=(blocks:Block[])=>blocks.filter(b=>b.text.length<=10000);
 const value=(v:string,b:Block,shown:string):Value=>({value:v,quote:b.text,blockId:b.id,part:b.part,shown});
 const kw=(n:number)=>String(n).replace('.',',');
 const uniq=(values:Value[])=>{const seen=new Set<string>();return values.filter(v=>!seen.has(v.value)&&seen.add(v.value));};
+// Все места в акте (текст и надписи схемы), без повторов одного абзаца: каждое отмечается цветом в просмотре.
+const places=(values:Value[])=>{const seen=new Set<string>();return values.filter(v=>!seen.has(v.blockId+'|'+v.value)&&seen.add(v.blockId+'|'+v.value));};
 const result=(field:string,label:string,status:FindingStatus,reason:string,act:Value[],norm:string,tu:Value[]=[]):NominalFinding=>
- ({field,label,status,reason,act:uniq(act).slice(0,4),tu:uniq(tu).slice(0,4),actCandidates:act.length,tuCandidates:tu.length,norm});
+ ({field,label,status,reason,act:places(act).slice(0,8),tu:uniq(tu).slice(0,4),actCandidates:act.length,tuCandidates:tu.length,norm});
 
 // «ВА-80А», «ВА 47-29 3P 25 А», «автоматический выключатель с Iн= 25 А», «Iн=63А».
 const BREAKER=[

@@ -30,7 +30,10 @@ function numberingLevel(paragraph:XmlNode[]):number|undefined{
 }
 export function xmlBlocks(xml:string,part:string):Block[]{
  const tree=new XMLParser({preserveOrder:true,ignoreAttributes:false,trimValues:false,parseTagValue:false}).parse(xml);const blocks:Block[]=[];
- const content=(nodes:any[]):string=>nodes.map(n=>n['w:t']?content(n['w:t']):n['#text']!==undefined?String(n['#text']):n['w:tab']?'\t':n['w:br']||n['w:cr']?'\n':Object.entries(n).filter(([k])=>![':@','w:pPr','w:rPr','w:instrText','w:del','w:delText'].includes(k)).map(([,v])=>Array.isArray(v)?content(v):'').join('')).join('');
+ // Рамки схем записаны дважды: mc:Choice (DrawingML, с числовыми координатами фигур) и mc:Fallback (VML).
+ // Берём один вариант — Fallback, как его показывает просмотр; без Fallback — Choice.
+ const alternate=(kids:any[]):string=>{const fallback=kids.find(k=>k['mc:Fallback']);return fallback?content(fallback['mc:Fallback']):kids.filter(k=>k['mc:Choice']).map(k=>content(k['mc:Choice'])).slice(0,1).join('');};
+ const content=(nodes:any[]):string=>nodes.map(n=>n['mc:AlternateContent']?alternate(n['mc:AlternateContent']):n['w:t']?content(n['w:t']):n['#text']!==undefined?String(n['#text']):n['w:tab']?'\t':n['w:br']||n['w:cr']?'\n':Object.entries(n).filter(([k])=>![':@','w:pPr','w:rPr','w:instrText','w:del','w:delText'].includes(k)).map(([,v])=>Array.isArray(v)?content(v):'').join('')).join('');
  // The traversal order is the same as before table metadata existed, so block ids do not change.
  let tables=0;
  type TablePosition={table:number;row:number;cell:number};

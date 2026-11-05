@@ -14,7 +14,9 @@ const shown=(v:Row)=>v.shown??v.quote;
 type Jump=(blockId:string,side:'act'|'tu',text?:string,tone?:'ok'|'bad'|'warn')=>void;
 function Evidence({side,values,onJump,tone}:{side:string;values:Row[];onJump?:Jump;tone?:'ok'|'bad'|'warn'}){
  if(!values?.length)return <p className="tu-evidence tu-evidence-missing"><span>{side}</span>не найдено</p>;
- return <>{values.map((v,i)=><p className="tu-evidence" key={i}>
+ // Одно значение в нескольких местах (текст и схема) показываем один раз; в документе отмечены все места.
+ const once=values.filter((v,i)=>values.findIndex(x=>shown(x)===shown(v))===i);
+ return <>{once.map((v,i)=><p className="tu-evidence" key={i}>
   <span>{side}</span>
   {onJump?<button type="button" className="tu-quote" title={v.quote} onClick={()=>onJump(v.blockId,side==='ТУ'?'tu':'act',v.shown??v.value,tone)}>{shown(v)}</button>:<q title={v.quote}>{shown(v)}</q>}
  </p>)}</>;
