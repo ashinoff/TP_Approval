@@ -153,7 +153,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
    </PackagePanel>
    <div className="act-main">
     {openTu&&<TuViewer key={openTu} detail={detail} tuId={openTu} api={api} loadFile={loadFile}/>}
-    {!current&&!openTu&&<div className="empty-document"><p>Загрузите DOCX в панели «Пакет документов», чтобы начать работу с документом.</p></div>}
+    {!current&&!openTu&&<div className="empty-document"><p>Загрузите PDF в панели «Пакет документов», чтобы начать работу с документом.</p></div>}
     {current&&<div className="word-grid" style={referenceView?{display:'none'}:undefined}>
      <div className="word-document">{model&&bytes?<DocumentViewer key={versionId} ref={viewerRef} bytes={bytes} model={model} comments={versionNotes} onSelection={setSelection} onComment={focus} focusedId={focused} focusRequest={focusRequest} marks={actMarks} onAddRemark={form?undefined:()=>{const why=remarkBlockReason(detail,tasks,profile,versionId);if(why){setError(why);return;}if(selection){setForm(selection);dirty('remark',true);}}} remarkBlocked={remarkBlockReason(detail,tasks,profile,versionId)}/>:!error&&<p role="status">Загрузка документа…</p>}</div>
      <aside className="word-remarks" aria-label="Замечания к документу">

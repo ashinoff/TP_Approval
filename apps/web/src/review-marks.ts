@@ -30,8 +30,8 @@ export function checkMarks(check:Row|undefined,side:'act'|'tu'):BlockMark[]{
 export function changedMarks(model:Row|undefined,other:Row|undefined,otherLabel:string):BlockMark[]{
  if(!model||!other)return [];
  const norm=(t:string)=>t.replace(/\s+/g,' ').trim();
- const texts=new Set((other.blocks as Row[]).filter(b=>b.part==='word/document.xml').map(b=>norm(b.text)));
- return (model.blocks as Row[]).filter(b=>b.part==='word/document.xml'&&norm(b.text)&&!texts.has(norm(b.text)))
+ const texts=new Set((other.blocks as Row[]).filter(b=>(b.part==='word/document.xml'||String(b.part).startsWith('pdf/'))).map(b=>norm(b.text)));
+ return (model.blocks as Row[]).filter(b=>(b.part==='word/document.xml'||String(b.part).startsWith('pdf/'))&&norm(b.text)&&!texts.has(norm(b.text)))
   .map(b=>({blockId:b.id,tone:'changed' as const,title:`Отличается от ${otherLabel}`}));
 }
 

@@ -1,0 +1,32 @@
+/* Просмотр PDF: страница = холст + текстовый слой pdf.js (стили — из pdfjs-dist/web/pdf_viewer.css) + слои разметки. */
+.pdf-frame{position:relative}
+.pdf-scroll{height:70vh;min-height:420px;overflow:auto;background:#e9eef2;padding:12px 16px 24px;box-sizing:border-box}
+.unified-act .pdf-scroll{height:calc(100vh - 120px);min-height:520px}
+.tu-view .pdf-scroll{height:calc(100vh - 160px);min-height:520px}
+.review-pane .pdf-frame{flex:1;min-height:0;display:flex;flex-direction:column}
+.review-pane .pdf-scroll{flex:1;height:auto;min-height:0}
+@media(max-width:850px){.unified-act .pdf-scroll{height:65vh;min-height:380px}}
+.pdf-scroll .page-caption{font:12px sans-serif;color:#7b8d96;text-align:center;margin:10px 0 6px}
+.pdf-page{position:relative;margin:0 auto;background:#fff;box-shadow:0 2px 10px rgb(20 34 56 / .14)}
+.pdf-page canvas{display:block}
+.pdf-overlay{position:absolute;inset:0;pointer-events:none}
+.pdf-below{z-index:0}.pdf-above{z-index:3}
+.textLayer{position:absolute;text-align:initial;inset:0;overflow:clip;opacity:1;line-height:1;text-size-adjust:none;forced-color-adjust:none;transform-origin:0 0;caret-color:CanvasText;z-index:1}
+.textLayer :is(span,br){color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0% 0%}
+.textLayer ::selection{background:rgb(49 86 163 / .3)}
+.textLayer br::selection{background:transparent}
+.textLayer .endOfContent{display:block;position:absolute;inset:100% 0 0;z-index:0;cursor:default;user-select:none}
+.pdf-mark,.pdf-check-hit,.pdf-search-hit,.pdf-value-hit,.pdf-jump,.pdf-remark{position:absolute;border-radius:3px;box-sizing:border-box}
+.pdf-mark[data-mark=ok]{background:rgb(46 157 91 / .16);box-shadow:inset 0 -2px 0 rgb(46 157 91 / .55)}
+.pdf-mark[data-mark=bad]{background:rgb(217 58 47 / .18);box-shadow:inset 0 -2px 0 rgb(217 58 47 / .7)}
+.pdf-mark[data-mark=warn]{background:rgb(217 154 0 / .2);box-shadow:inset 0 -2px 0 rgb(217 154 0 / .7)}
+.pdf-mark[data-mark=changed]{background:rgb(49 86 163 / .14)}
+.mark-click .textLayer span{cursor:pointer}
+.pdf-check-hit{background:rgb(255 213 74 / .35)}
+.pdf-search-hit{outline:2px solid #d7a82e}
+.pdf-value-hit{background:rgb(255 213 74 / .75)}
+.pdf-jump{border:3px solid #3156a3;border-radius:6px;animation:pdf-jump 1s ease-out 2}
+.pdf-jump[data-jump=ok]{border-color:#2e9d5b}.pdf-jump[data-jump=bad]{border-color:#d93a2f}.pdf-jump[data-jump=warn]{border-color:#d99a00}
+@keyframes pdf-jump{0%{transform:scale(1.08);opacity:0}100%{transform:scale(1);opacity:1}}
+.pdf-remark{pointer-events:auto;cursor:pointer;background:rgb(255 196 186 / .45);box-shadow:inset 0 -2px 0 #c62828}
+.pdf-remark:hover,.pdf-remark.is-focused{background:rgb(255 160 145 / .6);outline:2px solid #c62828}

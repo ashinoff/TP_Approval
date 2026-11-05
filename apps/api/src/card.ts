@@ -1,3 +1,4 @@
+import {isBody} from './documents.js';
 import {z} from 'zod';
 import {readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -66,7 +67,7 @@ export async function cardFromTu(db:DB,storage:string,actId:string){
  if(!act.technical_conditions_id)throw new HttpError(409,'TU_REQUIRED','Сначала загрузите ТУ.');
  const tu=requireValue((await db.query("SELECT t.file_id FROM app.technical_conditions t JOIN app.files f ON f.id=t.file_id WHERE t.id=$1 AND f.scan_status='READY'",[act.technical_conditions_id])).rows[0]);
  const model=await documentModel(await readFile(resolve(storage,tu.file_id)));
- const facts=tuCardFacts(model.blocks.filter(b=>b.part==='word/document.xml'));
+ const facts=tuCardFacts(model.blocks.filter(b=>isBody(b.part)));
  const current=new Map((await cardValues(db,actId)).map(v=>[v.field_code,v]));
  const fields=(await cardFields(db)).filter(f=>f.tu_source);
  const values=fields.filter(f=>facts[f.tu_source as keyof typeof facts].value&&current.get(f.code)?.origin!=='MANUAL')

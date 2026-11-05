@@ -5,6 +5,7 @@ import {XMLParser} from 'fast-xml-parser';
 import {diffWordsWithSpace} from 'diff';
 import {z} from 'zod';
 import {validateDocx} from './files.js';
+import {isPdf,pdfModel} from './pdf-model.js';
 import {HttpError,requireValue,type DB} from './db.js';
 import {audit,lockAct,role} from './workflow.js';
 /** Position of a paragraph inside a Word table: table index within the part, row and cell. */
@@ -14,6 +15,8 @@ export type TableCell={table:number;row:number;cell:number};
  * `table` and `numbering` are optional reading aids for the requisite rules and never affect the id.
  */
 export type Block={id:string;part:string;text:string;sha256:string;table?:TableCell;numbering?:{level:number}};
+/** Основной текст документа: тело DOCX или страница PDF (колонтитулы DOCX — отдельно). */
+export const isBody=(part:string)=>part==='word/document.xml'||part.startsWith('pdf/');
 const hash=(s:string|Buffer)=>createHash('sha256').update(s).digest('hex');
 type XmlNode=Record<string,any>;
 const childNodes=(nodes:XmlNode[],name:string)=>nodes.filter(n=>Array.isArray(n[name])).map(n=>n[name] as XmlNode[]);
@@ -62,14 +65,17 @@ export function xmlBlocks(xml:string,part:string):Block[]{
  };
  walk(tree);return blocks;
 }
-export async function documentModel(bytes:Buffer){const parts=await validateDocx(bytes);const blocks:Block[]=[];for(const [part,xml]of parts)if(/^word\/(document|header\d+|footer\d+)\.xml$/.test(part))blocks.push(...xmlBlocks(xml.toString('utf8'),part));return {sha256:hash(bytes),blocks};}
+export async function documentModel(bytes:Buffer):Promise<{sha256:string;format:'docx'|'pdf';blocks:Block[];pages?:{width:number;height:number}[]}>{
+ if(isPdf(bytes))return pdfModel(bytes);
+ const parts=await validateDocx(bytes);const blocks:Block[]=[];for(const [part,xml]of parts)if(/^word\/(document|header\d+|footer\d+)\.xml$/.test(part))blocks.push(...xmlBlocks(xml.toString('utf8'),part));return {sha256:hash(bytes),format:'docx',blocks};
+}
 export const anchorSchema=z.object({kind:z.literal('OOXML_PARAGRAPH_V1'),part:z.string().max(100),blockId:z.string().max(150),blockHash:z.string().regex(/^[a-f0-9]{64}$/),fileHash:z.string().regex(/^[a-f0-9]{64}$/),start:z.number().int().min(0),end:z.number().int().min(1),quote:z.string().min(1).max(5000)}).strict();
 export function checkAnchor(model:{sha256:string;blocks:Block[]},anchor:z.infer<typeof anchorSchema>){const block=model.blocks.find(b=>b.id===anchor.blockId&&b.part===anchor.part);if(anchor.fileHash!==model.sha256||!block||block.sha256!==anchor.blockHash||anchor.end<=anchor.start||block.text.slice(anchor.start,anchor.end)!==anchor.quote||anchor.end>block.text.length)throw new HttpError(409,'ANCHOR_MISMATCH','Привязка не соответствует исходному DOCX. Выделите фрагмент заново.');}
 export async function versionSource(db:DB,storage:string,actId:string,versionId:string){
  const v=requireValue((await db.query("SELECT v.*,f.sha256,f.id AS private_file_id FROM app.versions v JOIN app.files f ON f.id=v.file_id AND f.scan_status='READY' WHERE v.id=$1 AND v.act_id=$2",[versionId,actId])).rows[0]);
  const bytes=await readFile(resolve(storage,v.private_file_id));if(hash(bytes)!==v.sha256)throw new HttpError(500,'FILE_INTEGRITY_FAILURE');return {version:v,bytes};
 }
-export async function preview(db:DB,storage:string,actId:string,versionId:string){const {version,bytes}=await versionSource(db,storage,actId,versionId);const model=await documentModel(bytes);await audit(db,actId,'DOCUMENT_VIEWED',{versionId,sha256:model.sha256,renderer:'DOCX_PREVIEW_PROTOTYPE'});return {...model,versionId,versionNumber:version.number,renderer:'DOCX_PREVIEW_PROTOTYPE',limitations:['HTML-вёрстка приблизительная; не заменяет Word/ONLYOFFICE.','Автоматическая пагинация и поля PAGE не гарантируются.','Печать недоступна до проверки надёжного генератора.']};}
+export async function preview(db:DB,storage:string,actId:string,versionId:string){const {version,bytes}=await versionSource(db,storage,actId,versionId);const model=await documentModel(bytes);await audit(db,actId,'DOCUMENT_VIEWED',{versionId,sha256:model.sha256,renderer:'DOCX_PREVIEW_PROTOTYPE'});return {...model,versionId,versionNumber:version.number,renderer:model.format==='pdf'?'PDFJS':'DOCX_PREVIEW_PROTOTYPE',limitations:['HTML-вёрстка приблизительная; не заменяет Word/ONLYOFFICE.','Автоматическая пагинация и поля PAGE не гарантируются.','Печать недоступна до проверки надёжного генератора.']};}
 export const remarkSchema=z.object({versionId:z.string().uuid(),taskId:z.string().uuid(),categoryId:z.string().uuid(),text:z.string().trim().min(1).max(10000),suggestedValue:z.string().max(5000).default(''),discussion:z.string().max(2000).default(''),anchor:anchorSchema}).strict();
 export async function createRemark(db:DB,storage:string,actId:string,input:unknown){
  const b=remarkSchema.parse(input);const act=await lockAct(db,actId);

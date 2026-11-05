@@ -1,3 +1,4 @@
+import {isBody} from './documents.js';
 import type {Block} from './documents.js';
 
 /**
@@ -117,6 +118,8 @@ function totalPower(blocks:Block[]):Extracted{
    const digit=segment.search(/\d/);
    const qualifier=digit<0?segment:segment.slice(0,digit);
    if(NOT_TOTAL.test(qualifier))continue;
+   // Таблица «Расчёт потерь» (приложение к акту): «Максимальная мощность, Рм, кВт 30,00» — не реквизит акта.
+   if(/^\s*,?\s*[РP]\s*[мm](?!\p{L})/u.test(qualifier))continue;
    // Ссылка вместо значения: «…с учетом максимальной мощности объекта …, указанной в п. 3 настоящих ТУ».
    if(/указанн\p{L}*\s+в\s+(?:п\.|пункт)|(?:^|\s)(?:п\.|пункт\p{L}*)\s*$/iu.test(qualifier))continue;
    const result=firstQuantity(segment,powerAt);
@@ -283,7 +286,7 @@ const TU_NUMBER=/^\s*№?\s*(\d{1,3}-\d{1,3}\/\d{1,6}-\d{2})\s*$/u;
 /** TU own number: the standalone first line / footer of the TU; in the act — «технических условиях от … № …». */
 function tuNumberInTu(blocks:Block[]):Extracted{
  const values:Value[]=[];
- const first=blocks.find(b=>b.part==='word/document.xml'&&b.text.trim());
+ const first=blocks.find(b=>isBody(b.part)&&b.text.trim());
  const candidates=[first,...blocks.filter(b=>/footer|header/.test(b.part))].filter(Boolean) as Block[];
  for(const b of candidates){const m=TU_NUMBER.exec(b.text);if(m)values.push(value(m[1],b,m[1]));}
  return {values,found:values.length>0};
@@ -324,7 +327,7 @@ function epuName(blocks:Block[]):Extracted{
 /** Number of TU sub-items under «Сетевая организация осуществляет» / «Заявитель осуществляет» (Word list levels). */
 function subItemCounts(blocks:Block[]){
  const result:Record<'network'|'applicant',{count:number;block:Block}|undefined>={network:undefined,applicant:undefined};
- const body=blocks.filter(b=>b.part==='word/document.xml');
+ const body=blocks.filter(b=>isBody(b.part));
  body.forEach((b,i)=>{
   const kind=/^\s*сетевая\s+организация\s+осуществляет/iu.test(b.text)?'network':/^\s*заявитель\s+осуществляет/iu.test(b.text)?'applicant':undefined;
   if(!kind||!b.numbering)return;

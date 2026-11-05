@@ -6,6 +6,9 @@ import {audit,lockAct,role,revision} from './workflow.js';
 import {documentModel} from './documents.js';
 
 export const documentKinds={ACT_TP:'ACT_DOCX',AVTU:'AVTU_DOCX',TU:'TU_DOCX'} as const;
+export const pdfKinds={ACT_TP:'ACT_PDF',AVTU:'AVTU_PDF',TU:'TU_PDF'} as const;
+/** Вид файла по типу документа и формату (PDF — основной, DOCX — для ранее загруженных). */
+export const fileKind=(type:keyof typeof documentKinds,pdf:boolean)=>(pdf?pdfKinds:documentKinds)[type];
 export const documentLabels={ACT_TP:'Акт ТП',AVTU:'АВТУ',TU:'ТУ'} as const;
 export async function contractDocuments(db:DB,act:Record<string,any>){
  return {contract:requireValue((await db.query('SELECT * FROM app.contracts WHERE id=$1',[act.contract_id])).rows[0]),
@@ -43,6 +46,6 @@ export async function tuPreview(db:DB,storage:string,actId:string,tuId:string){
  return {...await documentModel(bytes),sha256:tu.sha256,versionNumber:tu.number,technicalConditionsId:tu.id};
 }
 export function documentFilename(kind:string,contractNumber:string,number?:number){
- const label=kind==='TU_DOCX'?'ТУ':kind==='AVTU_DOCX'?'АВТУ':'АКТ ТП';
- return `${contractNumber.replace(/[\\/:*?"<>|\r\n]/g,'_').slice(0,120)} ${label}${number&&number>1?` — редакция ${number}`:''}.docx`;
+ const label=kind.startsWith('TU_')?'ТУ':kind.startsWith('AVTU_')?'АВТУ':'АКТ ТП';
+ return `${contractNumber.replace(/[\\/:*?"<>|\r\n]/g,'_').slice(0,120)} ${label}${number&&number>1?` — редакция ${number}`:''}.${kind.endsWith('_PDF')?'pdf':'docx'}`;
 }

@@ -4,6 +4,7 @@ import {randomUUID} from 'node:crypto';
 import type pg from 'pg';
 import {transaction} from '../apps/api/src/db.js';
 import {zip,docxParts} from './zip.js';
+import {checkedPdf,syntheticPdf} from './pdf-fixtures.js';
 export function checkedDocx(power='15',contract='00001-26-00000004-1',voltage='0,4',type='ACT',point='РУ-0,4 кВ ТП-У001'){
  const lines=[type==='TU'?'Технические условия — синтетический пример':'Акт ТП — синтетический пример',`Приложение к договору № ${contract}`,`Максимальная мощность: ${power} кВт, в том числе существующая мощность 7 кВт.`,...(voltage?[`Класс напряжения: ${voltage} кВ.`]:[]),'Адрес объекта: Учебный адрес, д. 15/31', `Точка присоединения: ${point}.`,...(type==='TU'?[]:['Устройства защиты: ВА-25А.'])];
  return zip({...docxParts,'word/document.xml':'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+lines.map(s=>`<w:p><w:r><w:t>${s}</w:t></w:r></w:p>`).join('')+'</w:body></w:document>'});
@@ -89,6 +90,26 @@ let d=await card();assert.equal(d.state,'RIRU_REVIEW');const event=(await owner.
   await assert.rejects(transaction(runtime,users.riru,db=>db.query("UPDATE app.tu_check_confirmations SET comment='Изменено задним числом' WHERE check_id=$1",[reportB.id])));
   assert.equal((await transaction(runtime,users.other,db=>db.query('SELECT id FROM app.tu_check_confirmations WHERE act_id=$1',[c.id]))).rowCount,0);
   pass('Confirmations do not carry over to a new version, are idempotent, visible to the head, immutable and isolated by RLS; submit proceeds');
+ }
+ {
+  // PDF — основной формат: импорт ТУ из PDF, акт PDF, версия, сверка, просмотр (модель с координатами) и скачивание.
+  const pdfTu=await checkedPdf('15','00001-26-00000004-1','TU'),pdfAct=await checkedPdf('15');
+  const extracted=await request(app).post('/api/v1/documents/extract-tu').set('Authorization','Bearer '+tokens.riru).field('resId',area).attach('file',pdfTu,'tu.pdf');
+  assert.equal(extracted.status,200,JSON.stringify(extracted.body));assert.equal(extracted.body.fields.contractNumber.value,'00001-26-00000004-1');assert.equal(extracted.body.source,'TU_PDF');
+  const scan=await request(app).post('/api/v1/documents/extract-tu').set('Authorization','Bearer '+tokens.riru).field('resId',area).attach('file',await syntheticPdf({lines:[],scanned:true}),'scan.pdf');
+  assert.equal(scan.body.error.code,'PDF_SCANNED');
+  const p=ok(await create('SYNTH-PDF')),pp=`/api/v1/acts/${p.id}`;const pcard=()=>get('riru',pp).then(ok);
+  const send=async(type:string,bytes:Buffer)=>{const r=await request(app).post(pp+'/files').set('Authorization','Bearer '+tokens.riru).field('documentType',type).attach('file',bytes,'document.pdf');assert.equal(r.status,201,JSON.stringify(r.body));return r.body;};
+  const tuFile=await send('TU',pdfTu);assert.equal(tuFile.kind,'TU_PDF');
+  const actFile=await send('ACT_TP',pdfAct);assert.equal(actFile.kind,'ACT_PDF');
+  const pv=ok(await post('riru',pp+'/versions',{fileId:actFile.id,expectedRevision:(await pcard()).revision}));
+  const report=ok(await post('riru',pp+'/check-tu',{versionId:pv.id,expectedRevision:(await pcard()).revision}));
+  assert.equal(report.status,'PASS',JSON.stringify(report.findings.filter((f:any)=>f.status!=='MATCH'&&f.status!=='INFO')));
+  assert.ok(report.findings.find((f:any)=>f.field==='normBreaker').status==='MATCH');
+  const model=ok(await get('riru',`${pp}/versions/${pv.id}/preview`));assert.equal(model.format,'pdf');assert.ok(model.blocks.every((b:any)=>b.part.startsWith('pdf/')&&Array.isArray(b.spans)));
+  const file=await request(app).get(`/api/v1/files/${actFile.id}/download`).set('Authorization','Bearer '+tokens.riru);
+  assert.equal(file.status,200);assert.match(file.headers['content-type'],/application\/pdf/);assert.match(decodeURIComponent(file.headers['content-disposition']),/\.pdf/);
+  pass('PDF documents: TU import and scan rejection, PDF act version, TU check passes on the same rules, PDF preview model with coordinates, download as .pdf');
  }
  console.log(`PASS: ${n} engineer preflight integration groups`);
 }

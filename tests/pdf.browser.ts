@@ -1,0 +1,87 @@
+// PDF — основной формат: загрузка, точный просмотр pdf.js, отметки сверки рамками на странице, «куда смотреть» и замечание
+// по выделению в настоящем Chromium на изолированной БД. Только синтетические PDF (tests/pdf-fixtures.ts).
+import {mkdtemp,cp,writeFile,readFile,mkdir} from 'node:fs/promises';
+import {resolve,dirname} from 'node:path';
+import {randomBytes,randomUUID} from 'node:crypto';
+import {createServer} from 'node:net';
+import {tmpdir} from 'node:os';
+import {execFile,spawn} from 'node:child_process';
+import {promisify} from 'node:util';
+import {createServer as httpServer} from 'node:http';
+import assert from 'node:assert/strict';
+import pg from 'pg';
+import {chromium} from 'playwright';
+import {migrate} from '../scripts/migrate.js';
+import {setupStandalone} from '../scripts/setup-standalone.js';
+import {createApp} from '../apps/api/src/app.js';
+import {hashPassword} from '../apps/api/src/passwords.js';
+import {checkedPdf} from './pdf-fixtures.js';
+
+const out=resolve('.local/pdf-browser-report');await mkdir(out,{recursive:true});
+const root=await mkdtemp(resolve(tmpdir(),'tp-review-'));
+const binaries=await import(`@embedded-postgres/windows-${process.arch}`);
+await cp(resolve(dirname(binaries.postgres),'..'),resolve(root,'native'),{recursive:true});const bin=resolve(root,'native','bin');
+const exe=(n:string)=>resolve(bin,n+'.exe');const run=promisify(execFile);
+const control=(args:string[])=>new Promise<void>((ok,fail)=>{const c=spawn(exe('pg_ctl'),args,{windowsHide:true,stdio:'ignore'});c.on('error',fail);c.on('exit',code=>code===0?ok():fail(new Error('pg_ctl '+code)));});
+const probe=createServer();await new Promise<void>(r=>probe.listen(0,'127.0.0.1',r));const port=(probe.address() as any).port;await new Promise<void>(r=>probe.close(()=>r()));
+const password=randomBytes(16).toString('hex'),runtimePassword=randomBytes(16).toString('hex'),pw=resolve(root,'pw');await writeFile(pw,password);
+await run(exe('initdb'),['-D',resolve(root,'pg'),'-U','postgres',`--pwfile=${pw}`,'--auth=scram-sha-256','--encoding=UTF8','--locale=C']);
+await control(['-D',resolve(root,'pg'),'-l',resolve(root,'pg.log'),'-o',`-h 127.0.0.1 -p ${port}`,'-w','start']);
+let server:any,browser:any;
+try{
+ const owner=`postgres://postgres:${password}@127.0.0.1:${port}/postgres`,runtime=`postgres://tp_runtime:${runtimePassword}@127.0.0.1:${port}/postgres`;
+ await setupStandalone({AUTH_MODE:'local',DATABASE_URL:runtime,MIGRATION_DATABASE_URL:owner,INITIAL_ADMIN_PASSWORD:'Synthetic-admin-123'});
+ const db=new pg.Client({connectionString:owner});await db.connect();
+ const userPassword='1191';const hash=await hashPassword(userPassword);
+ for(const [login,name,role] of [['eng','Инженер РИРУ · синтетический','RIRU_ENGINEER'],['head','Начальник РИРУ · синтетический','RIRU_HEAD']]){
+  const id=(await db.query("INSERT INTO app.users(issuer,subject,name) VALUES('urn:tp-approval:local',$1,$2) RETURNING id",[randomUUID(),name])).rows[0].id;
+  await db.query("INSERT INTO app.roles(user_id,role,res_id) VALUES($1,$2,(SELECT id FROM app.res_units WHERE code='ADLER'))",[id,role]);
+  await db.query('INSERT INTO app.local_credentials(user_id,login,password_hash,must_change) VALUES($1,$2,$3,false)',[id,login,hash]);
+  await db.query('UPDATE app.users SET position=$2 WHERE id=$1',[id,role==='RIRU_HEAD'?'Начальник РИРУ (тест)':'Инженер РИРУ (тест)']);
+ }
+ await db.end();
+ const pool=new pg.Pool({connectionString:runtime});
+ let handler:any=null;server=httpServer((q:any,r:any)=>handler(q,r));
+ await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));const url=`http://127.0.0.1:${server.address().port}`;
+ handler=createApp(pool,{authMode:'local',appOrigin:url,production:false,storagePath:resolve(root,'files'),maxFileBytes:20*1024*1024,webPath:resolve('dist/web')} as any);
+ browser=await chromium.launch({headless:true});
+ const context=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:1600,height:950}});const page=await context.newPage();const errors:string[]=[];page.on('pageerror',(e:Error)=>errors.push(e.message));
+ const shot=(n:string)=>page.screenshot({path:`${out}/${n}.png`});
+ const login=async(l:string)=>{await page.goto(url);await page.getByLabel('Логин',{exact:true}).fill(l);await page.getByLabel('Пароль',{exact:true}).fill(userPassword);await page.getByRole('button',{name:'Войти',exact:true}).click();await page.getByRole('button',{name:'Выйти',exact:true}).waitFor();};
+ const docs=resolve(root,'pdf')+'/';await mkdir(docs,{recursive:true});
+ await writeFile(docs+'tu.pdf',await checkedPdf('15','00001-26-00000004-1','TU'));await writeFile(docs+'act-bad.pdf',await checkedPdf('150'));await writeFile(docs+'act-good.pdf',await checkedPdf('15'));
+ // 1. Инженер: загрузка ТУ и акта в PDF, карточка из ТУ.
+ await login('eng');const form=page.getByRole('region',{name:'Загрузка документа инженером'});
+ await form.getByLabel('Файл технических условий').setInputFiles(docs+'tu.pdf');await form.getByText('Реквизиты извлечены из ТУ').waitFor({timeout:20000});
+ assert.equal(await form.getByLabel('Номер договора').inputValue(),'00001-26-00000004-1');assert.equal(await form.getByLabel('Максимальная мощность').inputValue(),'15');
+ await form.getByLabel('Планируемая дата исполнения').fill('2026-12-15');await form.getByLabel('Файл загружаемого документа').setInputFiles(docs+'act-bad.pdf');
+ await form.getByRole('button',{name:'Сохранить документ',exact:true}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor({timeout:20000});
+ await page.locator('.pdf-page canvas').first().waitFor({timeout:20000});await shot('01-document');console.log('OK 1: TU and act uploaded as PDF; the act opens in the exact PDF view');
+ // 2. Сверка: рамки цвета статуса прямо на странице; клик по красному значению — пара в ТУ обведена, значение выделено.
+ await page.getByRole('button',{name:'Режим проверки'}).click();const review=page.getByRole('dialog',{name:'Режим проверки документов'});
+ await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();await review.getByText(/⚠ Расхождение/).first().waitFor({timeout:20000});
+ const panes=review.locator('.review-pane');const left=panes.nth(0),right=panes.nth(1);
+ await left.locator('.pdf-mark[data-mark=bad]').first().waitFor({timeout:15000});await right.locator('.pdf-mark[data-mark=bad]').first().waitFor({timeout:15000});
+ assert.ok(await left.locator('.pdf-mark[data-mark=ok]').count()>=3,'Matching requisites are framed green on the PDF page');
+ const bad=await left.locator('.pdf-mark[data-mark=bad]').first().boundingBox();await page.mouse.click(bad!.x+bad!.width/2,bad!.y+bad!.height/2);
+ await right.locator('.pdf-jump[data-jump=bad]').waitFor();await right.locator('.pdf-value-hit').first().waitFor();await left.locator('.pdf-jump[data-jump=bad]').waitFor();
+ await page.waitForTimeout(400);await shot('02-review-pdf');console.log('OK 2: PDF pages in review mode; marks drawn on the page; click shows the paired value in the TU');
+ await review.getByRole('button',{name:'Завершить проверку'}).click();await review.waitFor({state:'detached'});
+ // 3. Исправленная версия PDF проходит сверку и уходит на согласование.
+ await page.getByLabel('Новая версия DOCX').setInputFiles(docs+'act-good.pdf');await page.locator('.word-heading select option').filter({hasText:'Версия 2'}).waitFor({state:'attached',timeout:20000});
+ await page.getByRole('button',{name:'Режим проверки'}).click();await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();
+ await review.getByText('Проверенные реквизиты совпали. Можно отправить на согласование.',{exact:true}).waitFor({timeout:20000});
+ await review.getByRole('button',{name:'Отправить на согласование',exact:true}).click();await page.waitForTimeout(1500);
+ await review.getByRole('button',{name:'Завершить проверку'}).click();console.log('OK 3: corrected PDF version passes the TU check and is submitted');
+ // 4. Начальник РИРУ выделяет «15 кВт» в тексте PDF и оставляет замечание — оно привязано именно к этим словам.
+ await page.getByRole('button',{name:'Выйти',exact:true}).click();await login('head');
+ await page.locator('[data-testid^="registry-row-"]').first().click();await page.getByRole('button',{name:'Режим проверки'}).click();
+ const span=left.locator('.textLayer span').filter({hasText:'15 кВт'}).first();await span.waitFor({timeout:20000});
+ await span.evaluate((el:Element)=>{const n=el.firstChild!;const i=n.textContent!.indexOf('15 кВт');const r=document.createRange();r.setStart(n,i);r.setEnd(n,i+6);getSelection()!.removeAllRanges();getSelection()!.addRange(r);el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));});
+ await review.getByRole('button',{name:'＋ Замечание'}).click();await review.getByLabel('Текст замечания').fill('Сверить мощность с расчётом нагрузки (синтетическое замечание к PDF).');
+ await review.getByRole('button',{name:'Сохранить замечание',exact:true}).click();await review.locator('.review-note').first().waitFor({timeout:15000});await left.locator('.pdf-remark').first().waitFor({timeout:15000});
+ assert.match(await left.locator('.pdf-remark').first().getAttribute('aria-label')??'',/Замечание: 15 кВт$/);
+ await page.waitForTimeout(400);await shot('03-remark-pdf');console.log('OK 4: reviewer selects words in the PDF text layer; the remark is anchored to exactly those words');
+ assert.deepEqual(errors,[]);console.log('PASS: PDF documents e2e');
+}catch(e){const p=browser?.contexts()[0]?.pages()[0];if(p){await p.screenshot({path:out+'/failure.png'});console.log('ALERTS:',await p.locator('[role=alert]').allTextContents());}console.log('FAIL:',(e as Error).message.slice(0,600));throw e;}finally{await browser?.close();server?.close();await control(['-D',resolve(root,'pg'),'-m','fast','-w','stop']).catch(()=>{});}
+process.exit(0);

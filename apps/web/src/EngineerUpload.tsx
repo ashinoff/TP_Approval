@@ -11,8 +11,8 @@ const kinds=[['ACT_TP','Акт ТП'],['AVTU','АВТУ'],['TU','ТУ к сущ�
 function FileTile({title,ariaLabel,file,disabled,onFile}:{title:string;ariaLabel:string;file?:File;disabled:boolean;onFile:(f:File|undefined)=>void}){
  return <div className={`file-tile${file?' file-tile-ready':''}`}>
   <span className="file-tile-title"><Icon name="file"/>{title}</span>
-  <label className={`primary-button file-button${disabled?' is-disabled':''}`}>Выбрать файл DOCX
-   <input className="sr-only" aria-label={ariaLabel} type="file" accept=".docx" disabled={disabled} onChange={e=>onFile(e.target.files?.[0])}/>
+  <label className={`primary-button file-button${disabled?' is-disabled':''}`}>Выбрать файл PDF
+   <input className="sr-only" aria-label={ariaLabel} type="file" accept=".pdf,application/pdf" disabled={disabled} onChange={e=>onFile(e.target.files?.[0])}/>
   </label>
   <span className="file-name">{file?file.name:'Файл не выбран'}</span>
  </div>;

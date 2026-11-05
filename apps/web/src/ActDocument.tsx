@@ -57,7 +57,7 @@ export default function PreparationControls({detail,api,action,busy,onVersion}:{
  if(!isPreparing(detail))return null;
  const latest=detail.versions.at(-1);
  const upload=async(file:File)=>{const result=await uploadDocument(api,detail.id,file,type,number,date);if(result.version)onVersion(result.version.id);};
- const uploadLabel=type==='TU'?'Загрузить редакцию ТУ':detail.state==='DRAFT'?'Загрузить DOCX':'Загрузить исправленную версию';
+ const uploadLabel=type==='TU'?'Загрузить редакцию ТУ':detail.state==='DRAFT'?'Загрузить PDF':'Загрузить исправленную версию';
  return <section className="preparation-controls" aria-label="Подготовка документа">
   <h3 className="panel-subtitle">Загрузить</h3>
   <label>Тип загружаемого документа
@@ -73,11 +73,11 @@ export default function PreparationControls({detail,api,action,busy,onVersion}:{
   </>}
   <div className="upload-field upload-pill">
    <span className="upload-pill-title">{uploadLabel}</span>
-   <label className={`primary-button file-button${busy?' is-disabled':''}`}>Выбрать файл DOCX
-    <input className="sr-only" aria-label="Новая версия DOCX" type="file" accept=".docx" disabled={busy} onChange={e=>{const f=e.target.files?.[0];if(f)void action(()=>upload(f));e.target.value='';}}/>
+   <label className={`primary-button file-button${busy?' is-disabled':''}`}>Выбрать файл PDF
+    <input className="sr-only" aria-label="Новая версия DOCX" type="file" accept=".pdf,application/pdf" disabled={busy} onChange={e=>{const f=e.target.files?.[0];if(f)void action(()=>upload(f));e.target.value='';}}/>
    </label>
   </div>
-  {type==='TU'&&<small>ТУ прикрепляются к договору; номер договора не меняется. Формат — DOCX.</small>}
+  {type==='TU'&&<small>ТУ прикрепляются к договору; номер договора не меняется. Формат — PDF, сохранённый из Word или Excel (сканы не принимаются).</small>}
   {detail.state==='RETURNED'&&<small>Перед повторной отправкой укажите исправления в замечаниях.</small>}
  </section>;
 }
