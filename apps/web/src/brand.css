@@ -1,0 +1,10 @@
+/* Фирменный знак и загрузка РОССЕТИ (как в «Учёте ПУ»). */
+.rosseti-mark{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;flex:none;border-radius:11px;background:#0B4DA2;color:#fff;box-shadow:0 2px 8px rgb(11 77 162 / .35)}
+.rosseti-mark svg{width:52%;height:52%}
+.rosseti-loader{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 0}
+.rosseti-letters{display:flex;gap:4px}
+.rosseti-letter{font-weight:800;font-size:34px;line-height:1;color:#cbd5e1;animation:rosseti-bulb 2.1s ease-in-out infinite}
+.rosseti-small .rosseti-letter{font-size:20px}.rosseti-small{padding:8px 0}
+.rosseti-label{font-size:12px;color:var(--muted,#5d6a78)}
+@keyframes rosseti-bulb{0%,100%{color:#cbd5e1;text-shadow:none}15%,85%{color:#2563eb;text-shadow:0 0 10px #3b82f6,0 0 20px #3b82f6,0 0 30px #1d4ed8}}
+@media (prefers-reduced-motion:reduce){.rosseti-letter{animation:none;color:#2563eb}}

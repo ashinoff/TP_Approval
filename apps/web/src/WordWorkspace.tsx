@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState,useMemo} from 'react';
+import {RossetiLoader} from './Brand.js';
 import DocumentViewer,{type SelectionAnchor,type DocumentViewerHandle} from './DocumentViewer.js';
 import {Icon,dateTime,roleNames} from './Ui.js';
 import PreparationControls,{SendButton,checkFor,isPreparing,openBlockers} from './ActDocument.js';
@@ -41,7 +42,7 @@ function TuViewer({detail,tuId,api,loadFile}:{detail:Row;tuId:string;api:Api;loa
  return <section className="tu-view" aria-label="Просмотр технических условий">
   <p className="tu-view-note">ТУ{tu.document_number?` № ${tu.document_number}`:''}, редакция {tu.number} — справочный документ: замечания и решения относятся к акту.</p>
   {error&&<p role="alert">{error}</p>}
-  {bytes&&model?<DocumentViewer bytes={bytes} model={model} comments={[]} onSelection={()=>{}} onComment={()=>{}}/>:!error&&<p role="status">Загрузка ТУ…</p>}
+  {bytes&&model?<DocumentViewer bytes={bytes} model={model} comments={[]} onSelection={()=>{}} onComment={()=>{}}/>:!error&&<RossetiLoader label="Загрузка ТУ…"/>}
  </section>;
 }
 
@@ -155,7 +156,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
     {openTu&&<TuViewer key={openTu} detail={detail} tuId={openTu} api={api} loadFile={loadFile}/>}
     {!current&&!openTu&&<div className="empty-document"><p>Загрузите PDF в панели «Пакет документов», чтобы начать работу с документом.</p></div>}
     {current&&<div className="word-grid" style={referenceView?{display:'none'}:undefined}>
-     <div className="word-document">{model&&bytes?<DocumentViewer key={versionId} ref={viewerRef} bytes={bytes} model={model} comments={versionNotes} onSelection={setSelection} onComment={focus} focusedId={focused} focusRequest={focusRequest} marks={actMarks} onAddRemark={form?undefined:()=>{const why=remarkBlockReason(detail,tasks,profile,versionId);if(why){setError(why);return;}if(selection){setForm(selection);dirty('remark',true);}}} remarkBlocked={remarkBlockReason(detail,tasks,profile,versionId)}/>:!error&&<p role="status">Загрузка документа…</p>}</div>
+     <div className="word-document">{model&&bytes?<DocumentViewer key={versionId} ref={viewerRef} bytes={bytes} model={model} comments={versionNotes} onSelection={setSelection} onComment={focus} focusedId={focused} focusRequest={focusRequest} marks={actMarks} onAddRemark={form?undefined:()=>{const why=remarkBlockReason(detail,tasks,profile,versionId);if(why){setError(why);return;}if(selection){setForm(selection);dirty('remark',true);}}} remarkBlocked={remarkBlockReason(detail,tasks,profile,versionId)}/>:!error&&<RossetiLoader label="Загрузка документа…"/>}</div>
      <aside className="word-remarks" aria-label="Замечания к документу">
       {showCheck&&<details className="side-block check-block" open={preparing||!!effective||undefined}>
        <summary>{checkSummary(check)}</summary>

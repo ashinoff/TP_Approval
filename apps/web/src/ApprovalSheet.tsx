@@ -2,6 +2,7 @@ import {useEffect,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {roleNames} from './Ui.js';
 import './sheet.css';
+import {RossetiLoader} from './Brand.js';
 type Row=Record<string,any>;
 const decisionNames:Record<string,string>={APPROVED:'Согласовано',RETURNED:'Возвращено с замечаниями',PENDING:'Ожидает решения',NOT_STARTED:'Этап не начат',NO_DECISION:'Без решения'};
 const remarkState:Record<string,string>={OPEN:'Не устранено',REPORTED_FIXED:'Исправлено, ожидает проверки',VERIFIED:'Устранено',REOPENED:'Исправление отклонено'};
@@ -42,7 +43,7 @@ export default function ApprovalSheet({detail,api,profile,onClose}:{detail:Row;a
   </div>
   <div className="sheet-scroll">
    {error&&<p role="alert">{error}</p>}
-   {!matrices&&!error&&<p role="status" className="sheet-loading">Формируем лист согласования…</p>}
+   {!matrices&&!error&&<RossetiLoader label="Формируем лист согласования…"/>}
    {matrices&&<article className="sheet-page">
     {!approved&&<div className="sheet-draft">Согласование не завершено — предварительный лист</div>}
     <h1>ЛИСТ СОГЛАСОВАНИЯ</h1>

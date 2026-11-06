@@ -6,6 +6,7 @@ import TuPreflight from './TuPreflight.js';
 import DecisionDialog from './DecisionDialog.js';
 import {SendButton,checkFor,isPreparing,openBlockers} from './ActDocument.js';
 import {initialVersion,remarkBlockReason,type Section} from './workplace.js';
+import {RossetiLoader} from './Brand.js';
 import {checkMarks,changedMarks,pairedBlock,findingTone} from './review-marks.js';
 import './review.css';
 
@@ -93,7 +94,7 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  const kind=detail.act_type==='AVTU'?'АВТУ':'Акт ТП';
  const sourceLabel=(t:Row)=>`Технические условия · ред. ${t.number}${t.document_number?` № ${t.document_number}`:''}${t.id===checkTuId?' · по ним сверка':''}`;
  const ownRemark=!!task&&notes.some(c=>c.task_id===task.id&&c.version_id===versionId);
- const viewerTitle=(d:typeof leftDoc,label:string)=>d.error?<p role="alert" className="review-error">{d.error}</p>:<p role="status" className="review-loading">Загрузка: {label}…</p>;
+ const viewerTitle=(d:typeof leftDoc,label:string)=>d.error?<p role="alert" className="review-error">{d.error}</p>:<RossetiLoader label={`Загрузка: ${label}…`}/>;
 
  // Портал в body: фиксированное окно не зависит от трансформаций и прокрутки страницы.
  return createPortal(<div ref={root} className={`review-mode${panel?'':' panel-hidden'}`} role="dialog" aria-modal="true" aria-label="Режим проверки документов">

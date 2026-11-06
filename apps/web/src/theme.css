@@ -119,3 +119,18 @@ button:not([class]),.review-verify button,.note-actions button,.card-actions but
 .float-remark{background:var(--brand)!important}.float-remark:hover{background:var(--brand-hover)!important}
 .float-remark.float-blocked{background:#8a95a8!important}
 .upload-pill{border-style:solid!important;border-width:1px!important}
+
+/* ===== 06.11.2026: фирменный знак, контуры, вкладки документов (решение владельца) ===== */
+.brand{display:flex!important;align-items:center;gap:10px}
+.brand .rosseti-mark{width:38px;height:38px;border-radius:12px}
+/* Таблетки, объединяющие кнопки, — синий контур; формы и карточки — тонкая серая рамка. */
+.queue-switch,.doc-type-switch,.review-subtabs,.note-filter,.review-tabs,.act-panels{border:1.5px solid var(--brand)!important;box-shadow:0 1px 3px rgb(49 86 163 / .12)}
+.card,.word-heading,.word-remarks,.word-package,.engineer-upload,.upload-form,.tu-preflight,.reference-books,.service-menu,.profile-card,.profile-section,.registry-card,.filters,.primary-filters{border:1px solid #cfd6e0!important}
+/* «Все документы»: вкладки крупнее основного меню, ненулевые цифры подсвечены. */
+.queue-switch.document-tabs button{padding:10px 18px!important;font-size:15px!important;font-weight:600!important;gap:8px}
+.document-tabs .tab-count{min-width:26px;height:24px;font-size:13px}
+.document-tabs .tab-count:not(.is-zero){background:var(--brand);color:#fff;box-shadow:0 0 0 3px rgb(49 86 163 / .15)}
+.document-tabs .tab-count.is-zero{background:transparent;color:#b3bccb;border:1px solid #dfe5ed}
+.document-tabs [data-tab=corrections] .tab-count:not(.is-zero){background:var(--red);color:#fff;box-shadow:0 0 0 3px rgb(217 58 47 / .15)}
+.document-tabs [data-tab=approved] .tab-count:not(.is-zero){background:var(--green);color:#fff;box-shadow:0 0 0 3px rgb(46 157 91 / .15)}
+.queue-switch.document-tabs button[aria-pressed=true] .tab-count:not(.is-zero){background:#fff;color:var(--menu-active);box-shadow:none}

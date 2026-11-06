@@ -3,6 +3,7 @@ import {getDocument,GlobalWorkerOptions,TextLayer,type PDFDocumentProxy,type Pag
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type {BlockMark,DocumentViewerHandle,JumpHit,SelectionAnchor} from './DocumentViewer.js';
 import './pdf.css';
+import {RossetiLoader} from './Brand.js';
 GlobalWorkerOptions.workerSrc=workerUrl;
 type Row=Record<string,any>;
 type Span={item:number;start:number;end:number;box:[number,number,number,number]};
@@ -160,5 +161,5 @@ export default function PdfViewer({bytes,model,comments,onSelection,onComment,fo
  <div className="word-frame pdf-frame" ref={frame}><div className={`pdf-scroll${onMarkClick?' mark-click':''}`} ref={scroller} role="document" aria-label="Документ PDF"/>
   {float&&onAddRemark&&(float.invalid?<span className="float-remark float-hint" style={{left:Math.max(4,float.x),top:float.y+6}}>Выделите текст в пределах одного абзаца</span>
    :<button type="button" className={`float-remark${remarkBlocked?' float-blocked':''}`} title={remarkBlocked} style={{left:Math.max(4,float.x),top:float.y+6}} onMouseDown={e=>e.preventDefault()} onClick={()=>{setFloat(null);onAddRemark();}}>＋ Замечание</button>)}
- </div>{!ready&&!error&&<p role="status">Подготовка просмотра…</p>}</section>;
+ </div>{!ready&&!error&&<RossetiLoader label="Подготовка просмотра…"/>}</section>;
 }
