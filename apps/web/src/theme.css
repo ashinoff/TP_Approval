@@ -134,3 +134,16 @@ button:not([class]),.review-verify button,.note-actions button,.card-actions but
 .document-tabs [data-tab=corrections] .tab-count:not(.is-zero){background:var(--red);color:#fff;box-shadow:0 0 0 3px rgb(217 58 47 / .15)}
 .document-tabs [data-tab=approved] .tab-count:not(.is-zero){background:var(--green);color:#fff;box-shadow:0 0 0 3px rgb(46 157 91 / .15)}
 .queue-switch.document-tabs button[aria-pressed=true] .tab-count:not(.is-zero){background:#fff;color:var(--menu-active);box-shadow:none}
+
+/* ===== Форма загрузки (06.11.2026): крупные режимы, выделенные названия документов, необязательные документы ===== */
+.engineer-upload .upload-modes{display:flex!important;width:100%;padding:4px}
+.engineer-upload .upload-modes button{flex:1;padding:13px 22px!important;font-size:16px!important;font-weight:700!important}
+.engineer-upload .extra-kinds button{padding:9px 16px!important;font-size:14px!important}
+.file-tile-title{font-size:16px!important;font-weight:800!important;color:var(--brand)!important;letter-spacing:.2px}
+.file-tile-title small{margin-left:8px;font-size:11px;font-weight:600;color:var(--muted,#7b8794);letter-spacing:0}
+.file-tile .act-kind{align-self:flex-start;padding:2px!important}
+.file-tile .act-kind button{padding:5px 14px!important;font-size:13px!important;font-weight:700!important}
+.upload-optional{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+.upload-optional .file-tile{background:#fafbfd}
+.upload-optional .file-tile-title{font-size:14px!important}
+@media(max-width:900px){.upload-optional{grid-template-columns:minmax(0,1fr)}.engineer-upload .upload-modes button{font-size:14px!important;padding:11px 12px!important}}

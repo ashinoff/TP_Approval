@@ -31,3 +31,11 @@ test('PDF: сверка с ТУ работает на тех же правила
  const f=Object.fromEntries(compareRequisites(act.blocks,tu.blocks,'00001-26-00000004-1').map(x=>[x.field,x]));
  assert.equal(f.contract.status,'MATCH');assert.equal(f.power.status,'MATCH');assert.equal(f.voltage.status,'MATCH');
 });
+
+test('экземпляр к печати: значки в углах каждого листа, текст документа не меняется',async()=>{
+ const {stampCorners}=await import('../apps/api/src/print-copy.js');
+ const source=await checkedPdf('15');const stamped=Buffer.from(await stampCorners(source));
+ assert.notDeepEqual(stamped,source);await validatePdf(stamped);
+ const before=(await pdfModel(source)).blocks.map(b=>b.text),after=(await pdfModel(stamped)).blocks.map(b=>b.text);
+ assert.deepEqual(after,before,'Stamped copy has the same text layer');
+});

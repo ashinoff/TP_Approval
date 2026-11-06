@@ -109,7 +109,15 @@ let d=await card();assert.equal(d.state,'RIRU_REVIEW');const event=(await owner.
   const model=ok(await get('riru',`${pp}/versions/${pv.id}/preview`));assert.equal(model.format,'pdf');assert.ok(model.blocks.every((b:any)=>b.part.startsWith('pdf/')&&Array.isArray(b.spans)));
   const file=await request(app).get(`/api/v1/files/${actFile.id}/download`).set('Authorization','Bearer '+tokens.riru);
   assert.equal(file.status,200);assert.match(file.headers['content-type'],/application\/pdf/);assert.match(decodeURIComponent(file.headers['content-disposition']),/\.pdf/);
-  pass('PDF documents: TU import and scan rejection, PDF act version, TU check passes on the same rules, PDF preview model with coordinates, download as .pdf');
+  // Дополнительные документы: только PDF, не меняют вид акта и ТУ, видны в пакете, открываются для сравнения и скачиваются с понятным именем.
+  const pole=await send('POLE_SCHEME',await checkedPdf('15'));assert.equal(pole.kind,'EXTRA_PDF');assert.equal(pole.extraDocument.kind,'POLE_SCHEME');assert.equal(pole.extraDocument.number,1);
+  const docxExtra=await request(app).post(pp+'/files').set('Authorization','Bearer '+tokens.riru).field('documentType','PSU').attach('file',checkedDocx('15'),'psu.docx');assert.equal(docxExtra.body.error.code,'PDF_REQUIRED');
+  const packaged=(await pcard()).contractDocuments;assert.equal(packaged.extraDocuments.length,1);assert.equal((await pcard()).act_type,'ACT_TP');
+  const extraModel=ok(await get('riru',`${pp}/extra/${pole.extraDocument.id}/preview`));assert.equal(extraModel.format,'pdf');
+  const extraFile=await request(app).get(`/api/v1/files/${pole.id}/download`).set('Authorization','Bearer '+tokens.riru);assert.match(decodeURIComponent(extraFile.headers['content-disposition']),/Поопорная схема/);
+  assert.equal((await get('other',`${pp}/extra/${pole.extraDocument.id}/preview`)).status,404);
+  assert.equal((await get('riru',`${pp}/print`)).body.error.code,'PRINT_REQUIRES_APPROVAL','Only an approved version is issued for printing');
+  pass('PDF documents: TU import and scan rejection, PDF act version, TU check passes on the same rules, PDF preview model with coordinates, download as .pdf; extra documents (PDF only) attach to the document');
  }
  console.log(`PASS: ${n} engineer preflight integration groups`);
 }

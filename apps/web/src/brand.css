@@ -8,3 +8,5 @@
 .rosseti-label{font-size:12px;color:var(--muted,#5d6a78)}
 @keyframes rosseti-bulb{0%,100%{color:#cbd5e1;text-shadow:none}15%,85%{color:#2563eb;text-shadow:0 0 10px #3b82f6,0 0 20px #3b82f6,0 0 30px #1d4ed8}}
 @media (prefers-reduced-motion:reduce){.rosseti-letter{animation:none;color:#2563eb}}
+.rosseti-mark svg{position:static!important;margin:0!important;width:21px!important;height:21px!important;flex:none}
+.brand .rosseti-mark{display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:0!important;margin:0!important;font-size:0!important;letter-spacing:0!important}

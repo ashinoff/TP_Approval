@@ -2,6 +2,7 @@ import type {ReactNode} from 'react';
 import {Icon,dateTime,shortDate} from './Ui.js';
 
 type Row=Record<string,any>;
+export const extraNames:Record<string,string>={PSU:'ПСУ',PREV_ACT:'Предыдущий акт ТП',POLE_SCHEME:'Поопорная схема'};
 const stateNames:Record<string,string>={DRAFT:'черновик',RIRU_REVIEW:'на согласовании',RES_REVIEW:'на согласовании',CENTRAL_REVIEW:'на согласовании',CENTRAL_COLLECTING:'сбор замечаний',RETURNED:'на доработке',REVISING:'пересмотр',APPROVED:'согласован'};
 
 /**
@@ -40,6 +41,11 @@ export default function PackagePanel({detail,cycle,openTu,onOpenTu,action,busy,a
     {canPrepare&&t.id!==detail.technical_conditions_id&&<button type="button" className="package-use" disabled={busy} onClick={()=>void action(()=>api(`/api/v1/acts/${detail.id}/technical-conditions/select`,{technicalConditionsId:t.id,expectedRevision:detail.revision}))}>Использовать эти ТУ</button>}
    </li>)}
    {!tus.length&&<li className="package-item package-missing"><b>ТУ</b><small>не прикреплены — без них отправка невозможна</small></li>}
+   {/* Дополнительные документы договора (ПСУ, предыдущий акт, поопорная схема): просмотр — в режиме проверки, здесь — скачивание. */}
+   {(folder.extraDocuments??[]).map((x:Row)=><li key={x.id} className="package-item package-extra">
+    <span className="package-open"><Icon name="file"/><span><b>{extraNames[x.kind]??'Документ'}{x.number>1?` (${x.number})`:''}</b><small>к {x.act_type==='AVTU'?'АВТУ':'акту ТП'} · загружено {dateTime(x.created_at)}</small></span></span>
+    <button type="button" className="icon-button package-download" aria-label={`Скачать: ${extraNames[x.kind]}`} title="Скачать" disabled={busy} onClick={()=>void action(()=>onDownload(x.file_id,x.number))}><Icon name="download"/></button>
+   </li>)}
   </ul>
   {others.length>0&&<div className="package-others">
    <small>Другие акты этого договора:</small>

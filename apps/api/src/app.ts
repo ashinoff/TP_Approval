@@ -16,10 +16,11 @@ import {approvalMatrix} from './matrix.js';
 import {registry,registryAct,registryCounts} from './registry.js';
 import {timeline} from './timeline.js';
 import {preview,createRemark,compareVersions} from './documents.js';
-import {documentKinds,fileKind,documentFilename,contractDocuments,registerDocument,selectTechnicalConditions,tuPreview} from './contract-documents.js';
+import {documentKinds,fileKind,documentFilename,extraPreview,extraLabels,contractDocuments,registerDocument,selectTechnicalConditions,tuPreview} from './contract-documents.js';
 import {checkTechnicalConditions,confirmTuFinding,enforceTechnicalConditions} from './tu-validation.js';
 import {currentRulesVersion,referenceBooks,saveReferenceBook} from './references.js';
 import {renderVector} from './vector.js';
+import {printCopy} from './print-copy.js';
 import {isPdf,validatePdf} from './pdf-model.js';
 import {adminDocuments,applyRestoreFiles,backupPath,createBackup,deleteBackup,listBackups,purge,readBackup,recordServerError,removeFiles,serviceCleanup,serviceHealth,stageRestoreFiles} from './admin-service.js';
 import {extractTuMetadata} from './tu-import.js';
@@ -96,6 +97,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   get('/api/v1/acts/:id/versions/:versionId/preview',async(db,req)=>preview(db,config.storagePath,id.parse(req.params.id),id.parse(req.params.versionId)));
   post('/api/v1/acts/:id/comments',async(db,req)=>createRemark(db,config.storagePath,id.parse(req.params.id),req.body));
   get('/api/v1/acts/:id/compare',async(db,req)=>compareVersions(db,config.storagePath,id.parse(req.params.id),id.parse(req.query.from),id.parse(req.query.to)));
+  get('/api/v1/acts/:id/extra/:extraId/preview',async(db,req)=>extraPreview(db,config.storagePath,id.parse(req.params.id),id.parse(req.params.extraId)));
   get('/api/v1/acts/:id/technical-conditions/:tuId/preview',async(db,req)=>tuPreview(db,config.storagePath,id.parse(req.params.id),id.parse(req.params.tuId)));
   post('/api/v1/acts/:id/technical-conditions/select',async(db,req)=>{const b=z.object({technicalConditionsId:id,expectedRevision:expected}).strict().parse(req.body);return selectTechnicalConditions(db,id.parse(req.params.id),b.technicalConditionsId,b.expectedRevision);});
   get('/api/v1/acts/:id/presentation',async(db,req)=>registryAct(db,id.parse(req.params.id)));
@@ -241,9 +243,11 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   });
   app.post('/api/v1/acts/:id/files',upload.single('file'),async(req,res)=>{
     const actId=id.parse(req.params.id);const file=requireValue(req.file,422,'FILE_REQUIRED');
-    const meta=z.object({documentType:z.enum(['ACT_TP','AVTU','TU']).default('ACT_TP'),documentNumber:z.string().trim().max(200).optional(),documentDate:z.iso.date().optional()}).strict().parse(req.body);
+    const meta=z.object({documentType:z.enum(['ACT_TP','AVTU','TU','PSU','PREV_ACT','POLE_SCHEME']).default('ACT_TP'),documentNumber:z.string().trim().max(200).optional(),documentDate:z.iso.date().optional()}).strict().parse(req.body);
     await transaction(pool,res.locals.userId,async db=>{const a=await lockAct(db,actId);await role(db,'RIRU_ENGINEER',a.res_id);if(!['DRAFT','RETURNED','REVISING'].includes(a.state))throw new HttpError(409,'INVALID_STATE');});
     const pdf=isPdf(file.buffer);
+    const extra=meta.documentType in extraLabels;
+    if(extra&&!pdf)throw new HttpError(415,'PDF_REQUIRED','Дополнительные документы загружаются только в PDF.');
     if(pdf)await validatePdf(file.buffer);
     else try{await validateDocx(file.buffer);}catch(e){if(e instanceof HttpError)throw e;throw new HttpError(415,'INVALID_DOCX');}
     await scan(file.buffer);
@@ -251,16 +255,26 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
     await writeFile(resolve(dir,fileId),file.buffer,{flag:'wx',mode:0o600});
     const result=await transaction(pool,res.locals.userId,async db=>{
       const a=await lockAct(db,actId);await role(db,'RIRU_ENGINEER',a.res_id);if(!['DRAFT','RETURNED','REVISING'].includes(a.state)) throw new HttpError(409,'INVALID_STATE');
-      const result=(await db.query("INSERT INTO app.files(id,act_id,sha256,size,kind,scan_status,created_by) VALUES($1,$2,$3,$4,$5,'READY',app.uid()) RETURNING *",[fileId,actId,createHash('sha256').update(file.buffer).digest('hex'),file.size,fileKind(meta.documentType,pdf)])).rows[0];
-      const technicalConditions=await registerDocument(db,a,fileId,meta.documentType,meta.documentNumber,meta.documentDate);
+      const result=(await db.query("INSERT INTO app.files(id,act_id,sha256,size,kind,scan_status,created_by) VALUES($1,$2,$3,$4,$5,'READY',app.uid()) RETURNING *",[fileId,actId,createHash('sha256').update(file.buffer).digest('hex'),file.size,extra?'EXTRA_PDF':fileKind(meta.documentType as keyof typeof documentKinds,pdf)])).rows[0];
+      if(extra){
+       // Доп. документ не меняет вид акта и редакции ТУ — только прикладывается к документу (номер по виду: 1, 2, …).
+       const extraDocument=(await db.query('INSERT INTO app.extra_documents(act_id,file_id,kind,number,created_by) SELECT $1,$2,$3,coalesce(max(number),0)+1,app.uid() FROM app.extra_documents WHERE act_id=$1 AND kind=$3 RETURNING *',[actId,fileId,meta.documentType])).rows[0];
+       await audit(db,actId,'EXTRA_DOCUMENT_UPLOADED',{fileId,kind:meta.documentType,number:extraDocument.number});return {...result,documentType:meta.documentType,extraDocument};
+      }
+      const technicalConditions=await registerDocument(db,a,fileId,meta.documentType as keyof typeof documentKinds,meta.documentNumber,meta.documentDate);
       await audit(db,actId,'FILE_UPLOADED',{fileId,validation:config.clamavHost?'STRUCTURE_AND_CLAMAV':'DEVELOPMENT_STRUCTURE_ONLY',documentType:meta.documentType});return {...result,documentType:meta.documentType,technicalConditions};
     });res.status(201).json(result);
   });
+  // Экземпляр к печати: согласованная версия PDF со значками в углах листов (исходный файл не меняется).
+  app.get('/api/v1/acts/:id/print',async(req,res)=>{
+   const copy=await transaction(pool,res.locals.userId,db=>printCopy(db,config.storagePath,id.parse(req.params.id)));
+   res.type('application/pdf').attachment(copy.filename).send(copy.bytes);
+  });
   app.get('/api/v1/files/:id/download',async(req,res)=>{
-    const file=await transaction(pool,res.locals.userId,async db=>{const f=requireValue((await db.query("SELECT f.*,a.contract_number,(SELECT number FROM app.technical_conditions WHERE file_id=f.id) AS tu_number,(SELECT number FROM app.versions WHERE file_id=f.id ORDER BY number DESC LIMIT 1) AS version_number FROM app.files f JOIN app.acts a ON a.id=f.act_id WHERE f.id=$1 AND f.scan_status='READY'",[id.parse(req.params.id)])).rows[0]);await audit(db,f.act_id,'DOCUMENT_DOWNLOADED',{fileId:f.id});return f;});
+    const file=await transaction(pool,res.locals.userId,async db=>{const f=requireValue((await db.query("SELECT f.*,a.contract_number,(SELECT number FROM app.technical_conditions WHERE file_id=f.id) AS tu_number,(SELECT number FROM app.versions WHERE file_id=f.id ORDER BY number DESC LIMIT 1) AS version_number,(SELECT kind FROM app.extra_documents WHERE file_id=f.id) AS extra_kind,(SELECT number FROM app.extra_documents WHERE file_id=f.id) AS extra_number FROM app.files f JOIN app.acts a ON a.id=f.act_id WHERE f.id=$1 AND f.scan_status='READY'",[id.parse(req.params.id)])).rows[0]);await audit(db,f.act_id,'DOCUMENT_DOWNLOADED',{fileId:f.id});return f;});
     const bytes=await readFile(resolve(config.storagePath,file.id));
     if(createHash('sha256').update(bytes).digest('hex')!==file.sha256) throw new HttpError(500,'FILE_INTEGRITY_FAILURE');
-    res.type(file.kind.endsWith('_PDF')?'application/pdf':'application/vnd.openxmlformats-officedocument.wordprocessingml.document').attachment(documentFilename(file.kind,file.contract_number,file.tu_number??file.version_number)).send(bytes);
+    res.type(file.kind.endsWith('_PDF')?'application/pdf':'application/vnd.openxmlformats-officedocument.wordprocessingml.document').attachment(documentFilename(file.kind,file.contract_number,file.tu_number??file.version_number??file.extra_number,file.extra_kind)).send(bytes);
   });
   post('/api/v1/acts/:id/versions',async(db,req)=>{
     const b=z.object({fileId:id,expectedRevision:expected,technicalData:z.record(z.string(),z.unknown()).default({})}).strict().parse(req.body);

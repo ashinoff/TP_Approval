@@ -50,7 +50,7 @@ function TuViewer({detail,tuId,api,loadFile}:{detail:Row;tuId:string;api:Api;loa
  * Document workplace: package on the left, the document in the middle, TU check and remarks on the right.
  * The act preview stays mounted (hidden) while a TU is open, so an unsaved remark is not lost.
  */
-export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,busy,onDownload,section,focusComment,focusVersion,onDirty,canLeave}:{detail:Row;profile:Row;tasks:Row[];api:Api;loadFile:(id:string)=>Promise<ArrayBuffer>;action:(fn:()=>Promise<unknown>)=>Promise<void>;busy:boolean;onDownload:(id:string,n:number)=>Promise<void>;section:Section;focusComment?:string;focusVersion?:string;onDirty:(value:boolean)=>void;canLeave:()=>boolean}){
+export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,busy,onDownload,onPrint,section,focusComment,focusVersion,onDirty,canLeave}:{detail:Row;profile:Row;tasks:Row[];api:Api;loadFile:(id:string)=>Promise<ArrayBuffer>;action:(fn:()=>Promise<unknown>)=>Promise<void>;busy:boolean;onDownload:(id:string,n:number)=>Promise<void>;onPrint?:()=>Promise<void>;section:Section;focusComment?:string;focusVersion?:string;onDirty:(value:boolean)=>void;canLeave:()=>boolean}){
  const [openTu,setOpenTu]=useState<string>();
  const referenceView=!!openTu;
  const [focusRequest,setFocusRequest]=useState(0);
@@ -133,6 +133,8 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
    {current&&<button className="primary-button review-launch" onClick={()=>{if(canLeave())setReviewOpen(true);}} title="Акт и ТУ рядом, замечания и автосверка"><Icon name="file"/>Режим проверки</button>}
    {detail.cycles.length>0&&<button className="secondary-button sheet-launch" onClick={()=>setSheetOpen(true)} title="ФИО согласовавших, решения, замечания — для печати"><Icon name="check"/>Лист согласования</button>}
    {current&&<button className="text-button" disabled={busy} onClick={()=>void action(()=>onDownload(current.file_id,current.number))}><Icon name="download"/>Скачать оригинал</button>}
+   {/* Экземпляр к печати: согласованная версия PDF со значками в углах листов. */}
+   {onPrint&&detail.presentation?.approvedPublication&&<button className="text-button print-copy" disabled={busy} title="Согласованная версия PDF со служебными значками по углам листов" onClick={()=>void action(onPrint)}><Icon name="download"/>К печати</button>}
    <span className="word-heading-spacer"/>
    {effective&&<p className={`task-deadline ${task.overdue?'overdue':''}`}>Ваша задача: {roleNames[task.role]} · срок {dateTime(task.due_at)} МСК{task.overdue?' · Просрочено':''}</p>}
    {effective&&<div className="word-review-actions">

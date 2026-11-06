@@ -10,10 +10,14 @@ export const pdfKinds={ACT_TP:'ACT_PDF',AVTU:'AVTU_PDF',TU:'TU_PDF'} as const;
 /** Вид файла по типу документа и формату (PDF — основной, DOCX — для ранее загруженных). */
 export const fileKind=(type:keyof typeof documentKinds,pdf:boolean)=>(pdf?pdfKinds:documentKinds)[type];
 export const documentLabels={ACT_TP:'Акт ТП',AVTU:'АВТУ',TU:'ТУ'} as const;
+/** Дополнительные документы договора (только PDF, без маршрута согласования). */
+export const extraLabels={PSU:'ПСУ',PREV_ACT:'Предыдущий акт ТП',POLE_SCHEME:'Поопорная схема'} as const;
+export type ExtraKind=keyof typeof extraLabels;
 export async function contractDocuments(db:DB,act:Record<string,any>){
  return {contract:requireValue((await db.query('SELECT * FROM app.contracts WHERE id=$1',[act.contract_id])).rows[0]),
   technicalConditions:(await db.query('SELECT * FROM app.technical_conditions WHERE contract_id=$1 ORDER BY number',[act.contract_id])).rows,
-  acts:(await db.query('SELECT id,act_number,act_type,state FROM app.acts WHERE contract_id=$1 ORDER BY created_at,id',[act.contract_id])).rows};
+  acts:(await db.query('SELECT id,act_number,act_type,state FROM app.acts WHERE contract_id=$1 ORDER BY created_at,id',[act.contract_id])).rows,
+  extraDocuments:(await db.query('SELECT e.id,e.act_id,e.file_id,e.kind,e.number,e.created_at,a.act_number,a.act_type FROM app.extra_documents e JOIN app.acts a ON a.id=e.act_id WHERE a.contract_id=$1 ORDER BY e.created_at,e.id',[act.contract_id])).rows};
 }
 export async function registerDocument(db:DB,act:Record<string,any>,fileId:string,type:keyof typeof documentKinds,documentNumber?:string,documentDate?:string){
  if(type!=='TU'){
@@ -45,7 +49,17 @@ export async function tuPreview(db:DB,storage:string,actId:string,tuId:string){
  await audit(db,a.id,'TECHNICAL_CONDITIONS_VIEWED',{technicalConditionsId:tu.id});
  return {...await documentModel(bytes),sha256:tu.sha256,versionNumber:tu.number,technicalConditionsId:tu.id};
 }
-export function documentFilename(kind:string,contractNumber:string,number?:number){
- const label=kind.startsWith('TU_')?'ТУ':kind.startsWith('AVTU_')?'АВТУ':'АКТ ТП';
+export function documentFilename(kind:string,contractNumber:string,number?:number,extraKind?:string){
+ const label=extraKind?extraLabels[extraKind as ExtraKind]??'Документ':kind.startsWith('TU_')?'ТУ':kind.startsWith('AVTU_')?'АВТУ':'АКТ ТП';
  return `${contractNumber.replace(/[\\/:*?"<>|\r\n]/g,'_').slice(0,120)} ${label}${number&&number>1?` — редакция ${number}`:''}.${kind.endsWith('_PDF')?'pdf':'docx'}`;
+}
+
+/** Просмотр дополнительного документа договора (ПСУ, предыдущий акт, поопорная схема) — для сравнения в режиме проверки. */
+export async function extraPreview(db:DB,storage:string,actId:string,extraId:string){
+ const a=requireValue((await db.query('SELECT * FROM app.acts WHERE id=$1',[actId])).rows[0]);
+ const e=requireValue((await db.query("SELECT e.*,f.sha256 FROM app.extra_documents e JOIN app.acts o ON o.id=e.act_id JOIN app.files f ON f.id=e.file_id AND f.scan_status='READY' WHERE e.id=$1 AND o.contract_id=$2",[extraId,a.contract_id])).rows[0]);
+ const bytes=await readFile(resolve(storage,e.file_id));
+ if(createHash('sha256').update(bytes).digest('hex')!==e.sha256)throw new HttpError(500,'FILE_INTEGRITY_FAILURE');
+ await audit(db,a.id,'EXTRA_DOCUMENT_VIEWED',{extraDocumentId:e.id,kind:e.kind});
+ return {...await documentModel(bytes),sha256:e.sha256,versionNumber:e.number,extraDocumentId:e.id,kind:e.kind};
 }

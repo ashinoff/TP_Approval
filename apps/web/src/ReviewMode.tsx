@@ -7,6 +7,7 @@ import DecisionDialog from './DecisionDialog.js';
 import {SendButton,checkFor,isPreparing,openBlockers} from './ActDocument.js';
 import {initialVersion,remarkBlockReason,type Section} from './workplace.js';
 import {RossetiLoader} from './Brand.js';
+import {extraNames} from './ContractDocuments.js';
 import {checkMarks,changedMarks,pairedBlock,findingTone} from './review-marks.js';
 import './review.css';
 
@@ -38,6 +39,7 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  const effective=!!task&&detail.author_id!==profile.id&&version?.created_by!==profile.id;
  const preparing=isPreparing(detail)&&versionId===newest?.id;
  const tus:Row[]=detail.contractDocuments?.technicalConditions??[];
+ const extras:Row[]=detail.contractDocuments?.extraDocuments??[];
  const checkTuId=cycle?.technical_conditions_id??detail.technical_conditions_id;
  const check=checkFor(detail,versionId,checkTuId);
 
@@ -53,8 +55,9 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  const fetchSource=useCallback(async(key:string)=>{
   const [kind,id]=key.split(':');
   if(kind==='v')return fetchVersion(id);
+  if(kind==='x'){const x=extras.find(e=>e.id===id)!;const [model,bytes]=await Promise.all([api(`/api/v1/acts/${detail.id}/extra/${id}/preview`),loadFile(x.file_id)]);return {model,bytes};}
   const tu=tus.find(t=>t.id===id)!;const [model,bytes]=await Promise.all([api(`/api/v1/acts/${detail.id}/technical-conditions/${id}/preview`),loadFile(tu.file_id)]);return {model,bytes};
- },[fetchVersion,tus,detail.id,api,loadFile]);
+ },[fetchVersion,tus,extras,detail.id,api,loadFile]);
  // Справа не может быть та же версия, что слева.
  useEffect(()=>{if(source==='v:'+versionId)setSource(defaultSource());},[versionId]);
  const leftDoc=usePreview(version?versionId:undefined,fetchVersion);
@@ -125,6 +128,7 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
      <select aria-label="Документ для сравнения" value={source??''} onChange={e=>setSource(e.target.value||undefined)}>
       {!source&&<option value="">Нет документа для сравнения</option>}
       {tus.length>0&&<optgroup label="Технические условия">{[...tus].reverse().map(t=><option key={t.id} value={'tu:'+t.id}>{sourceLabel(t)}</option>)}</optgroup>}
+      {extras.length>0&&<optgroup label="Дополнительные документы">{extras.map(x=><option key={x.id} value={'x:'+x.id}>{extraNames[x.kind]??'Документ'}{x.number>1?` (${x.number})`:''}</option>)}</optgroup>}
       {detail.versions.length>1&&<optgroup label={`Другие версии (${kind})`}>{detail.versions.filter((v:Row)=>v.id!==versionId).map((v:Row)=><option key={v.id} value={'v:'+v.id}>{kind} · версия {v.number}</option>)}</optgroup>}
      </select>
      <span className="review-readonly">только просмотр</span>

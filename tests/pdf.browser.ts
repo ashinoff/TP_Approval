@@ -57,11 +57,14 @@ try{
  await form.getByLabel('Файл технических условий').setInputFiles(docs+'tu.pdf');await form.getByText('Реквизиты извлечены из ТУ').waitFor({timeout:20000});
  assert.equal(await form.getByLabel('Номер договора').inputValue(),'00001-26-00000004-1');assert.equal(await form.getByLabel('Максимальная мощность').inputValue(),'15');
  await form.getByLabel('Планируемая дата исполнения').fill('2026-12-15');await form.getByLabel('Файл загружаемого документа').setInputFiles(docs+'act-bad.pdf');
+ await form.getByLabel('Файл: Поопорная схема').setInputFiles(docs+'tu.pdf');await page.screenshot({path:`${out}/00-upload-form.png`,fullPage:true});
  await form.getByRole('button',{name:'Сохранить документ',exact:true}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor({timeout:20000});
- await page.locator('.pdf-page canvas').first().waitFor({timeout:20000});await shot('01-document');console.log('OK 1: TU and act uploaded as PDF; the act opens in the exact PDF view');
+ await page.locator('.pdf-page canvas').first().waitFor({timeout:20000});await shot('01-document');
+ await page.locator('.package-extra').filter({hasText:'Поопорная схема'}).waitFor();console.log('OK 1: TU and act uploaded as PDF; the act opens in the exact PDF view');
  // 2. Сверка: рамки цвета статуса прямо на странице; клик по красному значению — пара в ТУ обведена, значение выделено.
  await page.getByRole('button',{name:'Режим проверки'}).click();const review=page.getByRole('dialog',{name:'Режим проверки документов'});
  await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();await review.getByText(/⚠ Расхождение/).first().waitFor({timeout:20000});
+ assert.equal(await review.locator('option',{hasText:'Поопорная схема'}).count(),1,'Extra document can be opened for comparison');
  const panes=review.locator('.review-pane');const left=panes.nth(0),right=panes.nth(1);
  await left.locator('.pdf-mark[data-mark=bad]').first().waitFor({timeout:15000});await right.locator('.pdf-mark[data-mark=bad]').first().waitFor({timeout:15000});
  assert.ok(await left.locator('.pdf-mark[data-mark=ok]').count()>=3,'Matching requisites are framed green on the PDF page');
