@@ -93,6 +93,16 @@ export async function runIntegration(ownerUrl:string,runtimeUrl:string,root:stri
     assert.equal((await post('process',`/api/v1/acts/${actId}/close-collection`,{reason:'Срок истёк'})).status,200);
     assert.equal((await owner.query("SELECT count(*) FROM app.tasks WHERE act_id=$1 AND status='CANCELLED'",[actId])).rows[0].count,'3');pass('Only scoped process admin closes expired collection, missing decisions stay missing');
     const notes=(await get('riru','/api/v1/notifications')).body;assert.ok(notes.length>0);await post('riru',`/api/v1/notifications/${notes[0].id}/read`,{});assert.equal((await get('riru','/api/platform/badge')).body.count,1);pass('Unread notifications and action badge are independent');
+    // Понятная причина, если на этап некого назначить: никого нет, подходит только автор, несколько сотрудников.
+    {const {assigned}=await import('../apps/api/src/workflow.js');
+     const why=(wanted:string,area:string,excluded:string[])=>transaction(runtime,users.riru,db=>assigned(db,wanted,area,excluded)).then(()=>'',(e:any)=>String(e.message));
+     assert.match(await why('RIRU_HEAD',other,[]),/нет активного Начальника РИРУ/);
+     assert.match(await why('RIRU_HEAD',area,[users['riru-head']]),/подходит только .* автор документа/);
+     const extra=(await owner.query("INSERT INTO app.users(issuer,subject,name) VALUES($1,'second-head','Второй начальник (синтетический)') RETURNING id",[config.issuer])).rows[0].id;
+     await owner.query("INSERT INTO app.roles(user_id,role,res_id) VALUES($1,'RIRU_HEAD',$2)",[extra,area]);
+     assert.match(await why('RIRU_HEAD',area,[]),/несколько начальников РИРУ: .*Второй начальник/);
+     await owner.query("UPDATE app.roles SET revoked_at=now() WHERE user_id=$1",[extra]);
+     pass('Assignment failure explains the reason: nobody, only the author, or several employees in the RES');}
     // Удаление насовсем документов с полной историей (циклы, решения, неизменяемые замечания, публикации): ничего не остаётся.
     const everything=(await owner.query('SELECT id FROM app.acts')).rows.map(r=>r.id as string);assert.ok(everything.length>0);
     const withRemarks=Number((await owner.query('SELECT count(*) FROM app.comments')).rows[0].count);assert.ok(withRemarks>0,'Fixture has immutable remarks');

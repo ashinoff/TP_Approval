@@ -20,7 +20,17 @@ export async function assigned(db:DB,wanted:string,area:string,excluded:string[]
   await db.query('SELECT pg_advisory_xact_lock(817624)');
   const found=await db.query('SELECT id FROM app.candidates($1,$2) WHERE NOT(id=ANY($3::uuid[]))',[wanted,area,excluded]);
   const label:Record<string,string>={RIRU_ENGINEER:'Инженера РИРУ',RIRU_HEAD:'Начальника РИРУ',RES_HEAD:'Начальника РЭС',SUE:'СУЭ',STP:'СТП',GI:'ТЕХБЛОКА'};
-  if(found.rowCount!==1) throw new HttpError(409,'ASSIGNEE_CONFIGURATION',`Для ${label[wanted]??wanted} требуется один доступный исполнитель без конфликта ролей`);
+  if(found.rowCount!==1){
+   // Точная причина: нет сотрудника, несколько сотрудников или подходит только автор документа.
+   const who=(await db.query('SELECT id,name,all_res FROM app.candidate_labels($1,$2) ORDER BY name',[wanted,area])).rows as {id:string;name:string;all_res:boolean}[];
+   const res=(await db.query('SELECT name FROM app.res_units WHERE id=$1',[area])).rows[0]?.name??'этом РЭС';
+   const role=label[wanted]??wanted;const plural:Record<string,string>={RIRU_ENGINEER:'инженеров РИРУ',RIRU_HEAD:'начальников РИРУ',RES_HEAD:'начальников РЭС',SUE:'сотрудников СУЭ',STP:'сотрудников СТП',GI:'сотрудников ТЕХБЛОКА'};const names=(list:typeof who)=>list.map(c=>c.name+(c.all_res?' (роль на все РЭС)':'')).join(', ');
+   const free=who.filter(c=>!excluded.includes(c.id));
+   const reason=!who.length?`В «${res}» нет активного ${role}. Назначьте роль в разделе «Пользователи».`
+    :!free.length?`На роль ${role} в «${res}» подходит только ${names(who)} — это автор документа или уже участник согласования. Согласовывать свой документ нельзя: назначьте роль другому сотруднику.`
+    :`В «${res}» несколько ${plural[wanted]??'сотрудников'}: ${names(free)}. Оставьте роль одному сотруднику или настройте замещение.`;
+   throw new HttpError(409,'ASSIGNEE_CONFIGURATION',reason);
+  }
   return found.rows[0].id as string;
 }
 export async function task(db:DB,actId:string,cycleId:string,wanted:string,assignee:string) {
