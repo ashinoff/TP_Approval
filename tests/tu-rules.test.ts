@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {xmlBlocks} from '../apps/api/src/documents.js';
-import {compareRequisites,findingsPass,RULES_VERSION} from '../apps/api/src/tu-rules.js';
+import {compareRequisites,findingsPass,RULES_VERSION,samePerson} from '../apps/api/src/tu-rules.js';
 
 // ---------- Generic «Label: value» documents (earlier synthetic fixtures) ----------
 
@@ -15,7 +15,7 @@ const generic=(power='15 кВт',voltage='0,4 кВ',contract='00001-TEST-1',poin
 type F=ReturnType<typeof compareRequisites>;
 const field=(f:F,name:string)=>{const found=f.find(x=>x.field===name);assert.ok(found,`finding ${name}`);return found!;};
 
-test('TU rules V6: version label',()=>assert.equal(RULES_VERSION,'DOCX_CONTEXT_V6'));
+test('TU rules V7: version label',()=>assert.equal(RULES_VERSION,'DOCX_CONTEXT_V7'));
 
 test('TU rules: exact units, decimal separators and leading-zero contract; existing power is not total',()=>{
  const f=compareRequisites(generic('15,0 кВт','400 В'),generic('15000 Вт'),'00001-TEST-1');
@@ -119,7 +119,7 @@ test('TU rules V4: table metadata and Word list levels are read without changing
 test('TU rules V4: the standard TU + AVTU pair matches; only the connection point needs a person',()=>{
  const f=compareRequisites(avtu(),tu(),base.contract);
  const statuses=Object.fromEntries(f.map(x=>[x.field,x.status]));
- assert.deepEqual(statuses,{contract:'MATCH',power:'MATCH',voltage:'MATCH',address:'MATCH',point:'MANUAL_REVIEW',applicant:'MATCH',tuNumber:'MATCH',powerExisting:'MATCH',powerNew:'MATCH',supplyCenter:'MATCH',epuName:'MATCH',tuItemsNetwork:'MATCH',tuItemsApplicant:'MATCH',reliability:'INFO'});
+ assert.deepEqual(statuses,{contract:'MATCH',power:'MATCH',voltage:'MATCH',address:'MATCH',point:'MANUAL_REVIEW',applicant:'MATCH',tuNumber:'MATCH',powerExisting:'MATCH',powerNew:'MATCH',supplyCenter:'MATCH',epuName:'MATCH',tuItemsNetwork:'MATCH',tuItemsApplicant:'MATCH',tpCode:'MATCH',reliability:'MATCH'});
  assert.equal(field(f,'power').act.find(v=>v.value==='15000/1')!.shown,'15 кВт');
  assert.equal(field(f,'voltage').act[0].shown,'0,4 кВ');
  assert.equal(findingsPass(f),false);
@@ -144,7 +144,30 @@ test('TU rules V4: real-template discrepancies are found',()=>{
 
 test('TU rules V4: «8,0» is one number, not two; the added power is not mistaken for existing or total power',()=>{
  const f=compareRequisites(avtu(),tu(),base.contract);
- assert.deepEqual(f.find(x=>x.field==='power')!.act.map(v=>v.value),['15000/1']);
+ assert.deepEqual([...new Set(f.find(x=>x.field==='power')!.act.map(v=>v.value))],['15000/1'],'One value, possibly in several places (text, table, scheme)');
  assert.deepEqual(f.find(x=>x.field==='powerExisting')!.act.map(v=>v.value),['7000/1']);
  assert.deepEqual(f.find(x=>x.field==='powerNew')!.act.map(v=>v.value),['8000/1']);
+});
+
+// ---------- Уведомление / ТУ «Россети Юг»: падежи, адрес с «Российская Федерация», категория, схема ----------
+
+const plain=(lines:string[])=>lines.map((text,i)=>({id:`b${i}`,part:'word/document.xml',text,sha256:''})) as any;
+test('ФИО и организация сравниваются с учётом падежа',()=>{
+ assert.equal(samePerson('синтетикову петру ивановичу','синтетиков петр иванович'),true);
+ assert.equal(samePerson('учебной анне сергеевне','учебная анна сергеевна'),true);
+ assert.equal(samePerson('обществу с ограниченной ответственностью «учебное»','общество с ограниченной ответственностью «учебное»'),true);
+ assert.equal(samePerson('иванову петру','петров иван'),false);
+});
+test('уведомление: заявитель в дательном падеже, ЭПУ из кавычек, адрес, категория по мощности, ТП и «Р =» на схеме',()=>{
+ const act=plain(['1. Сетевая организация оказала Синтетикову Петру Ивановичу, именуемым(ой) в дальнейшем заявитель, услугу по договору №00001-26-00000004-1.',
+  'Объекты электроэнергетики (энергопринимающие устройства) сторон: «ЭПУ жилого дома» находятся по адресу: Российская Федерация, Краснодарский край, г. Учебный, ул. Тестовая, д. 5, к/н 00:00:0000000:1.',
+  'Максимальная мощность (всего) 30 кВт, в том числе:','ранее присоединенная максимальная мощность 15 кВт','РУ-0,4 кВ ТП-У001','ВРУ-0,4 кВ Заявителя Р = 30 кВт']);
+ const tu=plain(['Приложение к договору № 00001-26-00000004-1','Заявитель: Синтетиков Петр Иванович.','1. Наименование энергопринимающих устройств Заявителя: ЭПУ жилого дома.',
+  '2. Наименование и место нахождения объектов: «Жилой дом» по адресу: Краснодарский край, г. Учебный, ул. Тестовая, д. 5, к/н 00:00:0000000:1.',
+  '3. Максимальная мощность присоединяемых энергопринимающих устройств Заявителя: 30 кВт, в том числе существующая мощность 15 кВт.','4. Категория надежности: III-15 кВт.',
+  '7. Точка(и) присоединения: ближайшая опора ВЛ-0,4 кВ, ТП-У001 (30 кВт)']);
+ const f=Object.fromEntries(compareRequisites(act,tu,'00001-26-00000004-1').map(x=>[x.field,x]));
+ for(const field of ['applicant','epuName','address','reliability','tpCode','power'])assert.equal(f[field].status,'MATCH',field+': '+f[field].reason);
+ assert.ok(f.power.act.some((v:any)=>v.blockId==='b5'),'Scheme label «Р = 30 кВт» is marked as power');
+ assert.ok(f.tpCode.act.some((v:any)=>v.blockId==='b4'),'Scheme label with the TP code is marked');
 });

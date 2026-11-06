@@ -91,7 +91,10 @@ export default function PdfViewer({bytes,model,comments,onSelection,onComment,fo
   for(const v of views.current){v.below.replaceChildren();v.above.replaceChildren();}
   const rank={bad:3,warn:2,changed:1,ok:0};const tone=new Map<string,BlockMark>();
   for(const m of (JSON.parse(marksKey) as BlockMark[])){const was=tone.get(m.blockId);if(!was||rank[m.tone]>rank[was.tone])tone.set(m.blockId,{...m,title:was?was.title+'\n'+m.title:m.title});else tone.set(m.blockId,{...was,title:was.title+'\n'+m.title});}
-  for(const [id,m]of tone){const b=byId.get(id);const v=b&&viewOf(b.page);if(!v)continue;for(const r of rects(v,b.spans))box(v.below,r,'pdf-mark',{'data-mark':m.tone,'data-block':id,title:m.title});}
+  // Подсказка при наведении («✓ Номинал ВА: по справочнику…»): отметки лежат под текстом, поэтому title — на кусках текста.
+  for(const v of views.current)v.el.querySelectorAll<HTMLElement>('.textLayer [data-item][title]').forEach(el=>el.removeAttribute('title'));
+  for(const [id,m]of tone){const b=byId.get(id);const v=b&&viewOf(b.page);if(!v)continue;for(const r of rects(v,b.spans))box(v.below,r,'pdf-mark',{'data-mark':m.tone,'data-block':id,title:m.title});
+   for(const s of b.spans as Span[])v.el.querySelector<HTMLElement>(`.textLayer [data-item="${s.item}"]`)?.setAttribute('title',m.title);}
   for(const id of state.current.highlighted){const b=byId.get(id);const v=b&&viewOf(b.page);if(v)for(const r of rects(v,b.spans))box(v.below,r,'pdf-check-hit');}
   if(state.current.search){const q=state.current.search.toLocaleLowerCase();for(const b of blocks){const at=b.text.toLocaleLowerCase().indexOf(q);const v=at>=0&&viewOf(b.page);if(v)for(const r of rects(v,b.spans,at,at+q.length))box(v.below,r,'pdf-search-hit');}}
   const j=state.current.jump;

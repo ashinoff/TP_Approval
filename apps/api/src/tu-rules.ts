@@ -9,7 +9,8 @@ import type {Block} from './documents.js';
  * table columns of «Перечень точек присоединения», «(всего) 15,0 (пятнадцать) кВт», existing/new power,
  * the TU number, the applicant, the supply centre, the TU sub-item ranges and the reliability category.
  */
-export const RULES_VERSION='DOCX_CONTEXT_V6';
+export const RULES_VERSION='DOCX_CONTEXT_V7';
+// V7: ФИО и организация с учётом падежа, адрес без «Российская Федерация» и по кадастру, мощность категории (п. 4 ТУ), обозначение ТП и «Р =» на схеме, все места значения.
 // V6: текст рамок схем (mc:AlternateContent) берётся один раз из VML — надписи схемы участвуют в отметках.
 // V5: проверка номиналов ВА/ТТ/сечения по справочникам (nominal-rules.ts); версия отчёта дополняется ревизиями справочников.
 
@@ -131,6 +132,11 @@ function totalPower(blocks:Block[]):Extracted{
  if(cells.length===1){
   const amount=firstQuantity(cells[0].block.text+' кВт',powerAt);
   if(amount)values.push(value(amount,cells[0].block,shownQuantity(amount,'кВт','Вт')));
+ }
+ // Надпись однолинейной схемы у ВРУ заявителя: «Р = 30 кВт».
+ for(const b of textBlocks(blocks)){
+  const m=new RegExp(`(?<![\\p{L}])[РP]\\s*=\\s*(${NUMBER})\\s*кВт(?![\\p{L}])`,'u').exec(b.text.replace(/ /g,' '));
+  if(m)values.push(value(quantity(m[1],'кВт'),b,`${m[1]} кВт`));
  }
  return {values,found:found||cells.length>0};
 }
@@ -276,7 +282,7 @@ function applicant(blocks:Block[]):Extracted{
   const text=b.text.replace(/ /g,' ');
   const label=/(?:^|\n)\s*(?:\d+[.)]\s*)?Заявитель\s*:\s*([^\n]+)/iu.exec(text);
   if(label&&label[1].trim())values.push(value(fio(label[1]),b,trimEnd(label[1])));
-  const party=/с\s+одной\s+стороны\s+и\s+(.{3,200}?)\s*,\s*именуем/iu.exec(text);
+  const party=/с\s+одной\s+стороны\s+и\s+(.{3,200}?)\s*,\s*именуем/iu.exec(text)??/оказала\s+(?!заявителю)(.{3,150}?)\s*,\s*именуем/iu.exec(text);
   if(party)values.push(value(fio(party[1]),b,trimEnd(party[1])));
  }
  return {values,found:values.length>0};
@@ -318,7 +324,7 @@ function epuName(blocks:Block[]):Extracted{
  for(const b of textBlocks(blocks)){
   const tu=/наименование\s+энергопринимающих\s+устройств\s+заявителя\s*:\s*([^\n]+)/iu.exec(b.text);
   if(tu)values.push(value(looseKey(tu[1]),b,trimEnd(tu[1])));
-  const act=/энергопринимающих\s+устройств\s*:\s*«([^»]{1,200})»/iu.exec(b.text);
+  const act=/энергопринимающих\s+устройств\s*:\s*«([^»]{1,200})»/iu.exec(b.text)??/энергопринимающие\s+устройства\)?\s*сторон\s*:\s*«([^»]{1,200})»/iu.exec(b.text);
   if(act)values.push(value(looseKey(act[1]),b,act[1]));
  }
  return {values,found:values.length>0};
@@ -370,7 +376,8 @@ function reliability(blocks:Block[]):Extracted{
 // ---------- Comparison ----------
 
 const distinct=(values:Value[])=>[...new Set(values.map(v=>v.value))];
-const evidence=(rows:Value[])=>{const seen=new Set<string>();return rows.filter(row=>{if(seen.has(row.value))return false;seen.add(row.value);return true;}).slice(0,4);};
+// Каждое место значения (абзац, ячейка таблицы, надпись схемы) — отдельно: в просмотре отмечаются все; в отчёте одно значение показывается один раз.
+const evidence=(rows:Value[])=>{const seen=new Set<string>();return rows.filter(row=>{const key=row.blockId+'|'+row.value;if(seen.has(key))return false;seen.add(key);return true;}).slice(0,8);};
 const UNCLEAR='Реквизит не распознан однозначно. Сверьте вручную по исходным документам.';
 
 function finding(field:string,label:string,act:Extracted,tu:Extracted,decide:(a:string,t:string)=>{status:FindingStatus;reason:string}):Finding{
@@ -392,6 +399,20 @@ const pointCodes=(s:string)=>[...s.matchAll(/(?<![\p{L}])(к?тпн?|ктп|зт
  * Compares the act with the TU. Core requisites (contract, total power, voltage, address, point) are always
  * reported. Additional requisites are reported only when found in at least one document.
  */
+/** ФИО в разных падежах: «Иванову Петру Сергеевичу» = «Иванов Петр Сергеевич», «Петровой Анне» = «Петрова Анна». */
+const stem=(w:string)=>w.replace(/[.,;:«»"]/g,'').replace(/(ому|ему|ой|ей|ою|ею|ым|им|ом|ем|у|ю|е|а|я|ы|и|ь)$/u,'');
+export function samePerson(a:string,b:string){
+ const wa=a.split(/\s+/).filter(Boolean),wb=b.split(/\s+/).filter(Boolean);
+ if(wa.length<2||wa.length!==wb.length)return false;
+ return wa.every((w,i)=>{const x=stem(w),y=stem(wb[i]);return x===y||x.length>=2&&((x.startsWith(y)||y.startsWith(x))&&Math.abs(x.length-y.length)<=1);});
+}
+/** Обозначения ТП во всех абзацах (текст, таблицы, надписи схемы): «РУ-0,4 кВ ТП-А645» → «тп-а645». */
+function tpCodes(blocks:Block[]):Extracted{
+ const values:Value[]=[];
+ for(const b of textBlocks(blocks))for(const code of new Set(pointCodes(b.text).map(c=>c.toLowerCase())))values.push(value(code,b,code.toUpperCase()));
+ return {values,found:values.length>0};
+}
+
 export function compareRequisites(actBlocks:Block[],tuBlocks:Block[],contractNumber:string):Finding[]{
  const findings:Finding[]=[];
  const card=contractKey(contractNumber);
@@ -402,11 +423,15 @@ export function compareRequisites(actBlocks:Block[],tuBlocks:Block[],contractNum
  findings.push(finding('voltage','Класс напряжения',voltage(actBlocks),voltage(tuBlocks),exactUnits));
  findings.push(finding('address','Адрес объекта',address(actBlocks),address(tuBlocks),(a,t)=>{
   if(a===t)return {status:'MATCH',reason:'Адреса совпадают.'};
+  // «Российская Федерация» в начале и точка в конце адрес не меняют.
+  const plain=(s:string)=>s.replace(/^российская федерация\s*/u,'').replace(/[.\s]+$/u,'');
+  if(plain(a)===plain(t))return {status:'MATCH',reason:'Адреса совпадают (без учёта «Российская Федерация»).'};
   const house=(s:string)=>[...s.matchAll(/(?:д(?:ом)?\.?\s+)(\d+(?:[/.\-]\d+)?)/giu)].map(m=>m[1]);
   const cadastre=(s:string)=>[...s.matchAll(/к\s*\/\s*н\s*([\d:]+)/giu)].map(m=>m[1]);
   const [ha,ht,ca,ct]=[house(a),house(t),cadastre(a),cadastre(t)];
   if(ha.length===1&&ht.length===1&&ha[0]!==ht[0])return {status:'DIFFERENCE',reason:'Номера дома различаются.'};
   if(ca.length===1&&ct.length===1&&ca[0]!==ct[0])return {status:'DIFFERENCE',reason:'Кадастровые номера различаются.'};
+  if(ca.length===1&&ct.length===1&&(!ha.length||!ht.length||ha[0]===ht[0]))return {status:'MATCH',reason:'Кадастровый номер (и номер дома) совпадают; формулировки адреса записаны по-разному.'};
   return {status:'MANUAL_REVIEW',reason:'Формулировки адреса отличаются. Сверьте вручную.'};
  }));
  findings.push(finding('point','Точка присоединения',point(actBlocks),point(tuBlocks),(a,t)=>{
@@ -426,6 +451,7 @@ export function compareRequisites(actBlocks:Block[],tuBlocks:Block[],contractNum
  };
  optional('applicant','Заявитель',applicant(actBlocks),applicant(tuBlocks),(a,t)=>{
   if(a===t)return {status:'MATCH',reason:'ФИО заявителя совпадает.'};
+  if(samePerson(a,t))return {status:'MATCH',reason:'ФИО заявителя совпадает (с учётом падежа).'};
   const surname=(s:string)=>s.split(' ')[0];
   return surname(a)===surname(t)?{status:'MANUAL_REVIEW',reason:'Фамилия совпадает, остальная часть записана иначе. Сверьте вручную.'}:{status:'DIFFERENCE',reason:'Заявитель в акте и ТУ различается.'};
  });
@@ -462,10 +488,29 @@ export function compareRequisites(actBlocks:Block[],tuBlocks:Block[],contractNum
   optional(kind==='network'?'tuItemsNetwork':'tuItemsApplicant',label,{values:actValues,found:!!act},{values:tuValues,found:!!tu},(a,t)=>Number(a)===Number(t)?{status:'MATCH',reason:'В акте выполненными указаны все подпункты ТУ.'}:Number(a)<Number(t)?{status:'DIFFERENCE',reason:'В акте выполненными указаны не все подпункты ТУ.'}:{status:'MANUAL_REVIEW',reason:'В акте указано больше подпунктов, чем в ТУ. Сверьте вручную.'});
  }
 
- // Reliability category: TU may state only the added power, the act — the full one. Shown for information only.
+ // Обозначение ТП: все ТП, упомянутые в акте (текст, таблицы, надпись схемы «РУ-0,4 кВ ТП-А645»), должны быть в точке присоединения ТУ.
+ const actCodes=tpCodes(actBlocks),tuPoint=point(tuBlocks);
+ const tuCodeValues=tuPoint.values.flatMap(v=>[...new Set(pointCodes(v.quote).map(c=>c.toLowerCase()))].map(code=>({...v,value:code,shown:code.toUpperCase()})));
+ if(actCodes.values.length&&tuCodeValues.length){
+  const allowed=new Set(tuCodeValues.map(v=>v.value));const foreign=[...new Set(actCodes.values.map(v=>v.value))].filter(c=>!allowed.has(c));
+  findings.push({field:'tpCode',label:'Обозначение ТП (в т. ч. на схеме)',status:foreign.length?'DIFFERENCE':'MATCH',
+   reason:foreign.length?`В акте упомянута ТП, которой нет в точке присоединения ТУ: ${foreign.map(c=>c.toUpperCase()).join(', ')}.`:'Обозначение ТП в акте и на схеме совпадает с ТУ.',
+   act:evidence(foreign.length?actCodes.values.filter(v=>foreign.includes(v.value)):actCodes.values),tu:evidence(tuCodeValues),actCandidates:actCodes.values.length,tuCandidates:tuCodeValues.length});
+ }
+
+ // Категория надёжности (п. 4 ТУ «III-15 кВт»): категорию в акте не указывают — сверяется мощность: она должна совпасть
+ // с присоединяемой, ранее присоединённой или полной мощностью акта.
  const actReliability=reliability(actBlocks),tuReliability=reliability(tuBlocks);
- if(actReliability.values.length||tuReliability.values.length){
-  findings.push({field:'reliability',label:'Категория надёжности',status:'INFO',reason:'Только для сведения: в ТУ может быть указана присоединяемая мощность, в акте — полная. Сравните по смыслу.',act:evidence(actReliability.values),tu:evidence(tuReliability.values),actCandidates:actReliability.values.length,tuCandidates:tuReliability.values.length});
+ const tuCategoryKw=tuReliability.values.flatMap(v=>[...v.quote.matchAll(new RegExp(`(${NUMBER})\\s*кВт`,'giu'))].map(m=>({...v,value:quantity(m[1],'кВт'),shown:`${m[1]} кВт`})));
+ if(tuCategoryKw.length){
+  const actPowers=[...actTotal.values,...actExisting.values,...derive(actTotal,actExisting,newPower(actBlocks)).values].filter(v=>v.value);
+  const matched=actPowers.filter(v=>tuCategoryKw.some(t=>t.value===v.value));
+  const ok=tuCategoryKw.every(t=>actPowers.some(v=>v.value===t.value));
+  findings.push({field:'reliability',label:'Мощность по категории надёжности (п. 4 ТУ)',status:ok?'MATCH':'MANUAL_REVIEW',
+   reason:ok?'Мощность категории из ТУ совпадает с мощностью в характеристиках присоединения акта (категория в акте не указывается).':'Мощность категории из ТУ не найдена среди мощностей акта. Сверьте вручную.',
+   act:evidence(ok?matched:actReliability.values),tu:evidence(tuCategoryKw),actCandidates:matched.length,tuCandidates:tuCategoryKw.length});
+ }else if(actReliability.values.length){
+  findings.push({field:'reliability',label:'Категория надёжности',status:'INFO',reason:'Только для сведения: в ТУ категория надёжности не найдена.',act:evidence(actReliability.values),tu:[],actCandidates:actReliability.values.length,tuCandidates:0});
  }
  return findings;
 }
