@@ -3,7 +3,7 @@ import './accounts.css';
 
 type Row=Record<string,any>;
 type RoleValue={role:string;resId:string|null};
-const roleNames:Record<string,string>={RIRU_ENGINEER:'Инженер РИРУ',RIRU_HEAD:'Начальник РИРУ',RES_HEAD:'Начальник РЭС',SUE:'СУЭ',STP:'СТП',GI:'ТЕХБЛОК',TECH_ADMIN:'Технический администратор',PROCESS_ADMIN:'Администратор процесса'};
+const roleNames:Record<string,string>={RIRU_ENGINEER:'Инженер РИРУ',RIRU_HEAD:'Начальник РИРУ',RES_HEAD:'Начальник РЭС',SUE:'СУЭ',STP:'СТП',GI:'ТЕХБЛОК',SUE_ENGINEER:'Инженер СУЭ',STP_ENGINEER:'Инженер СТП',GI_ENGINEER:'Инженер ТЕХБЛОКА',TECH_ADMIN:'Технический администратор',PROCESS_ADMIN:'Администратор процесса'};
 const isScoped=(role:string)=>['RIRU_ENGINEER','RIRU_HEAD','RES_HEAD'].includes(role);
 
 function Assignment({resUnits}:{resUnits:Row[]}){

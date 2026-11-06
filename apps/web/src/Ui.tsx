@@ -16,7 +16,7 @@ const symbols:Record<string,ReactNode>={
   branch:<><path d="M5 12h5m0 0V5h9m-9 7h9m-9 0v7h9"/><circle cx="4" cy="12" r="1"/></>,logout:<><path d="M9 3H3v18h6M9 12h12m-5-5 5 5-5 5"/></>,
 };
 export function Icon({name,size=18}:{name:string;size?:number}){return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{symbols[name]??symbols.file}</svg>;}
-export const roleNames:Record<string,string>={RIRU:'РИРУ',RIRU_ENGINEER:'Инженер РИРУ',RIRU_HEAD:'Начальник РИРУ',RES_HEAD:'Начальник РЭС',SUE:'СУЭ',STP:'СТП',GI:'ТЕХБЛОК',PROCESS_ADMIN:'Администратор процесса',TECH_ADMIN:'Технический администратор',PARALLEL:'СУЭ / СТП / ТЕХБЛОК',COMPLETED:'Завершено'};
+export const roleNames:Record<string,string>={RIRU:'РИРУ',RIRU_ENGINEER:'Инженер РИРУ',RIRU_HEAD:'Начальник РИРУ',RES_HEAD:'Начальник РЭС',SUE:'СУЭ',STP:'СТП',GI:'ТЕХБЛОК',SUE_ENGINEER:'Инженер СУЭ',STP_ENGINEER:'Инженер СТП',GI_ENGINEER:'Инженер ТЕХБЛОКА',PROCESS_ADMIN:'Администратор процесса',TECH_ADMIN:'Технический администратор',PARALLEL:'СУЭ / СТП / ТЕХБЛОК',COMPLETED:'Завершено'};
 export const statusNames:Record<string,string>={DRAFT:'Черновик',IN_REVIEW:'На согласовании',COLLECTING:'Сбор замечаний',REVISING:'Пересмотр',REWORK:'На доработке',APPROVED:'Согласовано',OVERDUE:'Просрочено',REVOKED:'Отозвано'};
 export const dateTime=(value:string|null|undefined)=>value?new Date(value).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—';
 export const shortDate=(value:string|null)=>value?new Date(value).toLocaleDateString('ru-RU',{timeZone:'Europe/Moscow'}):'Не указана';

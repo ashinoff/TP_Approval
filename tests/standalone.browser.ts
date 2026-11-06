@@ -48,6 +48,18 @@ export async function runStandaloneBrowser(options:{url:string;initialPassword:s
     await page.getByRole('button',{name:'Все документы',exact:true}).click();await page.getByRole('heading',{name:'Все документы'}).waitFor();
     await page.getByRole('button',{name:'Пользователи',exact:true}).click();
     pass('Admin service menu shows database health and creates a backup; admin has «Все документы»');
+    // Структура подразделений: таблетка подразделения → должность → назначить и снять сотрудника.
+    await page.getByRole('group',{name:'Раздел пользователей'}).getByRole('button',{name:'Структура'}).click();
+    const org=page.getByRole('region',{name:'Структура подразделений'});
+    await org.getByRole('group',{name:'Подразделение'}).getByRole('button',{name:/^СУЭ/}).click();
+    await org.getByRole('group',{name:'Должность'}).getByRole('button',{name:/^Инженеры СУЭ/}).click();
+    await org.getByLabel('Сотрудник для назначения').selectOption({label:'Учебный инженер'});await org.getByRole('button',{name:'Назначить',exact:true}).click();
+    await org.locator('.org-people li').filter({hasText:'Учебный инженер'}).waitFor({timeout:15000});await page.waitForTimeout(500);
+    await page.screenshot({path:options.output+'/structure.png',fullPage:true});
+    await org.locator('.org-people li').filter({hasText:'Учебный инженер'}).getByRole('button',{name:'Снять'}).click();
+    await org.getByRole('status').filter({hasText:'снят'}).waitFor({timeout:15000});assert.equal(await org.locator('.org-people li').count(),0);
+    await page.getByRole('group',{name:'Раздел пользователей'}).getByRole('button',{name:'Сотрудники'}).click();
+    pass('Admin assigns and removes an employee in the department structure (service engineer)');
 
     await form.getByLabel('ФИО',{exact:true}).fill('Учебный второй сотрудник');await form.getByLabel('Логин',{exact:true}).fill('browser.other');
     await form.getByLabel('Email',{exact:true}).fill('BROWSER.ENGINEER@example.test');

@@ -104,7 +104,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   get('/api/v1/acts/:id/timeline',async(db,req)=>timeline(db,id.parse(req.params.id)));
   get('/api/v1/admin/directory',async db=>(await db.query('SELECT app.admin_directory() AS data')).rows[0].data);
   post('/api/v1/admin/users',async(db,req)=>{
-    const b=z.object({issuer:z.url(),subject:text,name:text,role:z.enum(['RIRU_ENGINEER','RIRU_HEAD','RES_HEAD','SUE','STP','GI','TECH_ADMIN','PROCESS_ADMIN']),resId:id.nullable()}).strict().parse(req.body);
+    const b=z.object({issuer:z.url(),subject:text,name:text,role:z.enum(['RIRU_ENGINEER','RIRU_HEAD','RES_HEAD','SUE','STP','GI','SUE_ENGINEER','STP_ENGINEER','GI_ENGINEER','TECH_ADMIN','PROCESS_ADMIN']),resId:id.nullable()}).strict().parse(req.body);
     await role(db,'TECH_ADMIN');return (await db.query('SELECT app.admin_user($1,$2,$3,$4,$5) AS id',[b.issuer,b.subject,b.name,b.role,b.resId])).rows[0];
   });
   post('/api/v1/admin/substitutions',async(db,req)=>{

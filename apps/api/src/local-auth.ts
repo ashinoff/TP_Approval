@@ -97,7 +97,7 @@ export function localAuth(pool:pg.Pool,config:LocalConfig) {
 }
 
 export const assignmentSchema=z.object({
-  role:z.enum(['RIRU_ENGINEER','RIRU_HEAD','RES_HEAD','SUE','STP','GI','TECH_ADMIN','PROCESS_ADMIN']),
+  role:z.enum(['RIRU_ENGINEER','RIRU_HEAD','RES_HEAD','SUE','STP','GI','SUE_ENGINEER','STP_ENGINEER','GI_ENGINEER','TECH_ADMIN','PROCESS_ADMIN']),
   resId:z.string().uuid().nullable()
 }).strict().refine(b=>['RIRU_ENGINEER','RIRU_HEAD','RES_HEAD'].includes(b.role)?b.resId!==null:b.role==='PROCESS_ADMIN'||b.resId===null,'Укажите РЭС для районной роли');
 

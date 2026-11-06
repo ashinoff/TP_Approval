@@ -102,7 +102,14 @@ export async function runIntegration(ownerUrl:string,runtimeUrl:string,root:stri
      await owner.query("INSERT INTO app.roles(user_id,role,res_id) VALUES($1,'RIRU_HEAD',$2)",[extra,area]);
      assert.match(await why('RIRU_HEAD',area,[]),/несколько начальников РИРУ: .*Второй начальник/);
      await owner.query("UPDATE app.roles SET revoked_at=now() WHERE user_id=$1",[extra]);
-     pass('Assignment failure explains the reason: nobody, only the author, or several employees in the RES');}
+     pass('Assignment failure explains the reason: nobody, only the author, or several employees in the RES');
+     // Инженер службы: видит документы всех РЭС, но не становится вторым кандидатом на задачу начальника службы.
+     const sueEngineer=(await owner.query("INSERT INTO app.users(issuer,subject,name) VALUES($1,'sue-engineer','Инженер СУЭ (синтетический)') RETURNING id",[config.issuer])).rows[0].id;
+     await owner.query("INSERT INTO app.roles(user_id,role,res_id) VALUES($1,'SUE_ENGINEER',NULL)",[sueEngineer]);
+     assert.ok(Number((await transaction(runtime,sueEngineer,db=>db.query('SELECT count(*) FROM app.acts'))).rows[0].count)>0,'Service engineer reads documents');
+     assert.equal(await why('SUE',area,[]),'','Service engineer does not compete with the service head for the task');
+     await assert.rejects(owner.query("INSERT INTO app.roles(user_id,role,res_id) VALUES($1,'SUE_ENGINEER',$2)",[sueEngineer,area]),/check/i);
+     pass('Service engineers read every RES and do not take the head approval task');}
     // Удаление насовсем документов с полной историей (циклы, решения, неизменяемые замечания, публикации): ничего не остаётся.
     const everything=(await owner.query('SELECT id FROM app.acts')).rows.map(r=>r.id as string);assert.ok(everything.length>0);
     const withRemarks=Number((await owner.query('SELECT count(*) FROM app.comments')).rows[0].count);assert.ok(withRemarks>0,'Fixture has immutable remarks');

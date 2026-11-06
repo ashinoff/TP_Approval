@@ -40,3 +40,18 @@
 .service-parts{display:flex;flex-wrap:wrap;gap:6px}.service-part{font-size:12.5px;border:1px solid var(--line,#dfe5ed);border-radius:999px;padding:3px 10px;display:inline-flex;gap:6px;align-items:center}
 .service-part small{color:var(--muted,#5d6a78)}
 .service-backups .upload-pill{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.users-tabs{margin-bottom:14px}
+.org-structure{padding:18px;display:grid;gap:14px}
+.org-units button,.org-slots button{display:inline-flex;align-items:center;gap:8px}
+.org-units .tab-count,.org-slots .tab-count{min-width:22px;height:22px;padding:0 7px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--brand,#3156a3);color:#fff}
+.org-units .tab-count.is-zero,.org-slots .tab-count.is-zero{background:transparent;color:#b3bccb;border:1px solid #dfe5ed}
+.org-units .tab-count.needs,.org-slots .tab-count.needs{background:#d93a2f;color:#fff}
+:is(.org-units,.org-slots) button[aria-pressed=true] .tab-count:not(.needs){background:#fff;color:var(--menu-active,#253b59)}
+.org-slot{border:1px solid #cfd6e0;border-radius:12px;padding:14px 16px;display:grid;gap:10px;background:#fff}
+.org-slot h3{margin:0}
+.org-people{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.org-people li{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid #dfe5ed;border-radius:10px;padding:8px 12px}
+.org-people small{display:block;color:var(--muted,#5d6a78)}
+.org-assign{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.org-assign label{display:grid;gap:5px;font-size:13px;min-width:280px}
+.org-assign select{padding:8px;border:1px solid var(--line,#dfe5ed);border-radius:8px}
