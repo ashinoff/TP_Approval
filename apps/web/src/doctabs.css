@@ -212,3 +212,12 @@
 .data-block>.data-title .card-missing{color:#ff9c95}
 .reference-books>.reference-head{--pad:18px}
 .service-menu>.navy-head{margin-bottom:0}
+
+/* ══ Шапки разделов «История» и «Матрица» — тёмно-синие, как у остальных карточек ══ */
+.doc-panel>.timeline-panel,.doc-panel>.approval-matrix{background:var(--surface);border:1px solid var(--line)!important;border-radius:var(--r-m);overflow:hidden;padding:0 18px 18px!important;margin:0;max-width:none;box-shadow:none}
+.doc-panel>.timeline-panel>.section-heading,.doc-panel>.approval-matrix>.matrix-toolbar{display:flex;align-items:center!important;justify-content:space-between;gap:12px;margin:0 -18px 18px!important;padding:12px 18px;background:var(--menu);color:#fff;border-radius:9px 9px 0 0}
+.doc-panel>.timeline-panel>.section-heading .eyebrow{color:#93a4be;margin:0 0 2px}
+.doc-panel>.timeline-panel>.section-heading h3,.doc-panel>.approval-matrix>.matrix-toolbar h3{margin:0;color:#fff;font-size:var(--fs-l)}
+.doc-panel>.timeline-panel>.section-heading .count-label{background:rgb(255 255 255 / .14);color:#fff;border-radius:999px;padding:3px 10px}
+.doc-panel>.approval-matrix>.matrix-toolbar .link{color:#fff;border:1px solid rgb(255 255 255 / .3);border-radius:999px;padding:5px 12px}
+.doc-panel>.approval-matrix>.matrix-toolbar .link:hover{background:rgb(255 255 255 / .1)}
