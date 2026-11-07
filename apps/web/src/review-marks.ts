@@ -5,6 +5,8 @@ const shown=(v?:Row)=>v?(v.shown??v.value):'—';
 /**
  * Отметки сверки с ТУ для одного документа: зелёный — реквизит совпадает с ТУ (или подтверждён вручную),
  * красный — расхождение, жёлтый — не удалось сопоставить, нужна проверка глазами. Справочные пункты (INFO) не красим.
+ * Синий — «одинаково во всём акте»: реквизит, совпавший с ТУ, зелёный в одном месте, остальные его места в акте синие;
+ * переменные шаблона (ТП, фидер, опора, провод…), одинаковые во всех местах акта и на схеме, — тоже синие.
  */
 export function checkMarks(check:Row|undefined,side:'act'|'tu'):BlockMark[]{
  if(!check)return [];
@@ -21,7 +23,14 @@ export function checkMarks(check:Row|undefined,side:'act'|'tu'):BlockMark[]{
    :confirmed.has(f.field)?['ok',`✓ ${f.label}: подтверждено вручную`]
    :f.status==='DIFFERENCE'?['bad',`✗ ${f.label}: расхождение — ${pair}`]
    :['warn',`? ${f.label}: проверьте вручную — ${f.reason??pair}`];
-  for(const v of values)if(v.blockId)marks.push({blockId:v.blockId,tone,title,text:v.shown??v.value});
+  const same=String(f.field).startsWith('same.');
+  values.forEach((v:Row,i:number)=>{
+   // Совпадение с ТУ — зелёным одно место акта (первое), остальные места того же значения — синим.
+   const t:BlockMark['tone']=tone==='ok'&&(same||side==='act'&&!f.norm&&f.status==='MATCH'&&i>0)?'same':tone;
+   const title2=t==='same'&&!same?`= ${f.label}: то же значение, что совпало с ТУ (${shown(v)})`:same&&tone==='ok'?`= ${f.label}: ${shown(v)}`:title;
+   if(v.area)marks.push({blockId:'',tone:t,title:title2,area:v.area});
+   else if(v.blockId)marks.push({blockId:v.blockId,tone:t,title:title2,text:v.shown??v.value});
+  });
  }
  return marks;
 }

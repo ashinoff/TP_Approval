@@ -52,3 +52,27 @@ test('Act rules: элемент схемы записан за другой ст
  assert.equal(f.status,'MANUAL_REVIEW');assert.match(f.reason,/СИП 4х16/);
  assert.equal(byField(actFindings({blocks:missing as any})).boundaryScheme,undefined,'No red line — no boundary finding');
 });
+
+test('Act rules: место границы по рисунку сверяется с описанием',()=>{
+ const desc=description('- контакты присоединения СИП 4х16 L=9м заявителя от опоры №7 ВЛ-0,4кВ ф. «Лесной» ТП-Б12 сетевой организации в сторону ВРУ-0,4кВ заявителя');
+ const on=(o:object)=>byField(actFindings({blocks:[...desc,...scheme] as any,boundaries:[{...boundaries[0],on:o}] as any})).boundaryPlace;
+ const pole=on({kind:'pole',box:[290,596,302,608]});
+ assert.equal(pole.status,'MATCH');assert.deepEqual(pole.act[0].area,{page:2,box:[290,596,302,608]});
+ assert.equal(on({kind:'box',label:'ВРУ-0,4 кВ Заявителя',box:[0,0,1,1]}).status,'DIFFERENCE');
+ const tpDesc=description('- контакты подключения КЛ-0,23 кВ ВВГ 2х4 L=3 м заявителя от ВУ-0,4 кВ ж/д по ул. Северная, 16, ТП-176 сетевой организации в сторону ВРУ-0,23 кВ заявителя');
+ const tp=byField(actFindings({blocks:tpDesc as any,boundaries:[{...boundaries[0],on:{kind:'box',label:'ВУ-0,4 кВ ж.д. по ул. Северная, 16 ТП-176 СРЭС',box:[0,0,1,1]}}] as any})).boundaryPlace;
+ assert.equal(tp.status,'MATCH');assert.match(tp.reason,/РУ\/ВУ ТП/);
+ assert.equal(byField(actFindings({blocks:desc as any,boundaries})).boundaryPlace.status,'INFO','Line not on a pole or a box — a person looks');
+});
+
+test('Act rules: единообразие переменных шаблона по всему акту',()=>{
+ const blocks=[block('a','ВРУ-0,23 кВ, КЛ-0,23 кВ ВВГ 2х4 L=3 м, ВА 40 А'),block('b','контакты подключения ВВГ 2х4 L=3 м от ВУ-0,4 кВ ТП-176 в сторону ВРУ-0,23 кВ'),
+  block('c','ВРУ-0,22 кВ Герун Ж.И. Р=7 кВт'),block('d','ВА 40 А'),block('e','ВУ-0,4 кВ ж.д. по ул. Северная, 16 ТП-176 СРЭС')];
+ const f=byField(actFindings({blocks:blocks as any}));
+ assert.equal(f['same.ВРУ'].status,'MATCH','0,22 and 0,23 kV are the same voltage');
+ assert.equal(f['same.ТП'].status,'MATCH');assert.equal(f['same.вводной автомат'].status,'MATCH');assert.equal(f['same.длина провода'].status,'MATCH');
+ const old=byField(actFindings({blocks:[...blocks,block('x','фидер «Альпийская» ТП-47 СРЭС, ВА 25 А')] as any}));
+ assert.equal(old['same.ТП'].status,'MANUAL_REVIEW');assert.match(old['same.ТП'].reason,/ТП-176 \(2 места\), ТП-47 \(1 место\)/);
+ assert.equal(old['same.ТП'].act[0].shown,'ТП-47','The odd value comes first');
+ assert.equal(old['same.вводной автомат'].status,'MANUAL_REVIEW');
+});

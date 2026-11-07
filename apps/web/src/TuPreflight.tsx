@@ -18,7 +18,7 @@ function Evidence({side,values,onJump,tone}:{side:string;values:Row[];onJump?:Ju
  const once=values.filter((v,i)=>values.findIndex(x=>shown(x)===shown(v))===i);
  return <>{once.map((v,i)=><p className="tu-evidence" key={i}>
   <span>{side}</span>
-  {onJump?<button type="button" className="tu-quote" title={v.quote} onClick={()=>onJump(v.blockId,side==='ТУ'?'tu':'act',v.shown??v.value,tone)}>{shown(v)}</button>:<q title={v.quote}>{shown(v)}</q>}
+  {onJump&&v.blockId?<button type="button" className="tu-quote" title={v.quote} onClick={()=>onJump(v.blockId,side==='ТУ'?'tu':'act',v.shown??v.value,tone)}>{shown(v)}</button>:<q title={v.quote}>{shown(v)}</q>}
  </p>)}</>;
 }
 

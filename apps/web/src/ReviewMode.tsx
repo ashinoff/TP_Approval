@@ -120,7 +120,7 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
       {detail.versions.map((v:Row)=><option key={v.id} value={v.id}>{kind} · версия {v.number}{v.id===newest?.id?' · последняя':''}</option>)}
      </select>
     </div>
-    {showMarks&&(leftMarks.length>0)&&<div className="mark-legend review-legend">{rightVersion?<span><i className="changed"/>отличается от версии {rightVersion.number}</span>:<><span><i className="ok"/>совпадает с ТУ</span><span><i className="bad"/>расхождение</span><span><i className="warn"/>проверить вручную</span>{pairedTu&&<span className="legend-hint">клик по пункту — парный пункт в ТУ</span>}</>}</div>}
+    {showMarks&&(leftMarks.length>0)&&<div className="mark-legend review-legend">{rightVersion?<span><i className="changed"/>отличается от версии {rightVersion.number}</span>:<><span><i className="ok"/>совпадает с ТУ</span><span><i className="bad"/>расхождение</span><span><i className="warn"/>проверить вручную</span><span><i className="same"/>одинаково во всём акте</span>{pairedTu&&<span className="legend-hint">клик по пункту — парный пункт в ТУ</span>}</>}</div>}
     {leftDoc.data?<DocumentViewer key={versionId} ref={left} bytes={leftDoc.data.bytes} model={leftDoc.data.model} comments={versionNotes} onSelection={setSelection} onComment={id=>{setFocused(id);setPanel(true);setTab('remarks');}} focusedId={focused} focusRequest={focusRequest} onScrollRatio={sync?r=>right.current?.scrollToRatio(r):undefined} marks={leftMarks} onMarkClick={pairedTu?pairFromLeft:undefined} onAddRemark={addRemark} remarkBlocked={blocked}/>:viewerTitle(leftDoc,kind)}
    </section>
    <section className="review-pane" aria-label="Документ для сравнения">

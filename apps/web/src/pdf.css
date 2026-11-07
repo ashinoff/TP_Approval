@@ -19,12 +19,16 @@
 .pdf-mark,.pdf-check-hit,.pdf-search-hit,.pdf-value-hit,.pdf-jump,.pdf-remark{position:absolute;border-radius:3px;box-sizing:border-box}
 .pdf-mark[data-mark=ok]{background:rgb(46 157 91 / .16);box-shadow:inset 0 -2px 0 rgb(46 157 91 / .55)}
 .pdf-mark[data-mark=bad]{background:rgb(217 58 47 / .18);box-shadow:inset 0 -2px 0 rgb(217 58 47 / .7)}
-.pdf-mark[data-mark=warn]{background:rgb(217 154 0 / .2);box-shadow:inset 0 -2px 0 rgb(217 154 0 / .7)}
+.pdf-mark[data-mark=warn]{background:rgb(240 190 60 / .14);box-shadow:inset 0 -2px 0 rgb(217 154 0 / .6)}
+.pdf-mark[data-mark=same]{background:rgb(49 86 163 / .12);box-shadow:inset 0 -2px 0 rgb(49 86 163 / .55)}
+.pdf-below>*{mix-blend-mode:multiply}
+.pdf-area{position:absolute;box-sizing:border-box;border-radius:8px;border:2px dashed currentColor;background:transparent}
+.pdf-area[data-mark=ok]{color:rgb(46 157 91)}.pdf-area[data-mark=same]{color:rgb(49 86 163)}.pdf-area[data-mark=bad]{color:rgb(217 58 47)}.pdf-area[data-mark=warn]{color:rgb(217 154 0)}
 .pdf-mark[data-mark=changed]{background:rgb(49 86 163 / .14)}
 .mark-click .textLayer span{cursor:pointer}
 .pdf-check-hit{background:rgb(255 213 74 / .35)}
 .pdf-search-hit{outline:2px solid #d7a82e}
-.pdf-value-hit{background:rgb(255 213 74 / .75)}
+.pdf-value-hit{background:rgb(255 213 74 / .35)}
 .pdf-jump{border:3px solid #3156a3;border-radius:6px;animation:pdf-jump 1s ease-out 2}
 .pdf-jump[data-jump=ok]{border-color:#2e9d5b}.pdf-jump[data-jump=bad]{border-color:#d93a2f}.pdf-jump[data-jump=warn]{border-color:#d99a00}
 @keyframes pdf-jump{0%{transform:scale(1.08);opacity:0}100%{transform:scale(1);opacity:1}}

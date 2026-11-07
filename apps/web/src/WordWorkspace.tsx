@@ -171,7 +171,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
        <button className="danger-button" disabled={!effective||!selection||busy} onClick={()=>{if(selection){setForm(selection);dirty('remark',true);}}}>Добавить замечание</button>
       </div>
       {effective&&!selection&&!form&&<p className="helper-text">Выделите мышью текст в документе (внутри одного абзаца) — рядом появится кнопка «＋ Замечание».</p>}
-      {actMarks.length>0&&<div className="mark-legend"><span><i className="ok"/>совпадает с ТУ</span><span><i className="bad"/>расхождение</span><span><i className="warn"/>проверить вручную</span></div>}
+      {actMarks.length>0&&<div className="mark-legend"><span><i className="ok"/>совпадает с ТУ</span><span><i className="bad"/>расхождение</span><span><i className="warn"/>проверить вручную</span><span><i className="same"/>одинаково во всём акте</span></div>}
       {notes.length>1&&<div className="note-filter" role="group" aria-label="Фильтр замечаний">
        {([['all','Все'],['open','Открытые'],['waiting','Ждут проверки'],['mine','Мои']] as const).map(([key,label])=><button key={key} type="button" aria-pressed={noteFilter===key} onClick={()=>setNoteFilter(key)}>{label}</button>)}
       </div>}

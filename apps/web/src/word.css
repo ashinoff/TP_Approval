@@ -11,5 +11,5 @@
 .float-remark:hover{background:#a51f1f}
 .mark-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:#5d7381;align-items:center}
 .mark-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
-.mark-legend .ok{background:#3c9a63}.mark-legend .bad{background:#c62828}.mark-legend .warn{background:#d99a1e}.mark-legend .changed{background:#2f7fd0}
+.mark-legend .ok{background:#3c9a63}.mark-legend .bad{background:#c62828}.mark-legend .warn{background:#d99a1e}.mark-legend .changed{background:#2f7fd0}.mark-legend .same{background:#3156a3}
 .float-remark.float-blocked{background:#7a8f9b}.float-remark.float-hint{background:#fff;color:#5d4a12;border:1px solid #e9c46a;cursor:default;font-weight:500}

@@ -17,7 +17,9 @@ import type {Block} from './documents.js';
 export type PdfSpan={item:number;start:number;end:number;box:[number,number,number,number]};
 export type PdfBlock=Block&{page:number;spans:PdfSpan[]};
 /** Красная линия границы балансовой принадлежности на схеме: горизонталь на странице и сторона сетевой организации. */
-export type PdfBoundary={page:number;y:number;x0:number;x1:number;networkAbove:boolean};
+export type PdfBoundary={page:number;y:number;x0:number;x1:number;networkAbove:boolean;
+ /** На чём граница по рисунку: кружок опоры или рамка (подпись внутри: «РУ-0,4 кВ ТП-…», «ВРУ-0,4 кВ…»). */
+ on?:{kind:'pole'|'box';label?:string;box:[number,number,number,number]}};
 export type PdfModel={sha256:string;format:'pdf';pages:{width:number;height:number}[];blocks:PdfBlock[];boundaries:PdfBoundary[]};
 
 const MAX_PAGES=60;
@@ -76,14 +78,18 @@ function tableCells(ops:Ops){
  return {h,v};
 }
 /**
- * Граница на схеме — красная горизонтальная линия (в бланках Россети — обводка толщиной от 1 pt). Учитываются
- * матрицы преобразования и вложенные формы (схема Visio вставлена в PDF как форма со своим масштабом).
+ * Схема: красные линии (граница), кружки (опоры) и рамки (ТП/РУ/ВУ, ВРУ) в координатах страницы. Учитываются
+ * матрицы преобразования и вложенные формы (схема из Visio попадает в PDF формой со своим масштабом).
+ * Граница бывает двух видов: прямая красная линия поперёк присоединения или две красные стрелки-ломаные,
+ * сходящиеся в точке границы, — тогда граница — эта точка.
  */
-function redLines(ops:Ops){
+type Pt=[number,number];
+function schemeShapes(ops:Ops){
  const O=pdfjs.OPS;type M=[number,number,number,number,number,number];let ctm:M=[1,0,0,1,0,0];const stack:M[]=[];
  const mul=(m:M,n:M):M=>[m[0]*n[0]+m[2]*n[1],m[1]*n[0]+m[3]*n[1],m[0]*n[2]+m[2]*n[3],m[1]*n[2]+m[3]*n[3],m[0]*n[4]+m[2]*n[5]+m[4],m[1]*n[4]+m[3]*n[5]+m[5]];
- const at=(x:number,y:number):[number,number]=>[ctm[0]*x+ctm[2]*y+ctm[4],ctm[1]*x+ctm[3]*y+ctm[5]];
- let color:ArrayLike<number>=[0,0,0],width=1;const lines:{y:number;x0:number;x1:number}[]=[];
+ const at=(x:number,y:number):Pt=>[ctm[0]*x+ctm[2]*y+ctm[4],ctm[1]*x+ctm[3]*y+ctm[5]];
+ let color:ArrayLike<number>=[0,0,0],width=1;
+ const red:{points:Pt[];horizontal?:{y:number;x0:number;x1:number}}[]=[],circles:{cx:number;cy:number;r:number}[]=[],boxes:{x0:number;y0:number;x1:number;y1:number}[]=[];
  for(let i=0;i<ops.fnArray.length-1;i++){
   const fn=ops.fnArray[i],args=ops.argsArray[i];
   if(fn===O.save){stack.push(ctm);continue;}
@@ -93,13 +99,34 @@ function redLines(ops:Ops){
   if(fn===O.paintFormXObjectEnd){ctm=stack.pop()??[1,0,0,1,0,0];continue;}
   if(fn===O.setStrokeRGBColor){color=args as ArrayLike<number>;continue;}
   if(fn===O.setLineWidth){width=args[0];continue;}
-  if(fn!==O.constructPath||![O.stroke,O.closeStroke].includes(ops.fnArray[i+1]))continue;
-  if(!(color[0]>=180&&color[1]<=90&&color[2]<=90)||width*Math.abs(ctm[3]||ctm[0])<0.9)continue;
-  const m=args[2] as number[];if(!m)continue;
-  const [ax,ay]=at(m[0],m[1]),[bx,by]=at(m[2],m[3]);
-  if(Math.abs(by-ay)<2&&Math.abs(bx-ax)>=40)lines.push({y:(ay+by)/2,x0:Math.min(ax,bx),x1:Math.max(ax,bx)});
+  const paint=ops.fnArray[i+1];
+  if(fn!==O.constructPath||![O.stroke,O.closeStroke,O.fill,O.eoFill,O.fillStroke,O.eoFillStroke].includes(paint))continue;
+  // Точки пути по командам (у кривых pdf.js не считает габарит — считаем сами по опорным точкам).
+  const kinds=args[0] as number[],coords=args[1] as number[];const points:Pt[]=[];let c=0,curve=false,rect=false;
+  for(const k of kinds){
+   if(k===O.moveTo||k===O.lineTo){points.push(at(coords[c],coords[c+1]));c+=2;}
+   else if(k===O.curveTo){curve=true;for(let j=0;j<3;j++)points.push(at(coords[c+j*2],coords[c+j*2+1]));c+=6;}
+   else if(k===O.curveTo2||k===O.curveTo3){curve=true;points.push(at(coords[c],coords[c+1]),at(coords[c+2],coords[c+3]));c+=4;}
+   else if(k===O.rectangle){rect=true;const [x,y,w,h]=coords.slice(c,c+4);points.push(at(x,y),at(x+w,y+h));c+=4;}
+  }
+  if(!points.length)continue;
+  const xs=points.map(q=>q[0]),ys=points.map(q=>q[1]);const [x0,x1,y0,y1]=[Math.min(...xs),Math.max(...xs),Math.min(...ys),Math.max(...ys)];
+  const stroked=paint!==O.fill&&paint!==O.eoFill;
+  if(stroked&&color[0]>=180&&color[1]<=90&&color[2]<=90&&width*Math.abs(ctm[3]||ctm[0])>=0.9){
+   red.push({points,horizontal:y1-y0<2&&x1-x0>=40?{y:(y0+y1)/2,x0,x1}:undefined});continue;
+  }
+  if(curve&&x1-x0>=4&&x1-x0<=26&&Math.abs((x1-x0)-(y1-y0))<3)circles.push({cx:(x0+x1)/2,cy:(y0+y1)/2,r:(x1-x0)/2});
+  else if(stroked&&rect&&x1-x0>=40&&y1-y0>=25)boxes.push({x0,y0,x1,y1});
  }
- return lines;
+ // Точки границы: прямые красные линии; иначе — общая точка двух красных ломаных (стрелки «сеть / заявитель»).
+ const lines=red.flatMap(r=>r.horizontal?[r.horizontal]:[]);
+ if(!lines.length){
+  let best:{d:number;p:Pt}|undefined;
+  for(let a=0;a<red.length;a++)for(let b=a+1;b<red.length;b++)for(const p of red[a].points)for(const q of red[b].points){
+   const d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<4&&(!best||d<best.d))best={d,p:[(p[0]+q[0])/2,(p[1]+q[1])/2]};}
+  if(best)lines.push({y:best.p[1],x0:best.p[0],x1:best.p[0]});
+ }
+ return {lines,circles,boxes};
 }
 function cellOf(x:number,y:number,lines:{h:number[][];v:number[][]}):Cell|undefined{
  const near=1;
@@ -140,10 +167,18 @@ export async function pdfModel(bytes:Uint8Array):Promise<PdfModel>{
    const visible=items.filter(it=>it.y>vy0+EDGE&&it.y<vy1-EDGE&&it.x>vx0+EDGE/2&&it.x<vx1-EDGE/2);
    const ops=await page.getOperatorList();const borders=tableCells(ops);
    // Сторона сетевой организации — по подписи у стрелки границы («Сетевая организация» выше или ниже линии).
-   for(const line of redLines(ops)){
+   const shapes=schemeShapes(ops);
+   for(const line of shapes.lines){
     const label=(re:RegExp)=>items.find(it=>re.test(it.str)&&Math.abs(it.y-line.y)<60&&it.x>line.x0-80&&it.x<line.x1+80);
     const net=label(/^\s*Сетев/u),app=label(/^\s*Заявител/u);
-    boundaries.push({page:n,y:line.y,x0:line.x0,x1:line.x1,networkAbove:net?net.y>line.y:app?app.y<line.y:true});
+    // На чём стоит граница: кружок опоры, через который (или по краю которого) проходит линия; иначе — край рамки
+    // ТП/РУ/ВУ или ВРУ (подпись — текст внутри рамки).
+    const pole=shapes.circles.find(c=>Math.abs(c.cy-line.y)<=c.r+3&&c.cx>=line.x0-c.r-3&&c.cx<=line.x1+c.r+3);
+    const box=pole?undefined:shapes.boxes.map(b=>({b,d:Math.min(Math.abs(b.y1-line.y),Math.abs(b.y0-line.y),line.y>b.y0&&line.y<b.y1?0:Infinity)}))
+     .filter(({b,d})=>d<=6&&b.x0<=line.x1+3&&b.x1>=line.x0-3).sort((p,q)=>p.d-q.d)[0]?.b;
+    const boxText=box?items.filter(it=>it.str.trim()&&it.x>=box.x0-1&&it.x<=box.x1+1&&it.y>=box.y0-1&&it.y<=box.y1+1).sort((p,q)=>q.y-p.y||p.x-q.x).map(it=>it.str).join(' ').replace(/\s+/g,' ').trim():undefined;
+    boundaries.push({page:n,y:line.y,x0:line.x0,x1:line.x1,networkAbove:net?net.y>line.y:app?app.y<line.y:true,
+     on:pole?{kind:'pole',box:[pole.cx-pole.r,pole.cy-pole.r,pole.cx+pole.r,pole.cy+pole.r]}:box?{kind:'box',label:boxText,box:[box.x0,box.y0,box.x1,box.y1]}:undefined});
    }
    // Куски в ячейках таблиц — отдельно; остальное — строками.
    const cells=new Map<string,{cell:Cell;items:Item[]}>();const free:Item[]=[];

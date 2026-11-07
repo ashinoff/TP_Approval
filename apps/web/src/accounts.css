@@ -78,3 +78,10 @@
 .ref-ct.none{color:var(--muted,#6b778a);border-style:dashed}
 .ref-empty{cursor:default;color:var(--muted,#6b778a)}
 @media (max-width:760px){.ref-picker{grid-template-columns:1fr}.ref-scale li{grid-template-columns:1fr auto;gap:6px 10px}.ref-bar{grid-column:1/-1;order:3}}
+.login-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px 16px;background:var(--paper,#f3f5f9)}
+.login-screen .login-card{width:100%;margin:0}
+.login-screen>.error{width:100%;max-width:480px}
+.login-brand{display:flex;align-items:center;gap:12px;color:var(--menu,#142238);font-size:30px;font-weight:800;line-height:1}
+.login-brand span{display:block;font-size:11px;letter-spacing:.18em;font-weight:700;margin-top:4px;color:var(--ink-2,#4a5870)}
+.login-brand .rosseti-mark{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;background:var(--brand,#3156a3);color:#fff}
+.login-brand .rosseti-mark svg{width:24px;height:24px}
