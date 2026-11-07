@@ -118,6 +118,8 @@ button:not([class]),.review-verify button,.note-actions button,.card-actions but
 .zoom-control .zoom-fit{border-left:1px solid var(--line);border-radius:0 999px 999px 0}
 .float-remark{background:var(--brand)!important}.float-remark:hover{background:var(--brand-hover)!important}
 .float-remark.float-blocked{background:#8a95a8!important}
+/* Подсказка у выделения — не кнопка: белая плашка с тёмным текстом (раньше синий фон темы перекрывал её, текст терялся). */
+.float-remark.float-hint{background:#fff!important;color:var(--ink)!important;border:1px solid #e9c46a!important;box-shadow:0 4px 12px #0002}
 .upload-pill{border-style:solid!important;border-width:1px!important}
 
 /* ===== 06.11.2026: фирменный знак, контуры, вкладки документов (решение владельца) ===== */

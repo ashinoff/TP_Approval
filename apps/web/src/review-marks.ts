@@ -21,7 +21,7 @@ export function checkMarks(check:Row|undefined,side:'act'|'tu'):BlockMark[]{
    :confirmed.has(f.field)?['ok',`✓ ${f.label}: подтверждено вручную`]
    :f.status==='DIFFERENCE'?['bad',`✗ ${f.label}: расхождение — ${pair}`]
    :['warn',`? ${f.label}: проверьте вручную — ${f.reason??pair}`];
-  for(const v of values)if(v.blockId)marks.push({blockId:v.blockId,tone,title});
+  for(const v of values)if(v.blockId)marks.push({blockId:v.blockId,tone,title,text:v.shown??v.value});
  }
  return marks;
 }

@@ -54,7 +54,8 @@ function valueRange(doc:Document,p:HTMLElement,text:string){
  const at=(offset:number):[Text,number]=>{let rest=offset;for(const t of nodes){if(rest<=t.length)return [t,rest];rest-=t.length;}const last=nodes.at(-1)!;return [last,last.length];};
  const range=doc.createRange();range.setStart(...at(m.index));range.setEnd(...at(m.index+m[0].length));return range;
 }
-export type BlockMark={blockId:string;tone:'ok'|'bad'|'warn'|'changed';title:string};
+/** text — значение внутри абзаца: PDF отмечает только его (если нашлось), DOCX — абзац целиком. */
+export type BlockMark={blockId:string;tone:'ok'|'bad'|'warn'|'changed';title:string;text?:string};
 export type JumpHit={text?:string;tone?:'ok'|'bad'|'warn'};
 export type DocumentViewerHandle={scrollToBlock:(blockId:string,hit?:JumpHit)=>void;pointAt:(blockId:string,hit?:JumpHit)=>void;highlightBlocks:(blockIds:string[])=>void;scrollToRatio:(ratio:number)=>void};
 function DocxViewer({bytes,model,comments,onSelection,onComment,focusedId,focusRequest,onScrollRatio,marks,onMarkClick,onAddRemark,remarkBlocked,ref}:{bytes:ArrayBuffer;model:Row;comments:Row[];onSelection:(a:SelectionAnchor|null)=>void;onComment:(id:string)=>void;focusedId?:string;focusRequest?:number;onScrollRatio?:(ratio:number)=>void;marks?:BlockMark[];onMarkClick?:(blockId:string)=>void;onAddRemark?:()=>void;remarkBlocked?:string;ref?:Ref<DocumentViewerHandle>}){

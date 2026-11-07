@@ -94,9 +94,10 @@ try{
  await review.getByRole('button',{name:'Завершить проверку'}).click();
  // Справочники номиналов видны инженеру только для чтения.
  await page.getByRole('button',{name:'Справочники'}).click();
- const books=page.getByRole('region',{name:'Справочники'});await books.getByRole('cell',{name:'100/5'}).first().waitFor();
+ const books=page.getByRole('region',{name:'Справочники'});await books.getByText('ТТ ≥ 100/5').first().waitFor();
+ await books.getByLabel('Мощность объекта, кВт').fill('15');await books.getByText(/не выше \d+ А/).waitFor();
  assert.equal(await books.getByRole('button',{name:'Редактировать'}).count(),0,'Engineer must not edit reference books');
- await books.getByRole('button',{name:'Сечения провода'}).click();await books.getByText('Применяется к маркам').waitFor();await page.waitForTimeout(400);await shot('03c-references');
+ await books.getByRole('button',{name:'ВЛ и КЛ'}).click();await books.getByText('Применяется к маркам').waitFor();await page.waitForTimeout(400);await shot('03c-references');
  // Ссылка на недоступный документ (как у администратора со старой вкладкой): один раз сообщение и переход к списку.
  await page.evaluate(()=>{location.hash='#/acts/00000000-0000-4000-8000-000000000000?section=documents';});
  await page.getByRole('alert').filter({hasText:'Документ по ссылке не найден'}).waitFor();

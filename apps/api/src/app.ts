@@ -1,5 +1,6 @@
 import express from 'express';
 import helmet from 'helmet';
+import compression from 'compression';
 import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
 import multer from 'multer';
@@ -48,6 +49,8 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   };
   const app=express(); app.disable('x-powered-by');
   if(config.trustProxyHops)app.set('trust proxy',config.trustProxyHops);
+  // JSON модели документа (координаты слов PDF) сжимается в 5–8 раз; уже сжатые PDF/PNG/ZIP compression не трогает.
+  app.use(compression());
   app.use(helmet({contentSecurityPolicy:{directives:{frameAncestors:[config.authMode==='local'?"'self'":config.platformOrigin]}},frameguard:false}));
   app.use(cors({origin:config.authMode==='local'?false:config.platformOrigin,allowedHeaders:['Authorization','Content-Type','Idempotency-Key'],methods:['GET','POST','OPTIONS']}));
   const rateMessage={error:{code:'RATE_LIMITED',message:'Слишком много запросов. Подождите минуту и обновите данные.'}};

@@ -66,9 +66,20 @@ export function xmlBlocks(xml:string,part:string):Block[]{
  };
  walk(tree);return blocks;
 }
-export async function documentModel(bytes:Buffer):Promise<{sha256:string;format:'docx'|'pdf';blocks:Block[];pages?:{width:number;height:number}[]}>{
+type DocumentModel={sha256:string;format:'docx'|'pdf';blocks:Block[];pages?:{width:number;height:number}[];boundaries?:unknown[]};
+async function buildModel(bytes:Buffer):Promise<DocumentModel>{
  if(isPdf(bytes))return pdfModel(bytes);
  const parts=await validateDocx(bytes);const blocks:Block[]=[];for(const [part,xml]of parts)if(/^word\/(document|header\d+|footer\d+)\.xml$/.test(part))blocks.push(...xmlBlocks(xml.toString('utf8'),part));return {sha256:hash(bytes),format:'docx',blocks};
+}
+// Модель зависит только от байтов файла (поданные версии неизменяемы), а разбор PDF — самая долгая часть открытия
+// документа и сверки: последние модели держим в памяти по хешу. Ошибка разбора не кэшируется.
+const models=new Map<string,Promise<DocumentModel>>();const MODEL_CACHE=40;
+export function documentModel(bytes:Buffer):Promise<DocumentModel>{
+ const key=hash(bytes);const hit=models.get(key);
+ if(hit){models.delete(key);models.set(key,hit);return hit;}
+ const built=buildModel(bytes);models.set(key,built);built.catch(()=>models.delete(key));
+ while(models.size>MODEL_CACHE)models.delete(models.keys().next().value!);
+ return built;
 }
 export const anchorSchema=z.object({kind:z.literal('OOXML_PARAGRAPH_V1'),part:z.string().max(100),blockId:z.string().max(150),blockHash:z.string().regex(/^[a-f0-9]{64}$/),fileHash:z.string().regex(/^[a-f0-9]{64}$/),start:z.number().int().min(0),end:z.number().int().min(1),quote:z.string().min(1).max(5000)}).strict();
 export function checkAnchor(model:{sha256:string;blocks:Block[]},anchor:z.infer<typeof anchorSchema>){const block=model.blocks.find(b=>b.id===anchor.blockId&&b.part===anchor.part);if(anchor.fileHash!==model.sha256||!block||block.sha256!==anchor.blockHash||anchor.end<=anchor.start||block.text.slice(anchor.start,anchor.end)!==anchor.quote||anchor.end>block.text.length)throw new HttpError(409,'ANCHOR_MISMATCH','Привязка не соответствует исходному DOCX. Выделите фрагмент заново.');}

@@ -6,6 +6,7 @@ import {audit,lockAct,role,revision} from './workflow.js';
 import {documentModel} from './documents.js';
 import {compareRequisites,findingsPass,BLOCKING_STATUSES,CONFIRMABLE_STATUSES} from './tu-rules.js';
 import {nominalFindings} from './nominal-rules.js';
+import {actFindings} from './act-rules.js';
 import {currentRulesVersion,loadReferences,rulesVersion} from './references.js';
 
 const PREPARATION_STATES=['DRAFT','RETURNED','REVISING'];
@@ -30,7 +31,7 @@ export async function checkTechnicalConditions(db:DB,storage:string,actId:string
  // Номиналы (ВА, ТТ, сечение) — по справочникам администратора; фазность и мощность из карточки, если заполнены.
  const refs=await loadReferences(db);
  const card=Object.fromEntries((await db.query('SELECT field_code,value FROM app.card_values WHERE act_id=$1',[a.id])).rows.map(r=>[r.field_code,r.value]));
- const findings=[...compareRequisites(models[0].blocks,models[1].blocks,a.contract_number),...nominalFindings(models[0].blocks,models[1].blocks,refs,{phases:card.phases,powerKw:card.power_kw})];
+ const findings=[...compareRequisites(models[0].blocks,models[1].blocks,a.contract_number),...nominalFindings(models[0].blocks,models[1].blocks,refs,{phases:card.phases,powerKw:card.power_kw}),...actFindings(models[0] as Parameters<typeof actFindings>[0])];
  const status=findingsPass(findings)?'PASS':'BLOCKED';
  const result=(await db.query('INSERT INTO app.tu_checks(act_id,version_id,technical_conditions_id,act_hash,tu_hash,rules_version,status,findings,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,app.uid()) RETURNING *',[a.id,versionId,s.tu.id,s.version.sha256,s.tu.sha256,rulesVersion(refs),status,JSON.stringify(findings)])).rows[0];
  await audit(db,a.id,'TU_CHECKED',{checkId:result.id,versionId,technicalConditionsId:s.tu.id,status});

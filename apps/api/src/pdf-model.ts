@@ -16,7 +16,9 @@ import type {Block} from './documents.js';
  */
 export type PdfSpan={item:number;start:number;end:number;box:[number,number,number,number]};
 export type PdfBlock=Block&{page:number;spans:PdfSpan[]};
-export type PdfModel={sha256:string;format:'pdf';pages:{width:number;height:number}[];blocks:PdfBlock[]};
+/** Красная линия границы балансовой принадлежности на схеме: горизонталь на странице и сторона сетевой организации. */
+export type PdfBoundary={page:number;y:number;x0:number;x1:number;networkAbove:boolean};
+export type PdfModel={sha256:string;format:'pdf';pages:{width:number;height:number}[];blocks:PdfBlock[];boundaries:PdfBoundary[]};
 
 const MAX_PAGES=60;
 const EDGE=12;
@@ -53,8 +55,9 @@ export async function validatePdf(bytes:Uint8Array){
 }
 
 /** Ячейки таблиц по рамкам: вертикальные и горизонтальные тонкие заливки страницы. */
-async function tableCells(page:Awaited<ReturnType<Awaited<ReturnType<typeof load>>['getPage']>>){
- const ops=await page.getOperatorList();const O=pdfjs.OPS;
+type Ops=Awaited<ReturnType<Awaited<ReturnType<Awaited<ReturnType<typeof load>>['getPage']>>['getOperatorList']>>;
+function tableCells(ops:Ops){
+ const O=pdfjs.OPS;
  const h:number[][]=[],v:number[][]=[];
  // Текущая матрица преобразования (save/restore/transform): рамки могут рисоваться со сдвигом системы координат.
  type M=[number,number,number,number,number,number];let ctm:M=[1,0,0,1,0,0];const stack:M[]=[];
@@ -71,6 +74,32 @@ async function tableCells(page:Awaited<ReturnType<Awaited<ReturnType<typeof load
   if(y1-y0<1.6&&x1-x0>3)h.push([x0,(y0+y1)/2,x1]);else if(x1-x0<1.6&&y1-y0>3)v.push([(x0+x1)/2,y0,y1]);
  }
  return {h,v};
+}
+/**
+ * Граница на схеме — красная горизонтальная линия (в бланках Россети — обводка толщиной от 1 pt). Учитываются
+ * матрицы преобразования и вложенные формы (схема Visio вставлена в PDF как форма со своим масштабом).
+ */
+function redLines(ops:Ops){
+ const O=pdfjs.OPS;type M=[number,number,number,number,number,number];let ctm:M=[1,0,0,1,0,0];const stack:M[]=[];
+ const mul=(m:M,n:M):M=>[m[0]*n[0]+m[2]*n[1],m[1]*n[0]+m[3]*n[1],m[0]*n[2]+m[2]*n[3],m[1]*n[2]+m[3]*n[3],m[0]*n[4]+m[2]*n[5]+m[4],m[1]*n[4]+m[3]*n[5]+m[5]];
+ const at=(x:number,y:number):[number,number]=>[ctm[0]*x+ctm[2]*y+ctm[4],ctm[1]*x+ctm[3]*y+ctm[5]];
+ let color:ArrayLike<number>=[0,0,0],width=1;const lines:{y:number;x0:number;x1:number}[]=[];
+ for(let i=0;i<ops.fnArray.length-1;i++){
+  const fn=ops.fnArray[i],args=ops.argsArray[i];
+  if(fn===O.save){stack.push(ctm);continue;}
+  if(fn===O.restore){ctm=stack.pop()??[1,0,0,1,0,0];continue;}
+  if(fn===O.transform){ctm=mul(ctm,args as M);continue;}
+  if(fn===O.paintFormXObjectBegin){stack.push(ctm);if(args?.[0])ctm=mul(ctm,args[0] as M);continue;}
+  if(fn===O.paintFormXObjectEnd){ctm=stack.pop()??[1,0,0,1,0,0];continue;}
+  if(fn===O.setStrokeRGBColor){color=args as ArrayLike<number>;continue;}
+  if(fn===O.setLineWidth){width=args[0];continue;}
+  if(fn!==O.constructPath||![O.stroke,O.closeStroke].includes(ops.fnArray[i+1]))continue;
+  if(!(color[0]>=180&&color[1]<=90&&color[2]<=90)||width*Math.abs(ctm[3]||ctm[0])<0.9)continue;
+  const m=args[2] as number[];if(!m)continue;
+  const [ax,ay]=at(m[0],m[1]),[bx,by]=at(m[2],m[3]);
+  if(Math.abs(by-ay)<2&&Math.abs(bx-ax)>=40)lines.push({y:(ay+by)/2,x0:Math.min(ax,bx),x1:Math.max(ax,bx)});
+ }
+ return lines;
 }
 function cellOf(x:number,y:number,lines:{h:number[][];v:number[][]}):Cell|undefined{
  const near=1;
@@ -102,14 +131,20 @@ function joinItems(items:Item[],spans:PdfSpan[],offset:number){
 export async function pdfModel(bytes:Uint8Array):Promise<PdfModel>{
  const doc=await load(bytes);
  try{
-  const pages:PdfModel['pages']=[];const blocks:PdfBlock[]=[];let tables=0;
+  const pages:PdfModel['pages']=[];const blocks:PdfBlock[]=[];const boundaries:PdfBoundary[]=[];let tables=0;
   for(let n=1;n<=doc.numPages;n++){
    const page=await doc.getPage(n);const [vx0,vy0,vx1,vy1]=page.view;pages.push({width:vx1-vx0,height:vy1-vy0});
    const content=await page.getTextContent();
    const items:Item[]=content.items.map((raw,i)=>{const it=raw as {str:string;transform:number[];width:number;height:number;hasEOL:boolean};
     return {i,str:it.str,x:it.transform[4],y:it.transform[5],w:it.width,h:it.height||Math.hypot(it.transform[2],it.transform[3]),eol:it.hasEOL};});
    const visible=items.filter(it=>it.y>vy0+EDGE&&it.y<vy1-EDGE&&it.x>vx0+EDGE/2&&it.x<vx1-EDGE/2);
-   const borders=await tableCells(page);
+   const ops=await page.getOperatorList();const borders=tableCells(ops);
+   // Сторона сетевой организации — по подписи у стрелки границы («Сетевая организация» выше или ниже линии).
+   for(const line of redLines(ops)){
+    const label=(re:RegExp)=>items.find(it=>re.test(it.str)&&Math.abs(it.y-line.y)<60&&it.x>line.x0-80&&it.x<line.x1+80);
+    const net=label(/^\s*Сетев/u),app=label(/^\s*Заявител/u);
+    boundaries.push({page:n,y:line.y,x0:line.x0,x1:line.x1,networkAbove:net?net.y>line.y:app?app.y<line.y:true});
+   }
    // Куски в ячейках таблиц — отдельно; остальное — строками.
    const cells=new Map<string,{cell:Cell;items:Item[]}>();const free:Item[]=[];
    for(const it of visible){
@@ -165,7 +200,7 @@ export async function pdfModel(bytes:Uint8Array):Promise<PdfModel>{
     }
    }
   }
-  return {sha256:hash(bytes),format:'pdf',pages,blocks};
+  return {sha256:hash(bytes),format:'pdf',pages,blocks,boundaries};
  }finally{await doc.destroy();}
 }
 export const isPdf=(bytes:Uint8Array)=>bytes.length>=5&&Buffer.from(bytes.subarray(0,5)).toString('latin1')==='%PDF-';

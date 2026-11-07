@@ -38,33 +38,40 @@ export default function PdfViewer({bytes,model,comments,onSelection,onComment,fo
  useEffect(()=>{if(!doc||zoomChosen||!scroller.current)return;const width=model.pages?.[0]?.width??595;
   const fit=(scroller.current.clientWidth-40)/(width*96/72)*100;setZoom([50,60,70,85,100,120].filter(n=>n<=fit).at(-1)??50);},[doc,zoomChosen]);
 
- // Отрисовка страниц: холст + текстовый слой + два слоя разметки (под текстом — отметки, над ним — замечания).
- useEffect(()=>{if(!doc||!scroller.current)return;let cancelled=false;const host=scroller.current;
+ // Страницы: сразу — каркас всех листов нужного размера (по нему работают прокрутка, отметки и замечания), а холст и
+ // текстовый слой pdf.js рисуются только у листов рядом с экраном. Раньше документ показывался лишь после отрисовки
+ // всех страниц подряд — в режиме проверки (два документа) это было самым долгим.
+ const drawRef=useRef<()=>void>(()=>{});
+ useEffect(()=>{if(!doc||!scroller.current)return;let cancelled=false;const host=scroller.current;let observer:IntersectionObserver|undefined;
   const run=async()=>{
    const keep=host.scrollTop/Math.max(1,host.scrollHeight);host.replaceChildren();views.current=[];
    const dpr=Math.min(2,window.devicePixelRatio||1);
-   for(let n=1;n<=doc.numPages;n++){
-    const p=await doc.getPage(n);if(cancelled)return;
+   const pages=await Promise.all(Array.from({length:doc.numPages},(_,i)=>doc.getPage(i+1)));if(cancelled)return;
+   const paint=async(n:number)=>{
+    const v=viewOf(n);if(!v||v.el.dataset.painted)return;v.el.dataset.painted='1';const p=pages[n-1],viewport=v.viewport;
+    const canvas=document.createElement('canvas');canvas.width=Math.floor(viewport.width*dpr);canvas.height=Math.floor(viewport.height*dpr);
+    canvas.style.width=`${viewport.width}px`;canvas.style.height=`${viewport.height}px`;
+    const text=document.createElement('div');text.className='textLayer';
+    v.el.prepend(canvas);v.below.after(text);
+    await p.render({canvasContext:canvas.getContext('2d')!,viewport,transform:dpr!==1?[dpr,0,0,dpr,0,0]:undefined}).promise;if(cancelled)return;
+    const layer=new TextLayer({textContentSource:await p.getTextContent(),container:text,viewport});await layer.render();if(cancelled)return;
+    layer.textDivs.forEach((d,i)=>{d.dataset.item=String(i);});drawRef.current();
+   };
+   observer=new IntersectionObserver(entries=>{for(const e of entries)if(e.isIntersecting)void paint(Number((e.target as HTMLElement).dataset.page)).catch(err=>{if(!cancelled)setError('Не удалось отобразить PDF: '+(err as Error).message);});},{root:host,rootMargin:'800px 0px'});
+   pages.forEach((p,i)=>{const n=i+1;
     const viewport=p.getViewport({scale:zoom/100*96/72});
     const el=document.createElement('div');el.className='pdf-page';el.id=`pdf-page-${n}`;el.dataset.page=String(n);
     el.style.width=`${viewport.width}px`;el.style.height=`${viewport.height}px`;el.style.setProperty('--scale-factor',String(viewport.scale));
-    const canvas=document.createElement('canvas');canvas.width=Math.floor(viewport.width*dpr);canvas.height=Math.floor(viewport.height*dpr);
-    canvas.style.width=`${viewport.width}px`;canvas.style.height=`${viewport.height}px`;
     const below=document.createElement('div');below.className='pdf-overlay pdf-below';
-    const text=document.createElement('div');text.className='textLayer';
     const above=document.createElement('div');above.className='pdf-overlay pdf-above';
     const caption=document.createElement('div');caption.className='page-caption';caption.textContent=`Страница ${n}`;
-    el.append(canvas,below,text,above);host.append(caption,el);
-    views.current.push({n,viewport,el,below,above});
-    await p.render({canvasContext:canvas.getContext('2d')!,viewport,transform:dpr!==1?[dpr,0,0,dpr,0,0]:undefined}).promise;
-    const layer=new TextLayer({textContentSource:await p.getTextContent(),container:text,viewport});await layer.render();
-    layer.textDivs.forEach((d,i)=>{d.dataset.item=String(i);});
-    if(cancelled)return;
-   }
+    el.append(below,above);host.append(caption,el);
+    views.current.push({n,viewport,el,below,above});observer!.observe(el);
+   });
    host.scrollTop=keep*host.scrollHeight;setReady(r=>r+1);
   };
   void run().catch(e=>{if(!cancelled)setError('Не удалось отобразить PDF: '+(e as Error).message);});
-  return()=>{cancelled=true;};
+  return()=>{cancelled=true;observer?.disconnect();};
  },[doc,zoom]);
 
  // Прямоугольники куска текста или его части (по доле символов) в координатах страницы.
@@ -90,11 +97,17 @@ export default function PdfViewer({bytes,model,comments,onSelection,onComment,fo
  const marksKey=JSON.stringify(marks??[]);
  const draw=()=>{
   for(const v of views.current){v.below.replaceChildren();v.above.replaceChildren();}
-  const rank={bad:3,warn:2,changed:1,ok:0};const tone=new Map<string,BlockMark>();
-  for(const m of (JSON.parse(marksKey) as BlockMark[])){const was=tone.get(m.blockId);if(!was||rank[m.tone]>rank[was.tone])tone.set(m.blockId,{...m,title:was?was.title+'\n'+m.title:m.title});else tone.set(m.blockId,{...was,title:was.title+'\n'+m.title});}
+  // Отметка ложится на само значение («ТП-А645», «СИП 4х16»), а не на весь абзац; не нашлось в тексте — абзац целиком.
+  // Подсказка при наведении собирает все реквизиты абзаца.
+  const rank={bad:3,warn:2,changed:1,ok:0};const tone=new Map<string,BlockMark>();const pieces=new Map<string,{tone:BlockMark['tone'];range:readonly [number,number]|null}[]>();
+  for(const m of (JSON.parse(marksKey) as BlockMark[])){const was=tone.get(m.blockId);if(!was||rank[m.tone]>rank[was.tone])tone.set(m.blockId,{...m,title:was?was.title+'\n'+m.title:m.title});else tone.set(m.blockId,{...was,title:was.title+'\n'+m.title});
+   const b=byId.get(m.blockId);if(!b)continue;const range=m.tone==='changed'?null:valueRange(b.text,m.text);const list=pieces.get(m.blockId)??[];
+   const same=list.find(p=>p.range?.[0]===range?.[0]&&p.range?.[1]===range?.[1]);if(same){if(rank[m.tone]>rank[same.tone])same.tone=m.tone;}else list.push({tone:m.tone,range});pieces.set(m.blockId,list);}
   // Подсказка при наведении («✓ Номинал ВА: по справочнику…»): отметки лежат под текстом, поэтому title — на кусках текста.
   for(const v of views.current)v.el.querySelectorAll<HTMLElement>('.textLayer [data-item][title]').forEach(el=>el.removeAttribute('title'));
-  for(const [id,m]of tone){const b=byId.get(id);const v=b&&viewOf(b.page);if(!v)continue;for(const r of rects(v,b.spans))box(v.below,r,'pdf-mark',{'data-mark':m.tone,'data-block':id,title:m.title});
+  for(const [id,m]of tone){const b=byId.get(id);const v=b&&viewOf(b.page);if(!v)continue;
+   const list=pieces.get(id)??[];const whole=list.find(p=>!p.range);
+   for(const p of whole?[whole]:list)for(const r of rects(v,b.spans,p.range?.[0],p.range?.[1]))box(v.below,r,'pdf-mark',{'data-mark':whole?m.tone:p.tone,'data-block':id,title:m.title});
    for(const s of b.spans as Span[])v.el.querySelector<HTMLElement>(`.textLayer [data-item="${s.item}"]`)?.setAttribute('title',m.title);}
   for(const id of state.current.highlighted){const b=byId.get(id);const v=b&&viewOf(b.page);if(v)for(const r of rects(v,b.spans))box(v.below,r,'pdf-check-hit');}
   if(state.current.search){const q=state.current.search.toLocaleLowerCase();for(const b of blocks){const at=b.text.toLocaleLowerCase().indexOf(q);const v=at>=0&&viewOf(b.page);if(v)for(const r of rects(v,b.spans,at,at+q.length))box(v.below,r,'pdf-search-hit');}}
@@ -108,6 +121,7 @@ export default function PdfViewer({bytes,model,comments,onSelection,onComment,fo
     d.addEventListener('click',()=>callbacks.current.onComment(c.id));d.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();callbacks.current.onComment(c.id);}});
     if(c.id===focusedId)d.classList.add('is-focused');}}
  };
+ drawRef.current=draw;
  useEffect(()=>{if(ready)draw();},[ready,marksKey,comments,focusedId]);
  useEffect(()=>{if(!ready||!focusedId)return;scroller.current?.querySelector<HTMLElement>(`[data-remark-id="${CSS.escape(focusedId)}"]`)?.scrollIntoView({block:'center'});},[focusedId,focusRequest,ready]);
 
@@ -133,8 +147,11 @@ export default function PdfViewer({bytes,model,comments,onSelection,onComment,fo
  useEffect(()=>{const host=scroller.current;if(!host)return;
   const select=()=>{setFloat(null);const sel=window.getSelection();if(!sel||sel.isCollapsed||!sel.rangeCount||!host.contains(sel.anchorNode)){callbacks.current.onSelection(null);return;}
    const range=sel.getRangeAt(0);const frameBox=frame.current!.getBoundingClientRect();const rb=range.getBoundingClientRect();const at={x:rb.left-frameBox.left,y:rb.bottom-frameBox.top};
-   const a=position(range.startContainer,range.startOffset),b=position(range.endContainer,range.endOffset);
-   if(!a||!b||a.block.id!==b.block.id||b.offset<=a.offset){callbacks.current.onSelection(null);setFloat({...at,invalid:true});return;}
+   const a=position(range.startContainer,range.startOffset);let b=position(range.endContainer,range.endOffset);
+   // Замечание привязывается к одному абзацу. Выделение, заехавшее в следующий (тройной щелчок, протяжка до конца
+   // строки), обрезается по концу первого абзаца, а не отклоняется.
+   if(a&&(!b||b.block.id!==a.block.id))b={block:a.block,offset:a.block.text.length};
+   if(!a||!b||b.offset<=a.offset){callbacks.current.onSelection(null);setFloat({...at,invalid:true});return;}
    const quote=a.block.text.slice(a.offset,b.offset);if(!quote.trim()||quote.length>5000){callbacks.current.onSelection(null);setFloat({...at,invalid:true});return;}
    callbacks.current.onSelection({kind:'OOXML_PARAGRAPH_V1',part:a.block.part,blockId:a.block.id,blockHash:a.block.sha256,fileHash:model.sha256,start:a.offset,end:b.offset,quote});setFloat(at);};
   const click=(e:MouseEvent)=>{if(window.getSelection()?.isCollapsed===false||!callbacks.current.onMarkClick)return;
@@ -159,7 +176,7 @@ export default function PdfViewer({bytes,model,comments,onSelection,onComment,fo
   <button className="secondary-button" disabled={!hits.length} onClick={()=>{const next=(hit+1)%hits.length;setHit(next);scrollToRect(hits[next].id);}}>Далее {hits.length?`${hit+1}/${hits.length}`:'0'}</button>
  </div>{error&&<p role="alert">{error}</p>}
  <div className="word-frame pdf-frame" ref={frame}><div className={`pdf-scroll${onMarkClick?' mark-click':''}`} ref={scroller} role="document" aria-label="Документ PDF"/>
-  {float&&onAddRemark&&(float.invalid?<span className="float-remark float-hint" style={{left:Math.max(4,float.x),top:float.y+6}}>Выделите текст в пределах одного абзаца</span>
+  {float&&onAddRemark&&(float.invalid?<span className="float-remark float-hint" style={{left:Math.max(4,float.x),top:float.y+6}}>Замечание ставится к тексту документа — начните выделение с текста абзаца</span>
    :<button type="button" className={`float-remark${remarkBlocked?' float-blocked':''}`} title={remarkBlocked} style={{left:Math.max(4,float.x),top:float.y+6}} onMouseDown={e=>e.preventDefault()} onClick={()=>{setFloat(null);onAddRemark();}}>＋ Замечание</button>)}
  </div>{!ready&&!error&&<RossetiLoader label="Подготовка просмотра…"/>}</section>;
 }
