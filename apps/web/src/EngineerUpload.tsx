@@ -47,8 +47,10 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
  const numberValid=CONTRACT_NUMBER_PATTERN.test(contractNumber);
  const actLabel=type==='AVTU'?'АВТУ':'Акт ТП';
  return <section className="card engineer-upload" aria-label="Загрузка документа инженером">
+  <div className="navy-head upload-head">
   <div className="doc-type-switch upload-modes" role="group" aria-label="Вид загружаемого документа">
    {modes.map(([k,label])=><button key={k} type="button" aria-pressed={mode===k} disabled={locked||!!created} onClick={()=>changeMode(k)}><Icon name={k==='NEW'?'newdoc':'extra'} size={16}/>{label}</button>)}
+  </div>
   </div>
   <p className="helper-text">{mode==='EXTRA'?'Выберите документ договора, вид дополнительного документа и загрузите один PDF.':`Загрузите ТУ — реквизиты заполнятся автоматически. Проверьте их и приложите ${type==='AVTU'?'АВТУ':'акт ТП'}. ПСУ, предыдущий акт и поопорную схему можно приложить сразу или позже.`}</p>
   {error&&<p role="alert">{error}</p>}

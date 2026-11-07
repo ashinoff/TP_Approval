@@ -54,11 +54,9 @@ try{
  await writeFile(docs+'tu.pdf',await checkedPdf('15','00001-26-00000004-1','TU'));await writeFile(docs+'act-bad.pdf',await checkedPdf('150'));await writeFile(docs+'act-good.pdf',await checkedPdf('15'));
  // 1. Инженер: загрузка ТУ и акта в PDF, карточка из ТУ.
  await login('eng');const form=page.getByRole('region',{name:'Загрузка документа инженером'});
- // Плавный бегунок в таблетке: подсветка перетекает к нажатой кнопке.
- const modes=form.getByRole('group',{name:'Вид загружаемого документа'});const thumb=modes.locator('.pill-thumb');await thumb.waitFor();
- const start=await thumb.boundingBox();await modes.getByRole('button',{name:'Доп. документы'}).click();await page.waitForTimeout(180);
- await modes.screenshot({path:`${out}/00a-pill-moving.png`});await page.waitForTimeout(600);const end=await thumb.boundingBox();await modes.screenshot({path:`${out}/00b-pill-end.png`});
- assert.ok(end!.x>start!.x+40,'Thumb slides to the pressed button');
+ // Вкладки со значком в рамке (08.11.2026): выбранная — синий контур и заливка, без бегунка-таблетки.
+ const modes=form.getByRole('group',{name:'Вид загружаемого документа'});await modes.getByRole('button',{name:'Доп. документы'}).click();
+ assert.equal(await modes.getByRole('button',{name:'Доп. документы'}).getAttribute('aria-pressed'),'true');await modes.screenshot({path:`${out}/00a-tabs.png`});
  await modes.getByRole('button',{name:'Новый документ'}).click();await page.waitForTimeout(600);
  await form.getByLabel('Файл технических условий').setInputFiles(docs+'tu.pdf');await form.getByText('Реквизиты извлечены из ТУ').waitFor({timeout:20000});
  assert.equal(await form.getByLabel('Номер договора').inputValue(),'00001-26-00000004-1');assert.equal(await form.getByLabel('Максимальная мощность').inputValue(),'15');

@@ -173,3 +173,42 @@
  .simple-registry tbody tr.reg-ok{--tone:#1f5f2a}.simple-registry tbody tr.reg-bad{--tone:#8e1f1f}
  .simple-registry tbody tr.reg-row>td,.simple-registry tbody tr.reg-row>td:first-child,.simple-registry tbody tr.reg-row>td:last-child{border:0!important;border-radius:0;box-shadow:none}
 }
+
+/* ══ 08.11.2026 (ночь): вкладки-переключатели как разделы документа — значок в рамке, без таблеток ══ */
+:is(.queue-switch,.doc-type-switch):not(.zz){display:inline-flex!important;flex-wrap:wrap;gap:4px!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;width:auto!important}
+:is(.queue-switch,.doc-type-switch)>button:not(.zz):not(.zy){display:inline-flex!important;align-items:center;gap:8px!important;padding:4px 12px 4px 4px!important;border:1.5px solid transparent!important;border-radius:12px!important;background:transparent!important;color:var(--ink-2)!important;font-size:var(--fs-s)!important;font-weight:500!important;box-shadow:none!important;min-height:0;transition:background .2s,border-color .2s,box-shadow .25s,color .2s}
+:is(.queue-switch,.doc-type-switch)>button>svg{flex:none;box-sizing:content-box;width:18px!important;height:18px!important;padding:6px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink-2);transition:border-color .2s,box-shadow .25s,color .2s,filter .25s}
+:is(.queue-switch,.doc-type-switch)>button:hover:not(:disabled):not([aria-pressed=true]){background:rgb(49 86 163 / .05)!important;color:var(--brand)!important}
+:is(.queue-switch,.doc-type-switch)>button:hover:not(:disabled)>svg{border-color:#9db2dc;color:var(--brand)}
+:is(.queue-switch,.doc-type-switch)>button[aria-pressed=true]:not(.zz):not(.zy){background:var(--sel-fill)!important;border-color:var(--sel-line)!important;box-shadow:var(--sel-glow)!important;color:var(--brand)!important;font-weight:600!important}
+:is(.queue-switch,.doc-type-switch)>button[aria-pressed=true]>svg{border-color:var(--brand);color:var(--brand);box-shadow:0 0 0 1px var(--glow-soft),0 0 10px var(--glow);filter:drop-shadow(0 0 1.5px var(--glow))}
+:is(.queue-switch,.doc-type-switch)>button:disabled{opacity:.55;cursor:not-allowed}
+.pill-thumb:is(.queue-switch>*,.doc-type-switch>*){display:none}
+
+/* ══ Тёмно-синие шапки карточек (как у листа согласования): зонирование ══ */
+.navy-head{--pad:18px;background:var(--menu);color:#fff;margin:calc(-1 * var(--pad)) calc(-1 * var(--pad)) 14px;padding:12px var(--pad);border-radius:9px 9px 0 0}
+.engineer-upload>.navy-head{--pad:20px}
+.unified-act .act-header{overflow:hidden}
+.act-header-top.navy-head{margin:-12px -18px 0;padding:14px 18px 12px}
+.navy-head .act-title,.navy-head .act-title .act-number{color:#fff}
+.navy-head .act-kind{color:#9fb6e6}
+.navy-head .act-facts{margin:8px 0 0}
+.navy-head .act-facts dt{color:#93a4be}
+.navy-head .act-facts dd{color:#fff}
+.navy-head .deadline-danger{color:#ff9c95}
+/* переключатели на тёмной шапке */
+.navy-head :is(.queue-switch,.doc-type-switch)>button:not(.zz):not(.zy){color:#c9d2e0!important}
+.navy-head :is(.queue-switch,.doc-type-switch)>button>svg{border-color:rgb(255 255 255 / .22);background:rgb(255 255 255 / .05);color:#c9d2e0}
+.navy-head :is(.queue-switch,.doc-type-switch)>button:hover:not(:disabled):not([aria-pressed=true]){background:rgb(255 255 255 / .06)!important;color:#fff!important}
+.navy-head :is(.queue-switch,.doc-type-switch)>button:hover:not(:disabled)>svg{border-color:#6d8fd9;color:#fff}
+.navy-head :is(.queue-switch,.doc-type-switch)>button[aria-pressed=true]:not(.zz):not(.zy){background:rgb(91 127 208 / .22)!important;border-color:#6d8fd9!important;color:#fff!important;box-shadow:0 0 0 1px rgb(109 143 217 / .15),0 0 12px rgb(91 127 208 / .30)!important}
+.navy-head :is(.queue-switch,.doc-type-switch)>button[aria-pressed=true]>svg{border-color:#8fb0ff;color:#fff;background:rgb(91 127 208 / .25);box-shadow:0 0 10px rgb(120 160 240 / .55);filter:drop-shadow(0 0 2px rgb(160 190 255 / .8))}
+.navy-head .tab-count{background:rgb(255 255 255 / .14)!important;color:#fff!important}
+.navy-head .primary-button{background:#fff!important;color:var(--menu)!important}
+/* заголовки блоков «Данные» и «Печать» */
+.data-block>.data-title,.upload-block .preparation-controls>.panel-subtitle{background:var(--menu);color:#fff!important;margin:-14px -16px 14px!important;padding:10px 16px!important;border-radius:9px 9px 0 0;font-size:var(--fs-m)!important}
+.data-block>.data-title svg,.upload-block .preparation-controls>.panel-subtitle svg{color:#8fb0ff!important;filter:drop-shadow(0 0 2px rgb(120 160 240 / .6))}
+.data-block>.data-title small{color:#93a4be}
+.data-block>.data-title .card-missing{color:#ff9c95}
+.reference-books>.reference-head{--pad:18px}
+.service-menu>.navy-head{margin-bottom:0}

@@ -3,7 +3,8 @@
  * отдельный слой, который при нажатии плавно перетекает к новой кнопке (в том числе через соседние).
  * Работает для всех таблеток приложения без правки каждого компонента: следим за aria-pressed/aria-selected.
  */
-const GROUPS='.queue-switch,.doc-type-switch,.act-panels,.review-subtabs,.note-filter,.review-tabs';
+// 08.11.2026: .queue-switch и .doc-type-switch — вкладки со значками в рамке (как разделы документа), без бегунка.
+const GROUPS='.review-subtabs,.note-filter,.review-tabs';
 const ACTIVE='[aria-pressed="true"],[aria-selected="true"]';
 
 function place(group:HTMLElement){

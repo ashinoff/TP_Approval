@@ -49,7 +49,7 @@ export default function ReferenceBooks({api,canEdit}:{api:(p:string,b?:object)=>
  const picked=Number.isFinite(kw)?rows.find(r=>kw>=r.from&&kw<=r.to):undefined;const beyond=Number.isFinite(kw)&&!picked&&rows.length>0;
  useEffect(()=>{if(picked)document.querySelector('.ref-scale li.picked')?.scrollIntoView({block:'nearest',behavior:'smooth'});},[picked]);
  return <section className="card reference-books" aria-label="Справочники">
-  <div className="reference-head">
+  <div className="reference-head navy-head">
    <div className="queue-switch" role="group" aria-label="Справочник">{(['breakers','cables'] as const).map(code=><button key={code} type="button" aria-pressed={tab===code} onClick={()=>switchTab(code)}><Icon name={code==='breakers'?'breaker':'cable'} size={16}/>{tabName[code]}</button>)}</div>
    {canEdit&&book&&!draft&&<button type="button" className="primary-button" onClick={edit}>Редактировать</button>}
   </div>

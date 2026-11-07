@@ -42,7 +42,7 @@ export default function ServiceMenu({api,downloadPath,onRestored}:{api:Api;downl
   await api('/api/v1/admin/service/restore',body);onRestored();}});
  const issues:Row[]=health?.issues??[];const problems=issues.filter(i=>i.count>0&&i.level!=='info');
  return <section className="card service-menu" aria-label="Сервисное меню">
-  <div className="queue-switch" role="group" aria-label="Раздел сервиса">{tabs.map(([key,label])=><button key={key} type="button" aria-pressed={tab===key} onClick={()=>{setTab(key);setConfirm(undefined);}}><Icon name={tabIcons[key]} size={16}/>{label}{key==='health'&&problems.length>0?<b className="tab-count" data-tab="corrections">{problems.length}</b>:null}</button>)}</div>
+  <div className="navy-head"><div className="queue-switch" role="group" aria-label="Раздел сервиса">{tabs.map(([key,label])=><button key={key} type="button" aria-pressed={tab===key} onClick={()=>{setTab(key);setConfirm(undefined);}}><Icon name={tabIcons[key]} size={16}/>{label}{key==='health'&&problems.length>0?<b className="tab-count" data-tab="corrections">{problems.length}</b>:null}</button>)}</div></div>
   {error&&<p role="alert" className="service-error">{error}</p>}
   {notice&&<p role="status" className="service-notice">{notice}</p>}
   {confirm&&<Confirm word={confirm.word} label={confirm.label} busy={busy} onCancel={()=>setConfirm(undefined)} onConfirm={()=>void run(confirm.run,confirm.word==='УДАЛИТЬ'?'Удалено.':undefined)}/>}
