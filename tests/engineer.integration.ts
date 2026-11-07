@@ -112,7 +112,9 @@ let d=await card();assert.equal(d.state,'RIRU_REVIEW');const event=(await owner.
   // Дополнительные документы: только PDF, не меняют вид акта и ТУ, видны в пакете, открываются для сравнения и скачиваются с понятным именем.
   const pole=await send('POLE_SCHEME',await checkedPdf('15'));assert.equal(pole.kind,'EXTRA_PDF');assert.equal(pole.extraDocument.kind,'POLE_SCHEME');assert.equal(pole.extraDocument.number,1);
   const docxExtra=await request(app).post(pp+'/files').set('Authorization','Bearer '+tokens.riru).field('documentType','PSU').attach('file',checkedDocx('15'),'psu.docx');assert.equal(docxExtra.body.error.code,'PDF_REQUIRED');
-  const packaged=(await pcard()).contractDocuments;assert.equal(packaged.extraDocuments.length,1);assert.equal((await pcard()).act_type,'ACT_TP');
+  // Решение владельца 08.11.2026 (миграция 028): «Изменения к ТУ» и «Проект».
+  for(const kind of ['TU_CHANGE','PROJECT']){const x=await send(kind,await checkedPdf('15'));assert.equal(x.kind,'EXTRA_PDF');assert.equal(x.extraDocument.kind,kind);}
+  const packaged=(await pcard()).contractDocuments;assert.equal(packaged.extraDocuments.length,3);assert.ok((await pcard()).cardMissing.includes('Планируемая дата исполнения'),'Act detail lists empty required card fields before submit');assert.equal((await pcard()).act_type,'ACT_TP');
   const extraModel=ok(await get('riru',`${pp}/extra/${pole.extraDocument.id}/preview`));assert.equal(extraModel.format,'pdf');
   const extraFile=await request(app).get(`/api/v1/files/${pole.id}/download`).set('Authorization','Bearer '+tokens.riru);assert.match(decodeURIComponent(extraFile.headers['content-disposition']),/Поопорная схема/);
   assert.equal((await get('other',`${pp}/extra/${pole.extraDocument.id}/preview`)).status,404);

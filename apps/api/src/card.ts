@@ -77,9 +77,13 @@ export async function cardFromTu(db:DB,storage:string,actId:string){
 }
 
 /** Обязательные поля для отправки; при проверке ТУ (рабочие документы) — блокирует отправку. */
+/** Названия обязательных полей карточки без значения (пусто, если карточка для документа не обязательна). */
+export async function missingCardFields(db:DB,act:Row):Promise<string[]>{
+ if(!act.tu_check_required)return [];
+ return (await db.query('SELECT f.label FROM app.card_fields f WHERE f.active AND f.required AND NOT EXISTS(SELECT 1 FROM app.card_values v WHERE v.act_id=$1 AND v.field_code=f.code) ORDER BY f.sort',[act.id])).rows.map(r=>r.label);
+}
 export async function requireCompleteCard(db:DB,act:Row){
- if(!act.tu_check_required)return;
- const missing=(await db.query('SELECT f.label FROM app.card_fields f WHERE f.active AND f.required AND NOT EXISTS(SELECT 1 FROM app.card_values v WHERE v.act_id=$1 AND v.field_code=f.code) ORDER BY f.sort',[act.id])).rows.map(r=>r.label);
+ const missing=await missingCardFields(db,act);
  if(missing.length)throw new HttpError(409,'CARD_INCOMPLETE',`Заполните карточку документа: ${missing.join(', ')}.`);
 }
 export const cardSnapshotSql="(SELECT coalesce(jsonb_object_agg(v.field_code,jsonb_build_object('label',f.label,'value',v.value,'unit',f.unit,'origin',v.origin)),'{}'::jsonb) FROM app.card_values v JOIN app.card_fields f ON f.code=v.field_code WHERE v.act_id=$1)";

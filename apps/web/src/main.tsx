@@ -9,6 +9,7 @@ import './practical.css';
 import './engineer.css';
 import './workspace.css';
 import './theme.css';
+import './doctabs.css';
 import {startSlidingPills} from './sliding-pills.js';
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
 startSlidingPills();

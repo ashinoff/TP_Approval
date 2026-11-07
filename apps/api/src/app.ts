@@ -26,7 +26,7 @@ import {isPdf,validatePdf} from './pdf-model.js';
 import {adminDocuments,applyRestoreFiles,backupPath,createBackup,deleteBackup,listBackups,purge,readBackup,recordServerError,removeFiles,serviceCleanup,serviceHealth,stageRestoreFiles} from './admin-service.js';
 import {extractTuMetadata} from './tu-import.js';
 import {requireContractNumber} from './contract-number.js';
-import {cardFields,cardValues,saveCard,cardFromTu,createCardField,updateCardField} from './card.js';
+import {cardFields,cardValues,missingCardFields,saveCard,cardFromTu,createCardField,updateCardField} from './card.js';
 import {documentModel} from './documents.js';
 import {prepareTu} from './prepare-tu.js';
 import {localAuth,listLocalUsers,createLocalUser,updateLocalAccess,addLocalRole,updateLocalProfile,deleteLocalUser} from './local-auth.js';
@@ -229,7 +229,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
     const comments=(await db.query('SELECT c.*,coalesce(c.author_snapshot->>\'name\',(SELECT actor_name FROM app.decisions WHERE task_id=c.task_id)) AS author_name,(SELECT role FROM app.tasks WHERE id=c.task_id) AS author_role,coalesce((SELECT jsonb_agg(e ORDER BY e.created_at,e.id) FROM app.comment_events e WHERE e.comment_id=c.id),\'[]\'::jsonb) AS events FROM app.comments c WHERE c.act_id=$1 ORDER BY c.created_at,c.id',[act.id])).rows;
     const releases=(await db.query('SELECT * FROM app.releases WHERE act_id=$1 ORDER BY published_at',[act.id])).rows;
     const checks=(await db.query("SELECT c.*,coalesce((SELECT jsonb_agg(jsonb_build_object('id',x.id,'field',x.field,'comment',x.comment,'actorId',x.actor_id,'actorName',x.actor_name,'createdAt',x.created_at) ORDER BY x.created_at) FROM app.tu_check_confirmations x WHERE x.check_id=c.id),'[]'::jsonb) AS confirmations FROM app.tu_checks c WHERE c.act_id=$1 ORDER BY c.created_at DESC,c.id DESC LIMIT 100",[act.id])).rows;
-    return {...act,checks,checkRulesVersion:await currentRulesVersion(db),card:await cardValues(db,act.id),contractDocuments:await contractDocuments(db,act),versions,cycles,tasks,comments,releases,presentation:await registryAct(db,act.id),timeline:await timeline(db,act.id)};
+    return {...act,checks,checkRulesVersion:await currentRulesVersion(db),card:await cardValues(db,act.id),cardMissing:await missingCardFields(db,act),contractDocuments:await contractDocuments(db,act),versions,cycles,tasks,comments,releases,presentation:await registryAct(db,act.id),timeline:await timeline(db,act.id)};
   },true);
   const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:config.maxFileBytes,files:1,fields:4}});
   app.post('/api/v1/documents/extract-tu',upload.single('file'),async(req,res)=>{
@@ -246,7 +246,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   });
   app.post('/api/v1/acts/:id/files',upload.single('file'),async(req,res)=>{
     const actId=id.parse(req.params.id);const file=requireValue(req.file,422,'FILE_REQUIRED');
-    const meta=z.object({documentType:z.enum(['ACT_TP','AVTU','TU','PSU','PREV_ACT','POLE_SCHEME']).default('ACT_TP'),documentNumber:z.string().trim().max(200).optional(),documentDate:z.iso.date().optional()}).strict().parse(req.body);
+    const meta=z.object({documentType:z.enum(['ACT_TP','AVTU','TU','PSU','PREV_ACT','POLE_SCHEME','TU_CHANGE','PROJECT']).default('ACT_TP'),documentNumber:z.string().trim().max(200).optional(),documentDate:z.iso.date().optional()}).strict().parse(req.body);
     await transaction(pool,res.locals.userId,async db=>{const a=await lockAct(db,actId);await role(db,'RIRU_ENGINEER',a.res_id);if(!['DRAFT','RETURNED','REVISING'].includes(a.state))throw new HttpError(409,'INVALID_STATE');});
     const pdf=isPdf(file.buffer);
     const extra=meta.documentType in extraLabels;

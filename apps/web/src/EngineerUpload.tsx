@@ -8,7 +8,7 @@ const labels:Record<string,string>={ACT_TP:'АКТ ТП',AVTU:'АВТУ',TU:'Т�
 /** Режимы формы (решение владельца 06.11.2026): новый документ (Акт ТП или АВТУ — переключатель внутри) и доп. документы. */
 const modes=[['NEW','Новый документ'],['EXTRA','Доп. документы']] as const;
 /** Необязательные документы при создании и виды доп. документов (ТУ — новая редакция к существующему документу). */
-const optional=[['PSU','ПСУ'],['PREV_ACT','Предыдущий акт ТП'],['POLE_SCHEME','Поопорная схема']] as const;
+const optional=[['PSU','ПСУ'],['PREV_ACT','Предыдущий акт ТП'],['POLE_SCHEME','Поопорная схема'],['TU_CHANGE','Изменения к ТУ'],['PROJECT','Проект']] as const;
 const extraKinds=[['TU','ТУ (новая редакция)'],...optional] as const;
 
 /** Поле выбора файла в виде полноценной кнопки: название документа, кнопка, имя выбранного файла. */
@@ -22,7 +22,7 @@ function FileTile({title,ariaLabel,file,disabled,onFile,optional,children}:{titl
  </div>;
 }
 
-export default function EngineerUpload({api,action,busy,resUnits,profile,onCreated,onDirty}:{api:(p:string,b?:object|FormData)=>Promise<any>;action:(fn:()=>Promise<unknown>)=>Promise<void>;busy:boolean;resUnits:Row[];profile:Row;onCreated:(id:string)=>void;onDirty:(dirty:boolean)=>void}){
+export default function EngineerUpload({api,action,busy,resUnits,profile,onCreated,onDirty}:{api:(p:string,b?:object|FormData)=>Promise<any>;action:(fn:()=>Promise<unknown>)=>Promise<unknown>;busy:boolean;resUnits:Row[];profile:Row;onCreated:(id:string)=>void;onDirty:(dirty:boolean)=>void}){
  const areas=resUnits.filter(r=>profile.roles.some((role:Row)=>role.role==='RIRU_ENGINEER'&&role.resId===r.id));
  const [resId,setResId]=useState(areas[0]?.id??''),[mode,setMode]=useState<'NEW'|'EXTRA'>('NEW'),[type,setType]=useState('ACT_TP'),[extraKind,setExtraKind]=useState('TU'),[extras,setExtras]=useState<Record<string,File|undefined>>({}),[file,setFile]=useState<File>(),[tu,setTu]=useState<File>(),[query,setQuery]=useState(''),[targets,setTargets]=useState<Row[]>([]),[target,setTarget]=useState(''),[error,setError]=useState(''),[created,setCreated]=useState<string>(),[extracting,setExtracting]=useState(false),[report,setReport]=useState<Row>();
  const [values,setValues]=useState({contractNumber:'',contractDate:'',applicant:'',address:''});

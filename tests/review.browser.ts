@@ -56,7 +56,7 @@ try{
  await form.getByLabel('Планируемая дата исполнения').fill('2026-12-15');await form.getByLabel('Файл загружаемого документа').setInputFiles(docs+'engineer-act-bad.docx');
  await shot('01-upload');console.log('OK 1: TU fills contract number and card (15 кВт, 0,4 кВ, 3ф)');
  await form.getByRole('button',{name:'Сохранить документ',exact:true}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor({timeout:20000});
- await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Матрица'}).click();await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Документ'}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor();await page.waitForTimeout(800);await shot('01b-act');
+ await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Матрица'}).click();await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Просмотр'}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor();await page.waitForTimeout(800);await shot('01b-act');
  // 2. Режим проверки у инженера: автосверка подсвечивает расхождение в обоих окнах.
  await page.getByRole('button',{name:'Режим проверки'}).click();const review=page.getByRole('dialog',{name:'Режим проверки документов'});
  await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();await review.getByText(/⚠ Расхождение/).first().waitFor({timeout:20000});
@@ -80,7 +80,7 @@ try{
  assert.equal(await review.getByRole('button',{name:'+ Добавить замечание'}).count(),0);
  await review.getByRole('button',{name:'Завершить проверку'}).click();await review.waitFor({state:'detached'});
  // 3. Исправленная версия, сверка, отправка из режима проверки.
- await page.getByLabel('Новая версия DOCX').setInputFiles(docs+'engineer-act-good.docx');await page.locator('.word-heading select option').filter({hasText:'Версия 2'}).waitFor({state:'attached',timeout:20000});
+ await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Данные'}).click();await page.getByLabel('Новая версия DOCX').setInputFiles(docs+'engineer-act-good.docx');await page.locator('.word-heading select option').filter({hasText:'Версия 2'}).waitFor({state:'attached',timeout:20000});
  await page.getByRole('button',{name:'Режим проверки'}).click();await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();
  await review.getByText('Проверенные реквизиты совпали. Можно отправить на согласование.',{exact:true}).waitFor({timeout:20000});
 // Номиналы акта проверены по справочникам: ВА-25А для 15 кВт (3ф) и СИП 4х16.
@@ -121,10 +121,10 @@ try{
  await review.getByRole('button',{name:'Скрыть панель'}).click();await review.getByRole('button',{name:'Показать замечания: 1'}).click();await review.locator('.review-note').filter({hasText:'Начальник РИРУ · синтетический'}).filter({hasText:'Сверить мощность'}).waitFor();
  console.log('OK 4: reviewer adds a remark from the floating button at the selection; edge tab reopens remarks with author and text');
  // Лист согласования: предварительный, с ФИО и должностью автора замечания и самим замечанием.
- await review.getByRole('button',{name:'Завершить проверку'}).click();await page.getByRole('button',{name:'Лист согласования'}).click();
- const sheet=page.getByRole('dialog',{name:'Лист согласования'});await sheet.getByRole('heading',{name:'ЛИСТ СОГЛАСОВАНИЯ'}).waitFor({timeout:15000});
+ await review.getByRole('button',{name:'Завершить проверку'}).click();await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Печать'}).click();
+ const sheet=page.getByRole('region',{name:'Лист согласования'});await sheet.getByRole('heading',{name:'ЛИСТ СОГЛАСОВАНИЯ'}).waitFor({timeout:15000});
  await sheet.getByText('Согласование не завершено — предварительный лист').waitFor();await sheet.getByText('Начальник РИРУ (тест)').first().waitFor();await sheet.getByText('Сверить мощность с расчётом нагрузки',{exact:false}).waitFor();
- await sheet.getByText('Ожидает решения').first().waitFor();await shot('06-sheet');await sheet.getByRole('button',{name:'Закрыть'}).click();
+ await sheet.getByText('Ожидает решения').first().waitFor();await shot('06-sheet');await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Просмотр'}).click();
  console.log('OK 6: approval sheet lists preparer, approvers with positions, decisions and remarks');
  await page.getByRole('button',{name:'Режим проверки'}).click();
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);

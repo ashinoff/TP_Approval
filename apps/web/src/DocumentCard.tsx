@@ -1,4 +1,5 @@
 import {useEffect,useState} from 'react';
+import {Icon} from './Ui.js';
 type Row=Record<string,any>;
 export type CardField={code:string;label:string;kind:'text'|'number'|'date'|'select';unit:string|null;options:string[];required:boolean;tu_source:string|null;sort:number;active:boolean};
 export type CardDraft=Record<string,{value:string;origin:'TU'|'MANUAL'}>;
@@ -25,7 +26,7 @@ export function changedValues(draft:CardDraft,saved:CardDraft){
 }
 
 /** Карточка в рабочем месте документа: инженер правит в подготовке, остальные видят значения (у цикла — зафиксированный снимок). */
-export default function DocumentCardPanel({detail,cycle,api,action,busy}:{detail:Row;cycle?:Row;api:(p:string,b?:object)=>Promise<any>;action:(fn:()=>Promise<unknown>)=>Promise<void>;busy:boolean}){
+export default function DocumentCardPanel({detail,cycle,api,action,busy}:{detail:Row;cycle?:Row;api:(p:string,b?:object)=>Promise<any>;action:(fn:()=>Promise<unknown>)=>Promise<unknown>;busy:boolean}){
  const [fields,setFields]=useState<CardField[]>([]);
  const editable=detail.presentation.canPrepare&&['DRAFT','RETURNED','REVISING'].includes(detail.state)&&!cycle;
  const saved=draftFromValues(detail.card??[]);
@@ -36,8 +37,8 @@ export default function DocumentCardPanel({detail,cycle,api,action,busy}:{detail
  const snapshot:Row|undefined=cycle?.card_snapshot??undefined;
  const missing=fields.filter(f=>f.required&&!saved[f.code]);
  const changes=changedValues(draft,saved);
- return <details className="side-block document-card" open={editable&&missing.length>0||undefined}>
-  <summary>Карточка документа{missing.length&&!snapshot?<span className="card-missing"> · не заполнено {missing.length}</span>:null}</summary>
+ return <section className={`data-block document-card${missing.length&&!snapshot?' card-incomplete':''}`} aria-label="Карточка документа">
+  <h3 className="data-title"><Icon name="data" size={16}/>Карточка документа{missing.length&&!snapshot?<span className="card-missing"> · не заполнено {missing.length}</span>:null}</h3>
   {snapshot?<>
    <p className="helper-text">Зафиксировано при отправке цикла {cycle!.number}.</p>
    <dl className="card-view">{Object.entries(snapshot).length?Object.entries(snapshot).map(([code,v]:[string,any])=><div key={code}><dt>{v.label}</dt><dd>{shownValue({kind:fields.find(f=>f.code===code)?.kind??'text',unit:v.unit},v.value)}{v.unit?` ${v.unit}`:''}</dd></div>):<p className="helper-text">Карточка не заполнялась.</p>}</dl>
@@ -49,5 +50,5 @@ export default function DocumentCardPanel({detail,cycle,api,action,busy}:{detail
    </div>
    {missing.length>0&&<p className="helper-text">Для отправки на согласование заполните: {missing.map(f=>f.label).join(', ')}.</p>}
   </>:<dl className="card-view">{fields.filter(f=>saved[f.code]).map(f=><div key={f.code}><dt>{f.label}</dt><dd>{shownValue(f,saved[f.code].value)}{f.unit?` ${f.unit}`:''}</dd></div>)}{!Object.keys(saved).length&&<p className="helper-text">Карточка не заполнена.</p>}</dl>}
- </details>;
+ </section>;
 }

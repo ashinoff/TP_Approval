@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {dateTime} from './Ui.js';
 import {openBlockers} from './ActDocument.js';
 
@@ -20,6 +20,20 @@ function Evidence({side,values,onJump,tone}:{side:string;values:Row[];onJump?:Ju
   <span>{side}</span>
   {onJump&&v.blockId?<button type="button" className="tu-quote" title={v.quote} onClick={()=>onJump(v.blockId,side==='ТУ'?'tu':'act',v.shown??v.value,tone)}>{shown(v)}</button>:<q title={v.quote}>{shown(v)}</q>}
  </p>)}</>;
+}
+
+/**
+ * Отметки «✗ не соответствует» к отчёту сверки. На сервер не пишутся (пункт и так блокирует отправку), но должны
+ * сохраняться между окнами: режим проверки и просмотр документа показывают один и тот же отчёт.
+ */
+const REJECTED_EVENT='tp-tu-rejected';
+const rejectedKey=(checkId:string)=>'tp.tu.rejected.'+checkId;
+function readRejected(checkId?:string):string[]{if(!checkId)return [];try{return JSON.parse(sessionStorage.getItem(rejectedKey(checkId))??'[]');}catch{return [];}}
+function useRejected(checkId?:string){
+ const [value,setValue]=useState<string[]>(()=>readRejected(checkId));
+ useEffect(()=>{setValue(readRejected(checkId));const sync=()=>setValue(readRejected(checkId));window.addEventListener(REJECTED_EVENT,sync);return()=>window.removeEventListener(REJECTED_EVENT,sync);},[checkId]);
+ const update=(next:(list:string[])=>string[])=>{if(!checkId)return;const list=next(readRejected(checkId));try{sessionStorage.setItem(rejectedKey(checkId),JSON.stringify(list));}catch{}setValue(list);window.dispatchEvent(new Event(REJECTED_EVENT));};
+ return [value,update] as const;
 }
 
 const QUICK_OK='Проверено вручную: соответствует.';
@@ -49,7 +63,7 @@ function ConfirmForm({field,busy,onConfirm,onReject}:{field:Row;busy:boolean;onC
  */
 export default function TuPreflight({check,required,busy,editable=true,onCheck,onConfirm,onJump,tuJump}:{check?:Row;required:boolean;busy:boolean;editable?:boolean;onCheck?:()=>void;onConfirm?:(field:string,comment:string)=>void;onJump?:Jump;tuJump?:boolean}){
  const onTuJump=tuJump?onJump:undefined;
- const [rejected,setRejected]=useState<string[]>([]);
+ const [rejected,setRejected]=useRejected(check?.id);
  const findings:Row[]=check?.findings??[];
  const confirmations:Row[]=check?.confirmations??[];
  const confirmed=new Map<string,Row>(confirmations.map(c=>[c.field as string,c] as [string,Row]));

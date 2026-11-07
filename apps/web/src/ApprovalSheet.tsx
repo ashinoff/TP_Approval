@@ -13,13 +13,22 @@ const d=(v?:string|null)=>v?new Date(v+(v.length===10?'T00:00:00Z':'')).toLocale
  * Лист согласования для печати: реквизиты, кто подготовил, итоговое согласование (ФИО, должность, дата),
  * история циклов с возвратами и все замечания с отметкой об устранении. Данные — только из фактических записей.
  */
-export default function ApprovalSheet({detail,api,profile,onClose}:{detail:Row;api:(p:string)=>Promise<any>;profile:Row;onClose:()=>void}){
+/** Служебный значок в углу листа (как на экземпляре к печати): затрудняет подмену листа. */
+const Corner=({at}:{at:string})=><span className={`sheet-corner sheet-corner-${at}`} aria-hidden="true"><svg viewBox="0 0 24 24" fill="#fff"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>;
+
+/** inline — лист внутри раздела «Печать» (без отдельного окна); печатается только сам лист. */
+export default function ApprovalSheet({detail,api,profile,onClose,inline=false}:{detail:Row;api:(p:string)=>Promise<any>;profile:Row;onClose?:()=>void;inline?:boolean}){
  const [matrices,setMatrices]=useState<Row[]>(),[people,setPeople]=useState<Record<string,Row>>({}),[error,setError]=useState('');
  useEffect(()=>{let active=true;
   Promise.all([Promise.all(detail.cycles.map((c:Row)=>api(`/api/v1/acts/${detail.id}/approval-matrix?cycleId=${c.id}`))),api(`/api/v1/acts/${detail.id}/people`)])
    .then(([m,p])=>{if(active){setMatrices(m);setPeople(Object.fromEntries((p as Row[]).map(x=>[x.id,x])));}}).catch(e=>{if(active)setError(e.message);});
   return()=>{active=false;};},[detail.id,detail.cycles.length,api]);
- useEffect(()=>{document.body.classList.add('sheet-open');return()=>document.body.classList.remove('sheet-open');},[]);
+ // Встроенный лист на время печати показывается отдельным окном: печатные стили скрывают всё остальное.
+ const [printing,setPrinting]=useState(false);
+ const framed=!inline||printing;
+ useEffect(()=>{if(!framed)return;document.body.classList.add('sheet-open');return()=>document.body.classList.remove('sheet-open');},[framed]);
+ useEffect(()=>{if(!printing)return;const t=setTimeout(()=>{window.print();setPrinting(false);},50);return()=>clearTimeout(t);},[printing]);
+ const print=()=>{if(inline)setPrinting(true);else window.print();};
  const pub=detail.presentation?.approvedPublication;
  const kind=detail.act_type==='AVTU'?'АВТУ':'Акт ТП';
  const finalCycle=pub?detail.cycles.find((c:Row)=>c.id===pub.cycleId):detail.cycles.at(-1);
@@ -34,17 +43,18 @@ export default function ApprovalSheet({detail,api,profile,onClose}:{detail:Row;a
  const row=(r:Row,i:number)=><tr key={r.role}><td>{i+1}</td><td>{r.department}</td><td>{r.person?.name??'—'}{position(r.person?.id)?<small>{position(r.person?.id)}</small>:null}</td>
   <td className={`decision-${r.status}`}>{decisionNames[r.status]??r.status}{r.substitution?<small>по замещению</small>:null}</td><td>{dt(r.decidedAt??r.completedAt)}</td></tr>;
 
- return createPortal(<div className="sheet-root" role="dialog" aria-modal="true" aria-label="Лист согласования">
+ const body=<div className={`sheet-root${framed?'':' sheet-inline'}`} role={framed?'dialog':'region'} aria-modal={framed?true:undefined} aria-label="Лист согласования">
   <div className="sheet-toolbar">
    <b>Лист согласования</b>
    <span className="sheet-spacer"/>
-   <button type="button" className="primary-button" disabled={!matrices} onClick={()=>window.print()}>Печать / PDF</button>
-   <button type="button" className="secondary-button" onClick={onClose}>Закрыть</button>
+   <button type="button" className="primary-button" disabled={!matrices} onClick={print}>Печать / PDF</button>
+   {onClose&&<button type="button" className="secondary-button" onClick={onClose}>Закрыть</button>}
   </div>
   <div className="sheet-scroll">
    {error&&<p role="alert">{error}</p>}
    {!matrices&&!error&&<RossetiLoader label="Формируем лист согласования…"/>}
    {matrices&&<article className="sheet-page">
+    <Corner at="tl"/><Corner at="tr"/><Corner at="bl"/><Corner at="br"/>
     {!approved&&<div className="sheet-draft">Согласование не завершено — предварительный лист</div>}
     <h1>ЛИСТ СОГЛАСОВАНИЯ</h1>
     <p className="sheet-subtitle">{kind} № {detail.act_number} по договору об осуществлении технологического присоединения № {detail.contract_number}{detail.contract_date?` от ${d(detail.contract_date)}`:''}</p>
@@ -78,5 +88,6 @@ export default function ApprovalSheet({detail,api,profile,onClose}:{detail:Row;a
     <footer className="sheet-footer">Сформировано {dt(new Date().toISOString())} · {profile.name} · ТП Согласование. Электронное согласование в системе не является электронной подписью.</footer>
    </article>}
   </div>
- </div>,document.body);
+ </div>;
+ return framed?createPortal(body,document.body):body;
 }

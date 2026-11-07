@@ -11,7 +11,7 @@ export const pdfKinds={ACT_TP:'ACT_PDF',AVTU:'AVTU_PDF',TU:'TU_PDF'} as const;
 export const fileKind=(type:keyof typeof documentKinds,pdf:boolean)=>(pdf?pdfKinds:documentKinds)[type];
 export const documentLabels={ACT_TP:'Акт ТП',AVTU:'АВТУ',TU:'ТУ'} as const;
 /** Дополнительные документы договора (только PDF, без маршрута согласования). */
-export const extraLabels={PSU:'ПСУ',PREV_ACT:'Предыдущий акт ТП',POLE_SCHEME:'Поопорная схема'} as const;
+export const extraLabels={PSU:'ПСУ',PREV_ACT:'Предыдущий акт ТП',POLE_SCHEME:'Поопорная схема',TU_CHANGE:'Изменения к ТУ',PROJECT:'Проект'} as const;
 export type ExtraKind=keyof typeof extraLabels;
 export async function contractDocuments(db:DB,act:Record<string,any>){
  return {contract:requireValue((await db.query('SELECT * FROM app.contracts WHERE id=$1',[act.contract_id])).rows[0]),

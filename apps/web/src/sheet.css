@@ -35,3 +35,15 @@ body.sheet-open{overflow:hidden}
  .sheet-page{box-shadow:none;max-width:none;padding:0}
  .sheet-table tr{break-inside:avoid}
 }
+/* Лист внутри раздела «Печать»: без отдельного окна, печатается только сам лист. */
+.sheet-root.sheet-inline{position:static;inset:auto;z-index:auto;border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden}
+.sheet-inline .sheet-toolbar{padding:8px 14px}
+.sheet-inline .sheet-scroll{flex:none;overflow:visible;padding:18px 12px}
+/* Служебные значки по углам листа (как на экземпляре к печати). */
+.sheet-corner{position:absolute;width:22px;height:22px;border-radius:50%;background:#3156A3;display:grid;place-items:center;box-shadow:0 0 0 1.5px #fff}
+.sheet-corner svg{width:13px;height:13px}
+.sheet-corner-tl{top:6mm;left:6mm}.sheet-corner-tr{top:6mm;right:6mm}.sheet-corner-bl{bottom:6mm;left:6mm}.sheet-corner-br{bottom:6mm;right:6mm}
+@media print{
+ .sheet-corner{-webkit-print-color-adjust:exact;print-color-adjust:exact;position:fixed}
+ .sheet-corner-tl{top:0;left:0}.sheet-corner-tr{top:0;right:0}.sheet-corner-bl{bottom:0;left:0}.sheet-corner-br{bottom:0;right:0}
+}

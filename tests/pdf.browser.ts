@@ -66,7 +66,7 @@ try{
  await form.getByLabel('Файл: Поопорная схема').setInputFiles(docs+'tu.pdf');await page.screenshot({path:`${out}/00-upload-form.png`,fullPage:true});
  await form.getByRole('button',{name:'Сохранить документ',exact:true}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor({timeout:20000});
  await page.locator('.pdf-page canvas').first().waitFor({timeout:20000});await shot('01-document');
- await page.locator('.package-extra').filter({hasText:'Поопорная схема'}).waitFor();console.log('OK 1: TU and act uploaded as PDF; the act opens in the exact PDF view');
+ await page.locator('.doc-picker select option').filter({hasText:'Поопорная схема'}).waitFor({state:'attached'});await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Данные'}).click();await page.locator('.package-extra').filter({hasText:'Поопорная схема'}).waitFor();await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Просмотр'}).click();console.log('OK 1: TU and act uploaded as PDF; the act opens in the exact PDF view');
  // 2. Сверка: рамки цвета статуса прямо на странице; клик по красному значению — пара в ТУ обведена, значение выделено.
  await page.getByRole('button',{name:'Режим проверки'}).click();const review=page.getByRole('dialog',{name:'Режим проверки документов'});
  await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();await review.getByText(/⚠ Расхождение/).first().waitFor({timeout:20000});
@@ -79,7 +79,7 @@ try{
  await page.waitForTimeout(400);await shot('02-review-pdf');console.log('OK 2: PDF pages in review mode; marks drawn on the page; click shows the paired value in the TU');
  await review.getByRole('button',{name:'Завершить проверку'}).click();await review.waitFor({state:'detached'});
  // 3. Исправленная версия PDF проходит сверку и уходит на согласование.
- await page.getByLabel('Новая версия DOCX').setInputFiles(docs+'act-good.pdf');await page.locator('.word-heading select option').filter({hasText:'Версия 2'}).waitFor({state:'attached',timeout:20000});
+ await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Данные'}).click();await page.getByLabel('Новая версия DOCX').setInputFiles(docs+'act-good.pdf');await page.locator('.word-heading select option').filter({hasText:'Версия 2'}).waitFor({state:'attached',timeout:20000});
  await page.getByRole('button',{name:'Режим проверки'}).click();await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();
  await review.getByText('Проверенные реквизиты совпали. Можно отправить на согласование.',{exact:true}).waitFor({timeout:20000});
  await review.getByRole('button',{name:'Отправить на согласование',exact:true}).click();await page.waitForTimeout(1500);

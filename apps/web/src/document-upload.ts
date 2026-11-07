@@ -1,5 +1,5 @@
 /** Дополнительные документы договора: прикладываются к документу, версию акта не создают. */
-export const EXTRA_KINDS=['PSU','PREV_ACT','POLE_SCHEME'];
+export const EXTRA_KINDS=['PSU','PREV_ACT','POLE_SCHEME','TU_CHANGE','PROJECT'];
 type Api=(path:string,body?:object|FormData)=>Promise<any>;
 export async function uploadDocument(api:Api,actId:string,file:File,type:string,number='',date=''){
  const data=new FormData();data.append('documentType',type);if(type==='TU'){if(number.trim())data.append('documentNumber',number.trim());if(date)data.append('documentDate',date);}data.append('file',file);

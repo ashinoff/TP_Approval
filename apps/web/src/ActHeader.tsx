@@ -13,11 +13,9 @@ function stageCaption(detail:Row,presentation:Row){
 
 /**
  * Top of the document workplace: what the document is, for whom and where, its status and the route.
- * Everything a reviewer needs to recognise the package without scrolling.
+ * Everything a reviewer needs to recognise the package without scrolling. Sections of the document live in the bar below.
  */
-type Panel='document'|'details'|'matrix'|'history';
-const panels:[Panel,string][]=[['document','Документ'],['details','Реквизиты'],['matrix','Матрица'],['history','История']];
-export default function ActHeader({detail,profile,panel='document',onPanel,onDelete}:{detail:Row;profile?:Row;panel?:string;onPanel:(panel:Panel)=>void;onDelete?:()=>void}){
+export default function ActHeader({detail,profile,onDelete}:{detail:Row;profile?:Row;onDelete?:()=>void}){
  const presentation=detail.presentation;
  const kind=detail.act_type==='AVTU'?'АВТУ':'Акт';
  const showContractNumber=detail.contract_number&&detail.contract_number!==detail.act_number;
@@ -26,9 +24,7 @@ export default function ActHeader({detail,profile,panel='document',onPanel,onDel
    <h2 className="act-title"><span className="act-kind">{kind}</span>{' '}<span className="act-number">{detail.act_number}</span></h2>
    <StatusBadge status={presentation.status}/>
    {presentation.overdue&&<span className="deadline-danger">⚠ Просрочено</span>}
-   <div className="card-tools act-panels" role="group" aria-label="Разделы документа">
-    {panels.map(([key,label])=><button key={key} type="button" aria-pressed={panel===key} onClick={()=>onPanel(key)}>{label}</button>)}
-   </div>
+   <span className="act-title-spacer"/>
    {onDelete&&<button type="button" className="danger-button act-delete" onClick={onDelete} title="Только администратор: удалить документ насовсем">Удалить документ</button>}
   </div>
   <dl className="act-facts">
@@ -38,8 +34,8 @@ export default function ActHeader({detail,profile,panel='document',onPanel,onDel
    <div><dt>РЭС</dt><dd>{presentation.res_name}</dd></div>
   </dl>
   <div className="act-route-row">
+   <div className="act-route-head"><span className="act-route-title">Схема согласования</span><span className="status act-stage-caption" data-testid="act-current-stage">{stageCaption(detail,presentation)}</span></div>
    <RouteLine route={presentation.route} me={profile?{id:profile.id,name:profile.name}:undefined}/>
-   <span className="status act-stage-caption" data-testid="act-current-stage">{stageCaption(detail,presentation)}</span>
   </div>
  </div>;
 }

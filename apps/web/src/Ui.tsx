@@ -13,6 +13,18 @@ const symbols:Record<string,ReactNode>={
   clock:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,alert:<><path d="M12 3 2 21h20L12 3Z"/><path d="M12 9v5m0 3h.01"/></>,
   file:<><path d="M14 2H5v20h14V7l-5-5Z"/><path d="M14 2v6h5M8 12h8M8 16h6"/></>,
   arrow:<path d="M4 12h16m-6-6 6 6-6 6"/>,back:<path d="M20 12H4m6-6-6 6 6 6"/>,refresh:<><path d="M20 4v6h-6M4 20v-6h6"/><path d="M5 8a8 8 0 0 1 14-3M19 16A8 8 0 0 1 5 19"/></>,
+  view:<><path d="M13 3H6.5A2.5 2.5 0 0 0 4 5.5v13A2.5 2.5 0 0 0 6.5 21H11"/><path d="M13 3l5 5v2.5M13 3v5h5"/><circle cx="16.5" cy="16.5" r="3.5"/><path d="m19 19 2.5 2.5"/></>,
+  data:<><ellipse cx="12" cy="5.5" rx="7.5" ry="2.5"/><path d="M4.5 5.5v13c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-13"/><path d="M4.5 12c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5"/></>,
+  grid:<><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M9 3v18"/><path d="m12.5 14.8 1.8 1.8 3.2-3.6"/></>,
+  timeline:<><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4.5h4.5"/><path d="M12 7.5V12l3 2"/></>,
+  printer:<><path d="M7 9V3.5h10V9"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/><path d="M17.5 12h.01"/></>,
+  upload:<><path d="M12 16V4m-5 5 5-5 5 5M4 15v5h16v-5"/></>,
+  engineer:<><circle cx="9" cy="7" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 10.5-5.1"/><path d="m14.5 20.5.9-3.4 4.6-4.6 2.5 2.5-4.6 4.6z"/></>,
+  chief:<><circle cx="9" cy="7" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="m16 10.5 2 2 4-4"/></>,
+  building:<><path d="M4 21V6l8-3.5L20 6v15"/><path d="M2 21h20M9.5 21v-5h5v5"/><path d="M8 9h.01M12 9h.01M16 9h.01M8 12.5h.01M12 12.5h.01M16 12.5h.01"/></>,
+  meter:<><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 15a5 5 0 0 1 10 0"/><path d="m12 15 2.6-3.2"/><path d="M8.5 17.5h7"/></>,
+  plug:<><path d="M9 2.5v4.5M15 2.5v4.5"/><path d="M6 7h12v3a6 6 0 0 1-12 0z"/><path d="M12 16v5.5"/></>,
+  gear:<><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></>,
   branch:<><path d="M5 12h5m0 0V5h9m-9 7h9m-9 0v7h9"/><circle cx="4" cy="12" r="1"/></>,logout:<><path d="M9 3H3v18h6M9 12h12m-5-5 5 5-5 5"/></>,
 };
 export function Icon({name,size=18}:{name:string;size?:number}){return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{symbols[name]??symbols.file}</svg>;}

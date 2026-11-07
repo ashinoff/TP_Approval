@@ -4,7 +4,7 @@ import DocumentViewer,{type SelectionAnchor,type DocumentViewerHandle} from './D
 import {Icon,StatusBadge,dateTime,roleNames} from './Ui.js';
 import TuPreflight from './TuPreflight.js';
 import DecisionDialog from './DecisionDialog.js';
-import {SendButton,checkFor,isPreparing,openBlockers} from './ActDocument.js';
+import {SendButton,checkFor,isPreparing,openBlockers,type Action} from './ActDocument.js';
 import {initialVersion,remarkBlockReason,type Section} from './workplace.js';
 import {RossetiLoader} from './Brand.js';
 import {extraNames} from './ContractDocuments.js';
@@ -29,7 +29,7 @@ function usePreview(key:string|undefined,fetcher:(key:string)=>Promise<Loaded>){
  * версия — только для просмотра; сбоку замечания и автосверка с ТУ. Инженер до отправки только сверяет,
  * согласующий оставляет замечания и принимает решение.
  */
-export default function ReviewMode({detail,profile,tasks,api,loadFile,action,busy,section,startVersion,onClose}:{detail:Row;profile:Row;tasks:Row[];api:Api;loadFile:(id:string)=>Promise<ArrayBuffer>;action:(fn:()=>Promise<unknown>)=>Promise<void>;busy:boolean;section:Section;startVersion?:string;onClose:()=>void}){
+export default function ReviewMode({detail,profile,tasks,api,loadFile,action,busy,section,startVersion,onClose,onFillCard}:{detail:Row;profile:Row;tasks:Row[];api:Api;loadFile:(id:string)=>Promise<ArrayBuffer>;action:Action;busy:boolean;section:Section;startVersion?:string;onClose:()=>void;onFillCard?:()=>void}){
  const root=useRef<HTMLDivElement>(null),left=useRef<DocumentViewerHandle>(null),right=useRef<DocumentViewerHandle>(null);
  const [versionId,setVersionId]=useState<string>(()=>startVersion??initialVersion(detail,tasks,section));
  const version=detail.versions.find((v:Row)=>v.id===versionId);
@@ -50,6 +50,8 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  const [selection,setSelection]=useState<SelectionAnchor|null>(null),[form,setForm]=useState<SelectionAnchor>(),[focused,setFocused]=useState<string>(),[focusRequest,setFocusRequest]=useState(0);
  const [categories,setCategories]=useState<Row[]>([]),[choice,setChoice]=useState<'approve'|'return'>(),[error,setError]=useState('');
  const explanations=useRef<Record<string,string>>({});
+ // Ошибки запросов показываются здесь же: строка ошибок страницы закрыта окном режима проверки.
+ const act=useCallback(async(fn:()=>Promise<unknown>)=>{const e=await action(fn,true);if(e)setError(e);},[action]);
 
  const fetchVersion=useCallback(async(id:string)=>{const v=detail.versions.find((x:Row)=>x.id===id)!;const [model,bytes]=await Promise.all([api(`/api/v1/acts/${detail.id}/versions/${id}/preview`),loadFile(v.file_id)]);return {model,bytes};},[detail.id,detail.versions,api,loadFile]);
  const fetchSource=useCallback(async(key:string)=>{
@@ -86,9 +88,9 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  // Клик по отмеченному реквизиту прокручивает второе окно к парному пункту.
  const pairFromLeft=(blockId:string)=>{const b=pairedTu&&pairedBlock(check,blockId,'act');if(!b)return;left.current?.pointAt(blockId,b.own);right.current?.scrollToBlock(b.blockId,b);};
  const pairFromRight=(blockId:string)=>{const b=pairedTu&&pairedBlock(check,blockId,'tu');if(!b)return;right.current?.pointAt(blockId,b.own);left.current?.scrollToBlock(b.blockId,b);};
- const runCheck=()=>void action(()=>api(`/api/v1/acts/${detail.id}/check-tu`,{versionId:newest.id,expectedRevision:detail.revision}));
- const confirm=(field:string,comment:string)=>void action(()=>api(`/api/v1/acts/${detail.id}/check-tu/${check!.id}/confirm`,{field,comment,expectedRevision:detail.revision}));
- const event=async(c:Row,type:string)=>{const explanation=explanations.current[c.id]?.trim();if(!explanation){setError('Опишите результат проверки исправления.');return;}setError('');await action(async()=>{await api(`/api/v1/comments/${c.id}/events`,{versionId,type,explanation});explanations.current[c.id]='';});};
+ const runCheck=()=>void act(()=>api(`/api/v1/acts/${detail.id}/check-tu`,{versionId:newest.id,expectedRevision:detail.revision}));
+ const confirm=(field:string,comment:string)=>void act(()=>api(`/api/v1/acts/${detail.id}/check-tu/${check!.id}/confirm`,{field,comment,expectedRevision:detail.revision}));
+ const event=async(c:Row,type:string)=>{const explanation=explanations.current[c.id]?.trim();if(!explanation){setError('Опишите результат проверки исправления.');return;}setError('');await act(async()=>{await api(`/api/v1/comments/${c.id}/events`,{versionId,type,explanation});explanations.current[c.id]='';});};
  const close=()=>{if(form&&!window.confirm('Закрыть режим проверки? Несохранённое замечание будет потеряно.'))return;if(document.fullscreenElement)void document.exitFullscreen();onClose();};
  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!choice&&!form&&!document.fullscreenElement)onClose();};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[choice,form,onClose]);
  useEffect(()=>{document.body.classList.add('review-open');return()=>document.body.classList.remove('review-open');},[]);
@@ -168,7 +170,7 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
     </div>}
     <div className="review-side-foot">
      {effective&&<>
-      {form?<form className="review-form" aria-label="Новое замечание" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void action(async()=>{await api(`/api/v1/acts/${detail.id}/comments`,{versionId,taskId:task!.id,categoryId:f.get('category'),text:f.get('description'),suggestedValue:f.get('suggestion'),discussion:'',anchor:form});setForm(undefined);setSelection(null);setTab('remarks');setNoteTab('open');});}}>
+      {form?<form className="review-form" aria-label="Новое замечание" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void act(async()=>{await api(`/api/v1/acts/${detail.id}/comments`,{versionId,taskId:task!.id,categoryId:f.get('category'),text:f.get('description'),suggestedValue:f.get('suggestion'),discussion:'',anchor:form});setForm(undefined);setSelection(null);setTab('remarks');setNoteTab('open');});}}>
        <select name="category" aria-label="Категория ошибки" required>{categories.filter(c=>c.active).map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select>
        <textarea name="description" aria-label="Текст замечания" placeholder="Текст замечания" required maxLength={10000}/>
        <input name="suggestion" aria-label="Предлагаемый текст" placeholder="Как должно быть (необязательно)" maxLength={5000}/>
@@ -182,11 +184,11 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
        <button className="primary-button" disabled={busy||!!form||!detail.presentation.actions.approve||ownRemark} title={ownRemark?'К этой версии есть ваше замечание — требуется возврат.':undefined} onClick={()=>setChoice('approve')}><Icon name="check"/>Согласовать</button>
       </div>
      </>}
-     {preparing&&<SendButton detail={detail} api={api} action={action} busy={busy}/>}
+     {preparing&&<SendButton detail={detail} api={api} action={action} busy={busy} onCheck={()=>{setPanel(true);setTab('check');}} onFillCard={onFillCard?()=>{if(!form||window.confirm('Закрыть режим проверки? Несохранённое замечание будет потеряно.'))onFillCard();}:undefined}/>}
      <button type="button" className="secondary-button review-wide" onClick={close}>Завершить проверку</button>
     </div>
    </aside>}
   </div>
-  {choice&&effective&&<DecisionDialog record={{act_number:detail.act_number,version:version?.number,cycle:cycle?.number}} comments={notes.filter(c=>c.task_id===task!.id)} choice={choice} busy={busy} onClose={()=>setChoice(undefined)} onSubmit={reason=>void action(async()=>{await api(`/api/v1/tasks/${task!.id}/decision`,{decision:choice==='approve'?'APPROVE':'RETURN',reason,versionId});setChoice(undefined);})}/>}
+  {choice&&effective&&<DecisionDialog record={{act_number:detail.act_number,version:version?.number,cycle:cycle?.number}} comments={notes.filter(c=>c.task_id===task!.id)} choice={choice} busy={busy} onClose={()=>setChoice(undefined)} onSubmit={reason=>void act(async()=>{await api(`/api/v1/tasks/${task!.id}/decision`,{decision:choice==='approve'?'APPROVE':'RETURN',reason,versionId});setChoice(undefined);})}/>}
  </div>,document.body);
 }
