@@ -1,10 +1,11 @@
 import {useEffect,useState} from 'react';
-import {dateTime} from './Ui.js';
+import {Icon,dateTime} from './Ui.js';
 import './accounts.css';
 type Row=Record<string,any>;
 type Api=(p:string,b?:object|FormData)=>Promise<any>;
 type Tab='health'|'documents'|'backups'|'errors';
 const tabs:[Tab,string][]=[['health','Состояние'],['documents','Документы'],['backups','Резервные копии'],['errors','Журнал ошибок']];
+const tabIcons:Record<Tab,string>={health:'heart',documents:'folder',backups:'stack',errors:'alert'};
 const bytes=(n?:number|null)=>n==null?'—':n<1024?`${n} Б`:n<1048576?`${(n/1024).toFixed(1)} КБ`:n<1073741824?`${(n/1048576).toFixed(1)} МБ`:`${(n/1073741824).toFixed(2)} ГБ`;
 const levelName:Record<string,string>={error:'Ошибка',warn:'Внимание',info:'Для сведения'};
 const stateName:Record<string,string>={DRAFT:'Черновик',RIRU_REVIEW:'У начальника РИРУ',RES_REVIEW:'У начальника РЭС',CENTRAL_REVIEW:'У служб',RETURNED:'Возвращён',REVISING:'Пересмотр',APPROVED:'Согласован'};
@@ -41,7 +42,7 @@ export default function ServiceMenu({api,downloadPath,onRestored}:{api:Api;downl
   await api('/api/v1/admin/service/restore',body);onRestored();}});
  const issues:Row[]=health?.issues??[];const problems=issues.filter(i=>i.count>0&&i.level!=='info');
  return <section className="card service-menu" aria-label="Сервисное меню">
-  <div className="queue-switch" role="group" aria-label="Раздел сервиса">{tabs.map(([key,label])=><button key={key} type="button" aria-pressed={tab===key} onClick={()=>{setTab(key);setConfirm(undefined);}}>{label}{key==='health'&&problems.length>0?<b className="tab-count" data-tab="corrections">{problems.length}</b>:null}</button>)}</div>
+  <div className="queue-switch" role="group" aria-label="Раздел сервиса">{tabs.map(([key,label])=><button key={key} type="button" aria-pressed={tab===key} onClick={()=>{setTab(key);setConfirm(undefined);}}><Icon name={tabIcons[key]} size={16}/>{label}{key==='health'&&problems.length>0?<b className="tab-count" data-tab="corrections">{problems.length}</b>:null}</button>)}</div>
   {error&&<p role="alert" className="service-error">{error}</p>}
   {notice&&<p role="status" className="service-notice">{notice}</p>}
   {confirm&&<Confirm word={confirm.word} label={confirm.label} busy={busy} onCancel={()=>setConfirm(undefined)} onConfirm={()=>void run(confirm.run,confirm.word==='УДАЛИТЬ'?'Удалено.':undefined)}/>}

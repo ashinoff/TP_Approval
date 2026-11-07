@@ -1,6 +1,6 @@
 type Row=Record<string,any>;
 export type Section='queue'|'work'|'preparation'|'approved'|'upload'|'progress'|'corrections'|'drafts'|'documents'|'all';
-export const sectionNames:Record<Section,string>={queue:'На согласование',work:'Все в работе',preparation:'Подготовка актов',approved:'Согласованные',upload:'Загрузка документа',progress:'На согласовании',corrections:'Не согласованные',drafts:'Черновики',documents:'Все документы',all:'Все документы'};
+export const sectionNames:Record<Section,string>={queue:'На согласование',work:'Все в работе',preparation:'Подготовка актов',approved:'Согласованные',upload:'Новый документ',progress:'На согласовании',corrections:'Не согласованные',drafts:'Черновики',documents:'Все документы',all:'Все документы'};
 /** Вкладки раздела «Все документы» инженера: только просмотр, загрузка — в отдельном меню. */
 export const documentTabs:Section[]=['drafts','progress','corrections','approved','documents'];
 export const documentTabNames:Partial<Record<Section,string>>={drafts:'Черновики',progress:'На согласовании',corrections:'Не согласованные',approved:'Согласованные',documents:'Все'};

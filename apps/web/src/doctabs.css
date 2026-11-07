@@ -133,3 +133,43 @@
  .data-panel{grid-template-columns:minmax(0,1fr)}
  .data-block.document-card .card-fields{grid-template-columns:1fr}
 }
+
+/* ══ 08.11.2026 (вечер): единый вид переключателей — синий контур и мягкая полупрозрачная синяя заливка ══ */
+:root{--sel-line:var(--brand);--sel-fill:rgb(49 86 163 / .10);--sel-glow:0 0 0 1px rgb(49 86 163 / .12),0 0 12px rgb(49 86 163 / .22)}
+/* бегунок таблеток */
+.pill-thumb{background:var(--sel-fill)!important;box-shadow:inset 0 0 0 1.5px var(--sel-line),var(--sel-glow)!important}
+:is(.queue-switch,.doc-type-switch,.review-subtabs,.note-filter,.review-tabs) button{display:inline-flex!important;align-items:center;gap:7px}
+:is(.queue-switch,.doc-type-switch,.review-subtabs,.note-filter) button[aria-pressed=true],.review-tabs button[aria-selected=true]{color:var(--brand)!important;background:var(--sel-fill)!important;box-shadow:inset 0 0 0 1.5px var(--sel-line)!important}
+:is(.queue-switch,.doc-type-switch,.review-subtabs,.note-filter).has-thumb>button[aria-pressed=true],.review-tabs.has-thumb>button[aria-selected=true]{background:transparent!important;box-shadow:none!important}
+:is(.queue-switch,.doc-type-switch,.review-subtabs,.note-filter) button[aria-pressed=true] svg,.review-tabs button[aria-selected=true] svg{filter:drop-shadow(0 0 2px rgb(49 86 163 / .55))}
+:is(.queue-switch,.doc-type-switch) button svg{flex:none}
+/* счётчики на выбранной вкладке остаются читаемыми */
+:is(.queue-switch,.doc-type-switch) button[aria-pressed=true] .tab-count{background:var(--brand)!important;color:#fff!important}
+/* разделы документа — тот же вид */
+.doc-tab{border:1.5px solid transparent!important}
+.doc-tab[aria-pressed=true]{background:var(--sel-fill)!important;border-color:var(--sel-line)!important;box-shadow:var(--sel-glow)!important}
+.doc-tab:hover:not([aria-pressed=true]){background:rgb(49 86 163 / .05)!important}
+
+/* ══ Левое меню: кнопки одного размера, значки по теме ══ */
+.main-sidebar nav button{height:48px!important;min-height:48px!important;box-sizing:border-box;display:flex!important;align-items:center!important;gap:10px!important;padding:0 12px!important;border:1.5px solid transparent!important;text-align:left}
+.main-sidebar nav button>svg{flex:none;width:20px;height:20px}
+.main-sidebar nav button>span{flex:1;min-width:0;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.main-sidebar nav button>b{flex:none}
+.main-sidebar nav button.selected{background:rgb(91 127 208 / .22)!important;border-color:#6d8fd9!important;box-shadow:0 0 0 1px rgb(109 143 217 / .15),0 0 12px rgb(91 127 208 / .30)!important}
+.main-sidebar nav button.selected>svg{filter:drop-shadow(0 0 3px rgb(140 170 235 / .8))}
+
+/* ══ Реестр: контур и мягкое внутреннее свечение строки по статусу ══ */
+.simple-registry{border-collapse:separate!important;border-spacing:0 6px!important}
+.simple-registry tbody tr.reg-row>td{--tone:#5f6b75;--tone-fill:rgb(95 107 117 / .05);background:var(--tone-fill)!important;border-top:1.5px solid color-mix(in srgb,var(--tone) 45%,transparent)!important;border-bottom:1.5px solid color-mix(in srgb,var(--tone) 45%,transparent)!important;box-shadow:inset 0 10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent),inset 0 -10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent)}
+.simple-registry tbody tr.reg-row>td:first-child{border-left:1.5px solid color-mix(in srgb,var(--tone) 45%,transparent)!important;border-radius:12px 0 0 12px;box-shadow:inset 10px 0 14px -12px color-mix(in srgb,var(--tone) 55%,transparent),inset 0 10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent),inset 0 -10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent)}
+.simple-registry tbody tr.reg-row>td:last-child{border-right:1.5px solid color-mix(in srgb,var(--tone) 45%,transparent)!important;border-radius:0 12px 12px 0;box-shadow:inset -10px 0 14px -12px color-mix(in srgb,var(--tone) 55%,transparent),inset 0 10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent),inset 0 -10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent)}
+.simple-registry tbody tr.reg-ok>td{--tone:#1f5f2a;--tone-fill:rgb(31 95 42 / .06)}
+.simple-registry tbody tr.reg-bad>td{--tone:#8e1f1f;--tone-fill:rgb(142 31 31 / .06)}
+.simple-registry tbody tr.reg-wait>td{--tone:#4a5560;--tone-fill:rgb(74 85 96 / .05)}
+.simple-registry tbody tr.reg-draft>td{--tone:#4a5560;--tone-fill:rgb(74 85 96 / .035)}
+.simple-registry tbody tr.reg-row:hover>td{--tone-fill:rgb(49 86 163 / .06)}
+@media(max-width:850px){
+ .simple-registry tbody tr.reg-row{margin:0 0 8px;border:1.5px solid color-mix(in srgb,var(--tone,#4a5560) 45%,transparent);border-radius:12px;overflow:hidden}
+ .simple-registry tbody tr.reg-ok{--tone:#1f5f2a}.simple-registry tbody tr.reg-bad{--tone:#8e1f1f}
+ .simple-registry tbody tr.reg-row>td,.simple-registry tbody tr.reg-row>td:first-child,.simple-registry tbody tr.reg-row>td:last-child{border:0!important;border-radius:0;box-shadow:none}
+}

@@ -88,10 +88,10 @@ export async function runStandaloneBrowser(options:{url:string;initialPassword:s
     pass('Duplicate email is explained; name/login/email/RES and additional roles can be edited and persist after F5');
     await page.getByRole('button',{name:'Выйти',exact:true}).click();await page.getByRole('heading',{name:'Вход в ТП Согласование'}).waitFor();
     await login('browser.engineer.new',options.initialPassword);await change(options.initialPassword);
-    await page.getByRole('heading',{name:'Загрузка документа',exact:true}).waitFor();
+    await page.getByRole('heading',{name:'Новый документ',exact:true}).waitFor();
     assert.equal(await page.getByRole('button',{name:'Пользователи',exact:true}).count(),0);
-    await page.reload();await page.getByRole('heading',{name:'Загрузка документа',exact:true}).waitFor();
-    await options.restart();await page.reload();await page.getByRole('heading',{name:'Загрузка документа',exact:true}).waitFor();
+    await page.reload();await page.getByRole('heading',{name:'Новый документ',exact:true}).waitFor();
+    await options.restart();await page.reload();await page.getByRole('heading',{name:'Новый документ',exact:true}).waitFor();
     pass('Employee opens the existing workspace; sessions and account survive service restart');
     await page.setViewportSize({width:390,height:844});
     // На ошибке перечисляем элементы, выходящие за ширину экрана, чтобы сразу было видно виновника.

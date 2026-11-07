@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {dateTime} from './Ui.js';
+import {Icon,dateTime} from './Ui.js';
 import './accounts.css';
 type Row=Record<string,any>;
 type Book={code:'breakers'|'cables';title:string;rows:Row[];settings:Row;revision:number;updated_at:string;updated_by_name?:string};
@@ -15,6 +15,8 @@ const columns={
 } as const;
 const blank={breakers:{phases:'3ф',from:0,to:0,breaker:0,ct:null},cables:{voltage:'0.38',from:0,to:0,cores:4,section:16}};
 const groupKey=(code:Book['code'],r:Row)=>code==='breakers'?r.phases:r.voltage;
+/** Расчётный ток при верхней границе мощности (cos φ = 1): 1ф — P/U, 3ф — P/(√3·U). Только для наглядности шкалы. */
+const current=(code:Book['code'],r:Row)=>{const single=code==='breakers'?r.phases==='1ф':r.voltage==='0.23';const amps=single?r.to/0.23:r.to/(Math.sqrt(3)*(code==='breakers'?0.4:0.38));return Math.round(amps*10)/10;};
 const norm=(code:Book['code'],r:Row)=>code==='breakers'?`ВА ≤ ${num(r.breaker)} А`:`${r.cores}×${num(r.section)} мм²`;
 
 /**
@@ -48,7 +50,7 @@ export default function ReferenceBooks({api,canEdit}:{api:(p:string,b?:object)=>
  useEffect(()=>{if(picked)document.querySelector('.ref-scale li.picked')?.scrollIntoView({block:'nearest',behavior:'smooth'});},[picked]);
  return <section className="card reference-books" aria-label="Справочники">
   <div className="reference-head">
-   <div className="queue-switch" role="group" aria-label="Справочник">{(['breakers','cables'] as const).map(code=><button key={code} type="button" aria-pressed={tab===code} onClick={()=>switchTab(code)}>{tabName[code]}</button>)}</div>
+   <div className="queue-switch" role="group" aria-label="Справочник">{(['breakers','cables'] as const).map(code=><button key={code} type="button" aria-pressed={tab===code} onClick={()=>switchTab(code)}><Icon name={code==='breakers'?'breaker':'cable'} size={16}/>{tabName[code]}</button>)}</div>
    {canEdit&&book&&!draft&&<button type="button" className="primary-button" onClick={edit}>Редактировать</button>}
   </div>
   <p className="helper-text">{tab==='breakers'
@@ -61,7 +63,7 @@ export default function ReferenceBooks({api,canEdit}:{api:(p:string,b?:object)=>
 
   {book&&!draft&&<>
    <div className="ref-picker">
-    <div className="queue-switch" role="group" aria-label="Группа">{groups[tab].map(([k,l])=><button key={k} type="button" aria-pressed={g===k} onClick={()=>setGroup({...group,[tab]:k})}>{l}</button>)}</div>
+    <div className="queue-switch" role="group" aria-label="Группа">{groups[tab].map(([k,l])=><button key={k} type="button" aria-pressed={g===k} onClick={()=>setGroup({...group,[tab]:k})}><Icon name={k==='1ф'||k==='0.23'?'phase1':'phase3'} size={16}/>{l}</button>)}</div>
     <label className="ref-power">Мощность объекта<span><input inputMode="decimal" placeholder="например, 15" value={power} onChange={e=>setPower(e.target.value)} aria-label="Мощность объекта, кВт"/>кВт</span></label>
     <div className={`ref-result${picked?' found':beyond?' beyond':''}`} aria-live="polite">
      {picked?tab==='breakers'
@@ -75,6 +77,7 @@ export default function ReferenceBooks({api,canEdit}:{api:(p:string,b?:object)=>
     {rows.map((r,i)=><li key={i} className={r===picked?'picked':''} onClick={()=>setPower(num(r.to))} title="Подставить верхнюю границу диапазона">
      <span className="ref-range">{num(r.from)} – {num(r.to)} кВт</span>
      <span className="ref-bar"><i style={{left:`${r.from/max*100}%`,width:`${Math.max(1.5,(r.to-r.from)/max*100)}%`}}/></span>
+     <span className="ref-amp" title={`Расчётный ток при ${num(r.to)} кВт, cos φ = 1`}><Icon name="zap" size={14}/><b>≈ {num(current(tab,r))} А</b><small>при {num(r.to)} кВт</small></span>
      <b className="ref-norm">{norm(tab,r)}</b>
      {tab==='breakers'&&<span className={`ref-ct${r.ct?'':' none'}`}>{r.ct?`ТТ ≥ ${r.ct}`:'без ТТ'}</span>}
     </li>)}

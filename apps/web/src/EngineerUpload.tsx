@@ -48,7 +48,7 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
  const actLabel=type==='AVTU'?'АВТУ':'Акт ТП';
  return <section className="card engineer-upload" aria-label="Загрузка документа инженером">
   <div className="doc-type-switch upload-modes" role="group" aria-label="Вид загружаемого документа">
-   {modes.map(([k,label])=><button key={k} type="button" aria-pressed={mode===k} disabled={locked||!!created} onClick={()=>changeMode(k)}>{label}</button>)}
+   {modes.map(([k,label])=><button key={k} type="button" aria-pressed={mode===k} disabled={locked||!!created} onClick={()=>changeMode(k)}><Icon name={k==='NEW'?'newdoc':'extra'} size={16}/>{label}</button>)}
   </div>
   <p className="helper-text">{mode==='EXTRA'?'Выберите документ договора, вид дополнительного документа и загрузите один PDF.':`Загрузите ТУ — реквизиты заполнятся автоматически. Проверьте их и приложите ${type==='AVTU'?'АВТУ':'акт ТП'}. ПСУ, предыдущий акт и поопорную схему можно приложить сразу или позже.`}</p>
   {error&&<p role="alert">{error}</p>}
@@ -73,7 +73,7 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
     <div className="upload-pair" key={inputKey}>
      <FileTile title="Технические условия" ariaLabel="Файл технических условий" file={tu} disabled={locked||!!created} onFile={f=>void readTu(f)}/>
      <FileTile title={actLabel} ariaLabel="Файл загружаемого документа" file={file} disabled={locked} onFile={setFile}>
-      <div className="doc-type-switch act-kind" role="group" aria-label="Акт ТП или АВТУ">{(['ACT_TP','AVTU'] as const).map(k=><button key={k} type="button" aria-pressed={type===k} disabled={locked||!!created} onClick={()=>changeType(k)}>{k==='AVTU'?'АВТУ':'Акт ТП'}</button>)}</div>
+      <div className="doc-type-switch act-kind" role="group" aria-label="Акт ТП или АВТУ">{(['ACT_TP','AVTU'] as const).map(k=><button key={k} type="button" aria-pressed={type===k} disabled={locked||!!created} onClick={()=>changeType(k)}><Icon name={k==='AVTU'?'form':'file'} size={16}/>{k==='AVTU'?'АВТУ':'Акт ТП'}</button>)}</div>
      </FileTile>
     </div>
     <div className="upload-pair upload-optional" key={'o'+inputKey}>
