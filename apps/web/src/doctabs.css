@@ -158,22 +158,6 @@
 .main-sidebar nav button.selected{background:rgb(91 127 208 / .22)!important;border-color:#6d8fd9!important;box-shadow:0 0 0 1px rgb(109 143 217 / .15),0 0 12px rgb(91 127 208 / .30)!important}
 .main-sidebar nav button.selected>svg{filter:drop-shadow(0 0 3px rgb(140 170 235 / .8))}
 
-/* ══ Реестр: контур и мягкое внутреннее свечение строки по статусу ══ */
-.simple-registry{border-collapse:separate!important;border-spacing:0 6px!important}
-.simple-registry tbody tr.reg-row>td{--tone:#5f6b75;--tone-fill:rgb(95 107 117 / .05);background:var(--tone-fill)!important;border-top:1.5px solid color-mix(in srgb,var(--tone) 45%,transparent)!important;border-bottom:1.5px solid color-mix(in srgb,var(--tone) 45%,transparent)!important;box-shadow:inset 0 10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent),inset 0 -10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent)}
-.simple-registry tbody tr.reg-row>td:first-child{border-left:1.5px solid color-mix(in srgb,var(--tone) 45%,transparent)!important;border-radius:12px 0 0 12px;box-shadow:inset 10px 0 14px -12px color-mix(in srgb,var(--tone) 55%,transparent),inset 0 10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent),inset 0 -10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent)}
-.simple-registry tbody tr.reg-row>td:last-child{border-right:1.5px solid color-mix(in srgb,var(--tone) 45%,transparent)!important;border-radius:0 12px 12px 0;box-shadow:inset -10px 0 14px -12px color-mix(in srgb,var(--tone) 55%,transparent),inset 0 10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent),inset 0 -10px 14px -12px color-mix(in srgb,var(--tone) 55%,transparent)}
-.simple-registry tbody tr.reg-ok>td{--tone:#1f5f2a;--tone-fill:rgb(31 95 42 / .06)}
-.simple-registry tbody tr.reg-bad>td{--tone:#8e1f1f;--tone-fill:rgb(142 31 31 / .06)}
-.simple-registry tbody tr.reg-wait>td{--tone:#4a5560;--tone-fill:rgb(74 85 96 / .05)}
-.simple-registry tbody tr.reg-draft>td{--tone:#4a5560;--tone-fill:rgb(74 85 96 / .035)}
-.simple-registry tbody tr.reg-row:hover>td{--tone-fill:rgb(49 86 163 / .06)}
-@media(max-width:850px){
- .simple-registry tbody tr.reg-row{margin:0 0 8px;border:1.5px solid color-mix(in srgb,var(--tone,#4a5560) 45%,transparent);border-radius:12px;overflow:hidden}
- .simple-registry tbody tr.reg-ok{--tone:#1f5f2a}.simple-registry tbody tr.reg-bad{--tone:#8e1f1f}
- .simple-registry tbody tr.reg-row>td,.simple-registry tbody tr.reg-row>td:first-child,.simple-registry tbody tr.reg-row>td:last-child{border:0!important;border-radius:0;box-shadow:none}
-}
-
 /* ══ 08.11.2026 (ночь): вкладки-переключатели как разделы документа — значок в рамке, без таблеток ══ */
 :is(.queue-switch,.doc-type-switch):not(.zz){display:inline-flex!important;flex-wrap:wrap;gap:4px!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;width:auto!important}
 :is(.queue-switch,.doc-type-switch)>button:not(.zz):not(.zy){display:inline-flex!important;align-items:center;gap:8px!important;padding:4px 12px 4px 4px!important;border:1.5px solid transparent!important;border-radius:12px!important;background:transparent!important;color:var(--ink-2)!important;font-size:var(--fs-s)!important;font-weight:500!important;box-shadow:none!important;min-height:0;transition:background .2s,border-color .2s,box-shadow .25s,color .2s}
@@ -221,3 +205,44 @@
 .doc-panel>.timeline-panel>.section-heading .count-label{background:rgb(255 255 255 / .14);color:#fff;border-radius:999px;padding:3px 10px}
 .doc-panel>.approval-matrix>.matrix-toolbar .link{color:#fff;border:1px solid rgb(255 255 255 / .3);border-radius:999px;padding:5px 12px}
 .doc-panel>.approval-matrix>.matrix-toolbar .link:hover{background:rgb(255 255 255 / .1)}
+
+/* ══ Реестр (08.11.2026): прозрачные карточки, только контур по статусу; внутри — аккуратная подсветка ══ */
+.registry-table-card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}
+.registry-table-card .registry-scroll{border-radius:0;padding:0 4px 6px}
+.simple-registry{border-collapse:separate!important;border-spacing:0 8px!important;background:transparent!important}
+.simple-registry thead th{background:transparent!important;border:0!important;color:var(--muted)!important;font-size:var(--fs-xs)!important;text-transform:uppercase;letter-spacing:.06em;padding:4px 12px!important}
+.simple-registry tbody tr.reg-row{--tone:#8a96a0;--tone-soft:rgb(138 150 160 / .16)}
+.simple-registry tbody tr.reg-wait{--tone:#e08a1e;--tone-soft:rgb(224 138 30 / .16)}
+.simple-registry tbody tr.reg-bad{--tone:#d14343;--tone-soft:rgb(209 67 67 / .14)}
+.simple-registry tbody tr.reg-ok{--tone:#2e8b4a;--tone-soft:rgb(46 139 74 / .15)}
+.simple-registry tbody tr.reg-row>td{background:transparent!important;border:0!important;border-top:1.5px solid var(--tone)!important;border-bottom:1.5px solid var(--tone)!important;padding:12px!important;color:var(--ink-2);box-shadow:none!important;transition:box-shadow .2s}
+.simple-registry tbody tr.reg-row>td:first-child{border-left:1.5px solid var(--tone)!important;border-radius:14px 0 0 14px}
+.simple-registry tbody tr.reg-row>td:last-child{border-right:1.5px solid var(--tone)!important;border-radius:0 14px 14px 0}
+.simple-registry tbody tr.reg-row:hover>td{background:var(--tone-soft)!important}
+.simple-registry tbody tr.reg-row.registry-row-overdue>td{border-style:solid!important}
+/* содержимое */
+.simple-registry td:first-child{font-weight:600;color:var(--ink)!important}
+.simple-registry .registry-number{position:static!important;background:transparent!important;border-left:0!important;min-width:150px;max-width:none}
+.simple-registry .registry-number a b{display:block;font-size:var(--fs-m)!important;font-weight:700;color:var(--ink)!important;letter-spacing:.01em}
+.simple-registry .registry-number a small{display:inline-flex!important;align-items:center;margin-top:4px!important;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--ink-2)!important;font-size:12px;background:var(--surface)}
+.simple-registry tbody tr.reg-row:hover .registry-number a b{color:var(--brand)!important}
+.simple-registry td[data-label="Дата договора"]{color:var(--ink)!important;font-variant-numeric:tabular-nums}
+.simple-registry .stage-caption{color:var(--ink-2)!important;font-weight:600}
+/* этапы маршрута — маленькие чипы с контуром */
+.simple-registry .mini-step{border:1px solid var(--line)!important;background:var(--surface)!important;border-radius:999px!important;padding:2px 8px!important;color:var(--ink-2)}
+.simple-registry .mini-step.flow-completed{border-color:#9fd0ad!important;color:#1f6b36}
+.simple-registry .mini-step.flow-active{border-color:var(--brand)!important;color:var(--brand);box-shadow:0 0 6px var(--glow-soft)}
+.simple-registry .mini-step.flow-returned{border-color:#efb7b3!important;color:var(--red)}
+/* статус — в цвет контура */
+.simple-registry .status-badge{background:transparent!important;border:1.5px solid var(--tone)!important;color:var(--tone)!important;border-radius:999px!important;padding:3px 10px!important;margin:0!important}
+.simple-registry tbody tr.reg-wait .status-badge{color:#b5650a!important}
+.simple-registry td[data-label="Статус"] small{color:var(--ink-2)!important}
+.simple-registry td[data-label="Статус"] small.deadline-danger{color:var(--red)!important;font-weight:600}
+/* кнопки действий — значок в рамке */
+.simple-registry .simple-actions .icon-button,.simple-registry .row-more summary{width:34px;height:34px;padding:0!important;display:grid!important;place-items:center;border:1.5px solid var(--line)!important;border-radius:10px!important;background:var(--surface)!important;color:var(--ink-2)!important;transition:border-color .2s,box-shadow .2s,color .2s}
+.simple-registry .simple-actions .icon-button:hover:not(:disabled),.simple-registry .row-more summary:hover,.simple-registry .row-more[open] summary{border-color:var(--brand)!important;color:var(--brand)!important;box-shadow:0 0 0 1px var(--glow-soft),0 0 10px var(--glow-soft)}
+@media(max-width:850px){
+ .simple-registry tbody tr.reg-row{display:block;margin:0 0 10px;border:1.5px solid var(--tone);border-radius:14px;background:transparent}
+ .simple-registry tbody tr.reg-row:hover{background:var(--tone-soft)}
+ .simple-registry tbody tr.reg-row>td,.simple-registry tbody tr.reg-row>td:first-child,.simple-registry tbody tr.reg-row>td:last-child{border:0!important;border-radius:0;background:transparent!important}
+}
