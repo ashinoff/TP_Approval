@@ -126,6 +126,20 @@ try{
  await sheet.getByText('Согласование не завершено — предварительный лист').waitFor();await sheet.getByText('Начальник РИРУ (тест)').first().waitFor();await sheet.getByText('Сверить мощность с расчётом нагрузки',{exact:false}).waitFor();
  await sheet.getByText('Ожидает решения').first().waitFor();await shot('06-sheet');await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Просмотр'}).click();
  console.log('OK 6: approval sheet lists preparer, approvers with positions, decisions and remarks');
+ // 7. Доработка: возврат → плашка «загрузите исправленный документ · версия 3» → загрузка → сверка с версией 2 (там замечание), прокрутка синхронная.
+ await page.getByRole('button',{name:'Вернуть с замечаниями'}).click();await page.getByRole('button',{name:'Подтвердить возврат',exact:true}).click();await page.getByRole('dialog',{name:'Возврат с замечаниями'}).waitFor({state:'detached',timeout:15000});
+ await page.getByRole('button',{name:'Выйти',exact:true}).click();await login('eng');
+ await page.getByRole('button',{name:'Все документы',exact:true}).click();await page.getByRole('button',{name:/^Не согласованные/}).click();await page.locator('[data-testid^="registry-row-"]').first().click();
+ const banner=page.locator('.rework-banner');await banner.getByText('Документ возвращён на доработку').waitFor({timeout:15000});await banner.getByText('версия 3').first().waitFor();await shot('07-rework');
+ await page.getByLabel('Исправленный документ',{exact:true}).setInputFiles(docs+'engineer-act-good.docx');await banner.getByText('Исправленный документ загружен — версия 3').waitFor({timeout:20000});
+ await banner.getByRole('button',{name:'Сверить исправления'}).click();
+ const compareSel=review.getByRole('combobox',{name:'Документ для сравнения'});await review.locator('iframe').nth(1).waitFor({timeout:20000});
+ assert.match(await compareSel.locator('option:checked').textContent()??'',/версия 2 · замечаний: \d/,'Right pane defaults to the version with remarks');
+ assert.ok(await review.getByLabel('Синхронная прокрутка').isChecked(),'Scroll sync is on when comparing versions');
+ await review.getByLabel('Что исправлено').first().fill('Мощность исправлена по расчёту нагрузки (синтетика).');await review.getByRole('button',{name:'Указать исправление'}).first().click();
+ await review.locator('.review-note').filter({hasText:'Исправлено, ждёт проверки'}).waitFor({timeout:15000});await page.waitForTimeout(500);await shot('07b-rework-compare');
+ await review.getByRole('button',{name:'Завершить проверку'}).click();
+ console.log('OK 7: returned act gets a corrected version 3; review compares it with version 2 (remarks) in sync and the engineer reports the fix');
  await page.getByRole('button',{name:'Режим проверки'}).click();
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);
  assert.ok(await page.evaluate(()=>{const m=document.querySelector('.review-mode')!;return m.scrollWidth<=innerWidth&&m.scrollHeight>innerHeight;}),'Review mode on a phone scrolls vertically without horizontal overflow');

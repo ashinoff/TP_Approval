@@ -44,9 +44,11 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  const check=checkFor(detail,versionId,checkTuId);
 
  // Справа по умолчанию — ТУ, по которым идёт сверка; без ТУ — предыдущая версия акта.
- const defaultSource=()=>{const tu=tus.find(t=>t.id===checkTuId)??tus.at(-1);if(tu)return 'tu:'+tu.id;const prev=detail.versions.filter((v:Row)=>v.id!==versionId).at(-1);return prev?'v:'+prev.id:undefined;};
+ // Исправленная версия сверяется с той, к которой были замечания: она справа по умолчанию, прокрутка синхронная.
+ const remarkedVersion=()=>{const own=detail.versions.find((v:Row)=>v.id===versionId);return [...detail.versions].reverse().find((v:Row)=>v.id!==versionId&&(!own||v.number<own.number)&&detail.comments.some((c:Row)=>c.version_id===v.id));};
+ const defaultSource=()=>{const remarked=remarkedVersion();if(remarked)return 'v:'+remarked.id;const tu=tus.find(t=>t.id===checkTuId)??tus.at(-1);if(tu)return 'tu:'+tu.id;const prev=detail.versions.filter((v:Row)=>v.id!==versionId).at(-1);return prev?'v:'+prev.id:undefined;};
  const [source,setSource]=useState<string|undefined>(defaultSource);
- const [sync,setSync]=useState(false),[panel,setPanel]=useState(true),[tab,setTab]=useState<'remarks'|'check'>(preparing?'check':'remarks'),[noteTab,setNoteTab]=useState<'open'|'resolved'>('open');
+ const [sync,setSync]=useState(()=>!!source?.startsWith('v:')),[panel,setPanel]=useState(true),[tab,setTab]=useState<'remarks'|'check'>(preparing&&!remarkedVersion()?'check':'remarks'),[noteTab,setNoteTab]=useState<'open'|'resolved'>('open');
  const [selection,setSelection]=useState<SelectionAnchor|null>(null),[form,setForm]=useState<SelectionAnchor>(),[focused,setFocused]=useState<string>(),[focusRequest,setFocusRequest]=useState(0);
  const [categories,setCategories]=useState<Row[]>([]),[choice,setChoice]=useState<'approve'|'return'>(),[error,setError]=useState('');
  const explanations=useRef<Record<string,string>>({});
@@ -64,6 +66,8 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  useEffect(()=>{if(source==='v:'+versionId)setSource(defaultSource());},[versionId]);
  const leftDoc=usePreview(version?versionId:undefined,fetchVersion);
  const rightDoc=usePreview(source,fetchSource);
+ useEffect(()=>{if(source?.startsWith('v:'))setSync(true);},[source]);
+ const [rightFocus,setRightFocus]=useState(0);
  useEffect(()=>{api('/api/v1/error-categories').then(setCategories).catch(()=>{});},[api]);
 
  // Цветная разметка: со сверкой ТУ — зелёный/красный/жёлтый в обоих окнах; с другой версией акта — синие изменённые абзацы.
@@ -83,14 +87,18 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  const statusOf=(c:Row)=>c.events.filter((e:Row)=>e.version_id===versionId).at(-1)?.type??c.events.at(-1)?.type??'OPEN';
  const openNotes=notes.filter(c=>statusOf(c)!=='VERIFIED'),resolvedNotes=notes.filter(c=>statusOf(c)==='VERIFIED');
  const versionNotes=useMemo(()=>notes.filter(c=>c.version_id===versionId),[notes,versionId]);
- const goToNote=(c:Row)=>{if(c.version_id!==versionId){setVersionId(c.version_id);}setFocused(c.id);setFocusRequest(n=>n+1);};
+ const rightNotes=useMemo(()=>source?.startsWith('v:')?notes.filter(c=>'v:'+c.version_id===source):[],[notes,source]);
+ // Замечание к версии, открытой справа, показываем справа, не уводя исправленный документ слева.
+ const goToNote=(c:Row)=>{setFocused(c.id);if(c.version_id!==versionId&&'v:'+c.version_id===source){setRightFocus(n=>n+1);return;}if(c.version_id!==versionId){setVersionId(c.version_id);}setFocusRequest(n=>n+1);};
+ // Инженер на доработке отмечает исправление по каждому замечанию прежних версий — прямо здесь, сверяя две версии.
+ const canReport=detail.presentation.canPrepare&&['RETURNED','REVISING'].includes(detail.state)&&versionId===newest?.id;
  const jump=(blockId:string,side:'act'|'tu',text?:string,tone?:'ok'|'bad'|'warn')=>{if(side==='act')left.current?.scrollToBlock(blockId,{text,tone});else if(pairedTu)right.current?.scrollToBlock(blockId,{text,tone});};
  // Клик по отмеченному реквизиту прокручивает второе окно к парному пункту.
  const pairFromLeft=(blockId:string)=>{const b=pairedTu&&pairedBlock(check,blockId,'act');if(!b)return;left.current?.pointAt(blockId,b.own);right.current?.scrollToBlock(b.blockId,b);};
  const pairFromRight=(blockId:string)=>{const b=pairedTu&&pairedBlock(check,blockId,'tu');if(!b)return;right.current?.pointAt(blockId,b.own);left.current?.scrollToBlock(b.blockId,b);};
  const runCheck=()=>void act(()=>api(`/api/v1/acts/${detail.id}/check-tu`,{versionId:newest.id,expectedRevision:detail.revision}));
  const confirm=(field:string,comment:string)=>void act(()=>api(`/api/v1/acts/${detail.id}/check-tu/${check!.id}/confirm`,{field,comment,expectedRevision:detail.revision}));
- const event=async(c:Row,type:string)=>{const explanation=explanations.current[c.id]?.trim();if(!explanation){setError('Опишите результат проверки исправления.');return;}setError('');await act(async()=>{await api(`/api/v1/comments/${c.id}/events`,{versionId,type,explanation});explanations.current[c.id]='';});};
+ const event=async(c:Row,type:string)=>{const explanation=explanations.current[c.id]?.trim();if(!explanation){setError(type==='REPORTED_FIXED'?'Опишите, что исправлено.':'Опишите результат проверки исправления.');return;}setError('');await act(async()=>{await api(`/api/v1/comments/${c.id}/events`,{versionId,type,explanation});explanations.current[c.id]='';});};
  const close=()=>{if(form&&!window.confirm('Закрыть режим проверки? Несохранённое замечание будет потеряно.'))return;if(document.fullscreenElement)void document.exitFullscreen();onClose();};
  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!choice&&!form&&!document.fullscreenElement)onClose();};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[choice,form,onClose]);
  useEffect(()=>{document.body.classList.add('review-open');return()=>document.body.classList.remove('review-open');},[]);
@@ -131,11 +139,11 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
       {!source&&<option value="">Нет документа для сравнения</option>}
       {tus.length>0&&<optgroup label="Технические условия">{[...tus].reverse().map(t=><option key={t.id} value={'tu:'+t.id}>{sourceLabel(t)}</option>)}</optgroup>}
       {extras.length>0&&<optgroup label="Дополнительные документы">{extras.map(x=><option key={x.id} value={'x:'+x.id}>{extraNames[x.kind]??'Документ'}{x.number>1?` (${x.number})`:''}</option>)}</optgroup>}
-      {detail.versions.length>1&&<optgroup label={`Другие версии (${kind})`}>{detail.versions.filter((v:Row)=>v.id!==versionId).map((v:Row)=><option key={v.id} value={'v:'+v.id}>{kind} · версия {v.number}</option>)}</optgroup>}
+      {detail.versions.length>1&&<optgroup label={`Другие версии (${kind})`}>{detail.versions.filter((v:Row)=>v.id!==versionId).map((v:Row)=>{const k=notes.filter(c=>c.version_id===v.id).length;return <option key={v.id} value={'v:'+v.id}>{kind} · версия {v.number}{k?` · замечаний: ${k}`:''}</option>;})}</optgroup>}
      </select>
      <span className="review-readonly">только просмотр</span>
     </div>
-    {!source?<div className="review-empty">Загрузите ТУ в пакет документов, чтобы сверять акт с ними.</div>:rightDoc.data?<DocumentViewer key={source} ref={right} bytes={rightDoc.data.bytes} model={rightDoc.data.model} comments={[]} onSelection={()=>{}} onComment={()=>{}} onScrollRatio={sync?r=>left.current?.scrollToRatio(r):undefined} marks={rightMarks} onMarkClick={pairedTu?pairFromRight:undefined}/>:viewerTitle(rightDoc,'документ')}
+    {!source?<div className="review-empty">Загрузите ТУ в пакет документов, чтобы сверять акт с ними.</div>:rightDoc.data?<DocumentViewer key={source} ref={right} bytes={rightDoc.data.bytes} model={rightDoc.data.model} comments={rightNotes} focusedId={focused} focusRequest={rightFocus} onSelection={()=>{}} onComment={()=>{}} onScrollRatio={sync?r=>left.current?.scrollToRatio(r):undefined} marks={rightMarks} onMarkClick={pairedTu?pairFromRight:undefined}/>:viewerTitle(rightDoc,'документ')}
    </section>
    {!panel&&<button type="button" className="review-edge" onClick={()=>setPanel(true)} aria-label={`Показать замечания: ${notes.length}`}><span>Замечания · {notes.length}</span></button>}
    {panel&&<aside className="review-side" aria-label="Замечания и сверка">
@@ -158,12 +166,14 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
      {(noteTab==='open'?openNotes:resolvedNotes).map((c,i)=>{
       const status=statusOf(c),v=detail.versions.find((x:Row)=>x.id===c.version_id);
       const canVerify=effective&&c.author_id===profile.id&&status==='REPORTED_FIXED';
+      const report=canReport&&!!v&&!!version&&version.number>v.number&&status!=='VERIFIED'&&status!=='REPORTED_FIXED';
       return <article key={c.id} className={`review-note note-${status}${focused===c.id?' is-focused':''}`}>
        <div className="review-note-head"><span className="review-num">{i+1}</span><button type="button" className="text-button" onClick={()=>goToNote(c)}>{kind} · версия {v?.number}{c.anchor?'':' · общее'}</button></div>
        {c.original_value&&<mark className="review-quote">«{c.original_value}»</mark>}
        <p className={status==='VERIFIED'?'resolved-text':''}>{c.text}</p>
        {c.suggested_value&&<p className="review-suggest">Предлагается: {c.suggested_value}</p>}
        <div className="review-note-foot"><span><Icon name="file" size={14}/>{c.author_name} · {roleNames[c.author_role]??''}</span><span className={`review-state state-${status}`}>{states[status]}</span></div>
+       {report&&<div className="review-verify review-report"><textarea aria-label="Что исправлено" placeholder={`Что исправлено в версии ${version.number}`} maxLength={2000} onChange={e=>{explanations.current[c.id]=e.target.value;}}/><div><button className="primary-button" disabled={busy} onClick={()=>void event(c,'REPORTED_FIXED')}>Указать исправление</button></div></div>}
        {canVerify&&<div className="review-verify"><textarea aria-label="Результат проверки исправления" placeholder="Что проверено" maxLength={2000} onChange={e=>{explanations.current[c.id]=e.target.value;}}/><div><button disabled={busy} onClick={()=>void event(c,'VERIFIED')}>Подтвердить устранение</button><button className="danger-button" disabled={busy} onClick={()=>void event(c,'REOPENED')}>Отклонить</button></div></div>}
       </article>;})}
      {!(noteTab==='open'?openNotes:resolvedNotes).length&&<p className="helper-text">{noteTab==='open'?'Открытых замечаний нет.':'Устранённых замечаний пока нет.'}</p>}

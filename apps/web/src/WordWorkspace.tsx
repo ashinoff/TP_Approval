@@ -5,6 +5,7 @@ import {Icon,dateTime,roleNames,shortDate} from './Ui.js';
 import PreparationControls,{SendButton,checkFor,isPreparing,openBlockers,type Action} from './ActDocument.js';
 import PackagePanel,{extraNames} from './ContractDocuments.js';
 import DocTabs,{type Panel} from './DocTabs.js';
+import {uploadDocument} from './document-upload.js';
 import TuPreflight from './TuPreflight.js';
 import DocumentCardPanel from './DocumentCard.js';
 import ReviewMode from './ReviewMode.js';
@@ -139,6 +140,12 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
  const openInView=(key?:string)=>{setOpenDoc(key);onPanel('document');};
  const toCheck=()=>{onPanel('document');setOpenDoc(undefined);requestAnimationFrame(()=>{if(checkRef.current){checkRef.current.open=true;checkRef.current.scrollIntoView({block:'start',behavior:'smooth'});}});};
  const view=panel==='document';
+ // Доработка: после возврата инженер загружает исправленный документ (новая версия), затем сверяет его с версией, где были замечания.
+ const rework=isPreparing(detail)&&['RETURNED','REVISING'].includes(detail.state)&&!!newest;
+ const newestSent=rework&&detail.cycles.some((c:Row)=>c.version_id===newest.id);
+ const remarked=[...detail.versions].reverse().find((v:Row)=>v.id!==newest?.id&&notes.some(c=>c.version_id===v.id));
+ const toFix=notes.filter(c=>{const last=c.events.filter((e:Row)=>e.version_id===newest?.id).at(-1)?.type;return last!=='REPORTED_FIXED'&&last!=='VERIFIED'&&c.events.at(-1)?.type!=='VERIFIED';}).length;
+ const uploadFix=(file:File)=>void action(async()=>{const r=await uploadDocument(api,detail.id,file,detail.act_type);if(r.version)changeVersion(r.version.id);});
 
  return <section className="word-workspace" aria-label="Работа с документом">
   <div className="word-heading doc-bar">
@@ -166,6 +173,15 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
   </div>
   {reviewOpen&&<ReviewMode detail={detail} profile={profile} tasks={tasks} api={api} loadFile={loadFile} action={action} busy={busy} section={section} startVersion={versionId} onClose={()=>setReviewOpen(false)} onFillCard={()=>{setReviewOpen(false);onPanel('details');}}/>}
   {view&&historical&&!openDoc&&<p role="note" className="historical-note">Историческая версия · только просмотр. Решения недоступны.{assigned?<button onClick={()=>changeVersion(assigned)}>Открыть назначенную версию</button>:newest&&<button onClick={()=>changeVersion(newest.id)}>Открыть последнюю версию</button>}</p>}
+  {view&&rework&&<div className={`rework-banner${newestSent?'':' is-uploaded'}`} role="status">
+   <span className="rework-icon" aria-hidden="true"><Icon name={newestSent?'return':'check'} size={20}/></span>
+   {newestSent?<div className="rework-text"><b>{detail.state==='REVISING'?'Пересмотр согласованного документа':'Документ возвращён на доработку'}</b><span>Замечаний к исправлению: {toFix}. Исправьте документ и загрузите его — это будет <b>версия {newest.number+1}</b>.</span></div>
+    :<div className="rework-text"><b>Исправленный документ загружен — версия {newest.number}</b><span>Сверьте его с версией {remarked?.number??newest.number-1}{remarked?' (там замечания)':''} в режиме проверки: две версии рядом, синхронная прокрутка. По каждому замечанию нажмите «Указать исправление»{toFix?` (осталось ${toFix})`:''}.</span></div>}
+   {newestSent?<label className={`primary-button file-button${busy?' is-disabled':''}`}><Icon name="upload" size={16}/>Загрузить исправленный документ · версия {newest.number+1}
+    <input className="sr-only" aria-label="Исправленный документ" type="file" accept=".pdf,application/pdf" disabled={busy} onChange={e=>{const f=e.target.files?.[0];if(f)uploadFix(f);e.target.value='';}}/></label>
+    :<><button className="primary-button" onClick={()=>{if(canLeave())setReviewOpen(true);}}><Icon name="view" size={16}/>Сверить исправления</button>
+     <label className={`secondary-button file-button${busy?' is-disabled':''}`}><Icon name="upload" size={16}/>Загрузить ещё раз · версия {newest.number+1}<input className="sr-only" aria-label="Ещё одна исправленная версия" type="file" accept=".pdf,application/pdf" disabled={busy} onChange={e=>{const f=e.target.files?.[0];if(f)uploadFix(f);e.target.value='';}}/></label></>}
+  </div>}
   {choice&&effective&&<DecisionDialog record={{act_number:detail.act_number,version:current.number,cycle:cycle.number}} comments={notes.filter(c=>c.task_id===task.id)} choice={choice} busy={busy} onClose={()=>setChoice(undefined)} onSubmit={reason=>void action(async()=>{await api(`/api/v1/tasks/${task.id}/decision`,{decision:choice==='approve'?'APPROVE':'RETURN',reason,versionId});setChoice(undefined);})}/>}
   {error&&<p role="alert" className="error">{error}</p>}
 

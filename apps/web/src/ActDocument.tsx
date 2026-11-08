@@ -74,7 +74,7 @@ export default function PreparationControls({detail,api,action,busy,onVersion}:{
  if(!isPreparing(detail))return null;
  const latest=detail.versions.at(-1);
  const upload=async(file:File)=>{const result=await uploadDocument(api,detail.id,file,type,number,date);if(result.version)onVersion(result.version.id);};
- const uploadLabel=type==='TU'?'Загрузить редакцию ТУ':EXTRA_KINDS.includes(type)?`Загрузить: ${extraNames[type]}`:detail.state==='DRAFT'?'Загрузить PDF':'Загрузить исправленную версию';
+ const uploadLabel=type==='TU'?'Загрузить редакцию ТУ':EXTRA_KINDS.includes(type)?`Загрузить: ${extraNames[type]}`:detail.state==='DRAFT'?(latest?`Заменить файл · версия ${latest.number+1}`:'Загрузить PDF · версия 1'):`Исправленный документ · версия ${(latest?.number??0)+1}`;
  return <section className="preparation-controls" aria-label="Подготовка документа">
   <h3 className="panel-subtitle"><Icon name="upload" size={16}/>Загрузить документ</h3>
   <label>Тип загружаемого документа
