@@ -11,14 +11,16 @@ const modes=[['NEW','Новый документ'],['EXTRA','Доп. докум�
 const optional=[['PSU','ПСУ'],['PREV_ACT','Предыдущий акт ТП'],['POLE_SCHEME','Поопорная схема'],['TU_CHANGE','Изменения к ТУ'],['PROJECT','Проект']] as const;
 const extraKinds=[['TU','ТУ (новая редакция)'],...optional] as const;
 
-/** Поле выбора файла в виде полноценной кнопки: название документа, кнопка, имя выбранного файла. */
+/** Строка списка документов: название слева, имя выбранного файла, справа кнопка загрузки. */
 function FileTile({title,ariaLabel,file,disabled,onFile,optional,children}:{title:string;ariaLabel:string;file?:File;disabled:boolean;onFile:(f:File|undefined)=>void;optional?:boolean;children?:ReactNode}){
- return <div className={`file-tile${file?' file-tile-ready':''}${optional?' file-tile-optional':''}`}>
-  <span className="file-tile-title"><Icon name="file"/>{title}{optional&&<small>необязательно</small>}</span>{children}
-  <label className={`primary-button file-button${disabled?' is-disabled':''}`}>Выбрать файл PDF
+ return <div className={`file-tile file-row${file?' file-tile-ready':''}${optional?' file-tile-optional':''}`}>
+  <span className="file-row-icon" aria-hidden="true"><Icon name={file?'okcircle':'file'} size={18}/></span>
+  <span className="file-tile-title">{title}{optional&&<small>необязательно</small>}</span>
+  {children&&<span className="file-row-extra">{children}</span>}
+  <span className="file-name" title={file?.name}>{file?file.name:'Файл не выбран'}</span>
+  <label className={`${file?'secondary-button':'primary-button'} file-button${disabled?' is-disabled':''}`}><Icon name="upload" size={16}/>{file?'Заменить':'Загрузить PDF'}
    <input className="sr-only" aria-label={ariaLabel} type="file" accept=".pdf,application/pdf" disabled={disabled} onChange={e=>onFile(e.target.files?.[0])}/>
   </label>
-  <span className="file-name">{file?file.name:'Файл не выбран'}</span>
  </div>;
 }
 
@@ -48,9 +50,11 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
  const actLabel=type==='AVTU'?'АВТУ':'Акт ТП';
  return <section className="card engineer-upload" aria-label="Загрузка документа инженером">
   <div className="navy-head upload-head">
+   <b className="upload-head-title"><Icon name="newdoc" size={20}/>Новый документ</b>
+   <span className="upload-head-help"><Icon name="alert" size={14}/>Технические данные заполняются автоматически из ТУ. Сканированные документы не читаются — загружайте только PDF, сформированные из Word или Excel.</span>
+  </div>
   <div className="doc-type-switch upload-modes" role="group" aria-label="Вид загружаемого документа">
    {modes.map(([k,label])=><button key={k} type="button" aria-pressed={mode===k} disabled={locked||!!created} onClick={()=>changeMode(k)}><Icon name={k==='NEW'?'newdoc':'extra'} size={16}/>{label}</button>)}
-  </div>
   </div>
   <p className="helper-text">{mode==='EXTRA'?'Выберите документ договора, вид дополнительного документа и загрузите один PDF.':`Загрузите ТУ — реквизиты заполнятся автоматически. Проверьте их и приложите ${type==='AVTU'?'АВТУ':'акт ТП'}. ПСУ, предыдущий акт и поопорную схему можно приложить сразу или позже.`}</p>
   {error&&<p role="alert">{error}</p>}
@@ -69,16 +73,16 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
    {areas.length>1&&<label className="res-field">РЭС<select name="resId" value={resId} disabled={locked||!!created} onChange={e=>{setResId(e.target.value);setReport(undefined);setTu(undefined);setInputKey(k=>k+1);}}>{areas.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label>}
    {mode==='EXTRA'?<>
     <div className="fields"><label>Поиск договора<input aria-label="Поиск договора для ТУ" value={query} onChange={e=>setQuery(e.target.value)}/></label><label>Документ договора<select aria-label="Карточка для ТУ" required value={target} onChange={e=>setTarget(e.target.value)}><option value="">Выберите документ</option>{targets.map(a=><option value={a.id} key={a.id}>{a.contract_number} {labels[a.act_type]}</option>)}</select></label></div>
-    <div className="doc-type-switch extra-kinds" role="group" aria-label="Вид дополнительного документа">{extraKinds.map(([k,label])=><button key={k} type="button" aria-pressed={extraKind===k} disabled={locked} onClick={()=>setExtraKind(k)}>{label}</button>)}</div>
-    <div className="upload-pair single" key={inputKey}><FileTile title={extraKinds.find(([k])=>k===extraKind)![1]} ariaLabel="Файл загружаемого документа" file={file} disabled={locked} onFile={setFile}/></div>
+    <div className="doc-type-switch extra-kinds" role="group" aria-label="Вид дополнительного документа">{extraKinds.map(([k,label])=><button key={k} type="button" aria-pressed={extraKind===k} disabled={locked} onClick={()=>setExtraKind(k)}><Icon name={k==='TU'?'file':'extra'} size={16}/>{label}</button>)}</div>
+    <div className="file-list" key={inputKey}><FileTile title={extraKinds.find(([k])=>k===extraKind)![1]} ariaLabel="Файл загружаемого документа" file={file} disabled={locked} onFile={setFile}/></div>
    </>:<>
-    <div className="upload-pair" key={inputKey}>
+    <div className="file-list" key={inputKey}>
+     <span className="file-list-caption">Обязательные документы</span>
      <FileTile title="Технические условия" ariaLabel="Файл технических условий" file={tu} disabled={locked||!!created} onFile={f=>void readTu(f)}/>
      <FileTile title={actLabel} ariaLabel="Файл загружаемого документа" file={file} disabled={locked} onFile={setFile}>
       <div className="doc-type-switch act-kind" role="group" aria-label="Акт ТП или АВТУ">{(['ACT_TP','AVTU'] as const).map(k=><button key={k} type="button" aria-pressed={type===k} disabled={locked||!!created} onClick={()=>changeType(k)}><Icon name={k==='AVTU'?'form':'file'} size={16}/>{k==='AVTU'?'АВТУ':'Акт ТП'}</button>)}</div>
      </FileTile>
-    </div>
-    <div className="upload-pair upload-optional" key={'o'+inputKey}>
+     <span className="file-list-caption">Дополнительные документы · можно приложить сейчас или позже</span>
      {optional.map(([k,label])=><FileTile key={k} optional title={label} ariaLabel={`Файл: ${label}`} file={extras[k]} disabled={locked} onFile={f=>{setExtras(x=>({...x,[k]:f}));onDirty(true);}}/>)}
     </div>
     {report?.notice&&<p role="status" className="helper-text">{report.notice}</p>}{extracting&&<p role="status">Читаем реквизиты ТУ…</p>}{report&&<p role="status">Реквизиты извлечены из ТУ. Проверьте значения; пустые или неоднозначные поля заполните по ТУ.</p>}
