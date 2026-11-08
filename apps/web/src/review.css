@@ -78,7 +78,6 @@ body.review-open{overflow:hidden}
 .review-edge:hover{background:#2468ad}
 .panel-hidden .review-body{padding-right:44px}
 /* Инструменты проверки — панель поверх правой части окна (08.11.2026) */
-.review-mode{position:relative}
 .review-tools{position:absolute;top:62px;right:12px;bottom:12px;z-index:30;width:min(380px,calc(100% - 24px));display:flex;flex-direction:column;background:#fff;border:1px solid #cfd6e0;border-radius:14px;box-shadow:0 12px 36px rgb(20 34 56 / .28);overflow:hidden}
 .review-tools-head{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--menu,#142238);color:#fff}
 .review-tools-head svg{color:#8fb0ff}
