@@ -327,3 +327,14 @@
  .file-tile.file-row{grid-template-columns:30px minmax(170px,240px) auto minmax(0,1fr) 170px;grid-template-areas:"i t x n b"}
  .file-row-icon{grid-area:i}.file-row .file-tile-title{grid-area:t}.file-row-extra{grid-area:x}.file-row .file-name{grid-area:n}.file-row .file-button{grid-area:b;justify-self:stretch;justify-content:center}
 }
+/* «Технические данные» — тёмная шапка; подзаголовки списка документов подсвечены */
+.engineer-upload .upload-card{padding:0 16px 16px!important;border:1px solid var(--line)!important;border-radius:14px!important;background:var(--surface)!important;overflow:hidden}
+.tech-head{margin:0 -16px 14px;padding:12px 16px;background:var(--menu);color:#fff}
+.tech-head h3{display:flex;align-items:center;gap:8px;margin:0 0 3px!important;font-size:var(--fs-l)!important;color:#fff}
+.tech-head h3 svg{color:#8fb0ff;filter:drop-shadow(0 0 3px rgb(120 160 240 / .6))}
+.tech-head p{margin:0;font-size:var(--fs-s);color:#b8c4d8}
+.file-list-caption{display:flex;align-items:center;gap:8px;padding:10px 16px!important;font-size:13px!important;letter-spacing:.04em!important;color:var(--brand)!important;background:var(--brand-soft)!important;border-left:4px solid var(--brand)}
+.file-list-caption::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--brand);box-shadow:0 0 6px var(--glow)}
+.file-list-caption+.file-tile-optional,.file-list-caption:not(:first-child){}
+.file-list>.file-list-caption:not(:first-child){color:#5d6b78!important;background:var(--paper)!important;border-left-color:#8a96a0}
+.file-list>.file-list-caption:not(:first-child)::before{background:#8a96a0;box-shadow:none}

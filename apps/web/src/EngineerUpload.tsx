@@ -94,8 +94,8 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
      })}
     </div>
     {fields.length>0&&<section className="upload-card" aria-label="Технические данные">
-     <h3>Технические данные</h3>
-     <p className="helper-text">Мощность, напряжение и фазность заполняются из ТУ. Планируемую дату исполнения укажите вручную. Обязательные поля (*) нужны для отправки на согласование.</p>
+     <div className="tech-head"><h3><Icon name="data" size={18}/>Технические данные</h3>
+     <p>Мощность, напряжение и фазность заполняются из ТУ. Планируемую дату исполнения укажите вручную. Обязательные поля (*) нужны для отправки на согласование.</p></div>
      <CardInputs fields={fields} draft={cardDraft} onChange={d=>{setCardDraft(d);onDirty(true);}} disabled={locked} suggestions={report?.card}/>
     </section>}
    </>}
