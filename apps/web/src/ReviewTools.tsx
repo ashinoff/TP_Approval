@@ -13,7 +13,7 @@ const parse=(v:string)=>Number(v.replace(',','.').trim());
 export default function ReviewTools({detail,api,onClose}:{detail:Row;api:(p:string)=>Promise<any>;onClose:()=>void}){
  const card=Object.fromEntries((detail.card??[]).map((v:Row)=>[v.field_code,v.value]));
  const [books,setBooks]=useState<Row[]>([]),[error,setError]=useState('');
- const [power,setPower]=useState(String(card.power_kw??'').replace('.',',')),[phase,setPhase]=useState<'1ф'|'3ф'>(card.phases==='1ф'?'1ф':'3ф'),[cos,setCos]=useState('1');
+ const [power,setPower]=useState(String(card.power_kw??'').replace('.',',')),[phase,setPhase]=useState<'1ф'|'3ф'>(card.phases==='1ф'?'1ф':'3ф'),[cos,setCos]=useState('0,95');
  const [amps,setAmps]=useState('');
  useEffect(()=>{api('/api/v1/references').then(setBooks).catch(e=>setError((e as Error).message));},[api]);
 
@@ -36,7 +36,7 @@ export default function ReviewTools({detail,api,onClose}:{detail:Row;api:(p:stri
     <h3><Icon name="zap" size={16}/>Калькулятор присоединения</h3>
     <div className="tool-inputs">
      <label>Мощность, кВт<input inputMode="decimal" aria-label="Мощность, кВт" value={power} onChange={e=>setPower(e.target.value)} placeholder="например, 15"/></label>
-     <label>cos φ<input inputMode="decimal" aria-label="cos φ" value={cos} onChange={e=>setCos(e.target.value)}/></label>
+     <label title="Коэффициент мощности: при cos φ < 1 полная мощность (кВА) и ток больше активной мощности">cos φ<input inputMode="decimal" aria-label="cos φ" value={cos} onChange={e=>setCos(e.target.value)}/></label>
     </div>
     <div className="doc-type-switch" role="group" aria-label="Фазность">{(['1ф','3ф'] as const).map(k=><button key={k} type="button" aria-pressed={phase===k} onClick={()=>setPhase(k)}><Icon name={k==='1ф'?'phase1':'phase3'} size={16}/>{k==='1ф'?'1ф · 0,23 кВ':'3ф · 0,4 кВ'}</button>)}</div>
     {card.power_kw&&<p className="tool-note">Из карточки: {String(card.power_kw).replace('.',',')} кВт{card.phases?`, ${card.phases}`:''}.</p>}

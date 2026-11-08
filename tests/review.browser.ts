@@ -79,7 +79,7 @@ try{
  await review.getByRole('button',{name:'По ширине'}).first().click();
  // Инструменты: калькулятор присоединения берёт мощность и фазность из карточки (15 кВт, 3ф).
  await review.getByRole('button',{name:'Инструменты'}).click();const tools=review.getByRole('complementary',{name:'Инструменты проверки'});
- await tools.getByText('21,7 А').waitFor();await tools.getByText(/не выше \d+ А/).waitFor();await tools.getByLabel('Ток, А').fill('25');await tools.getByText('17,32 кВт').waitFor();
+ await tools.getByText('22,8 А').waitFor();await tools.getByText('15,79 кВА').waitFor();await tools.getByText(/не выше \d+ А/).waitFor();await tools.getByLabel('Ток, А').fill('25');await tools.getByText('16,45 кВт').waitFor();
  await page.waitForTimeout(300);await shot('02c-tools');await tools.getByRole('button',{name:'Закрыть инструменты'}).click();
  await review.getByLabel('Синхронная прокрутка').check({force:true});await page.waitForTimeout(800);await shot('02-review-engineer');console.log('OK 2: act and TU side by side; requisites marked green/red in both panes with tooltips; zoom +/− without left clipping');
  assert.equal(await review.getByRole('button',{name:'+ Добавить замечание'}).count(),0);
@@ -139,7 +139,7 @@ try{
  await page.getByLabel('Исправленный документ',{exact:true}).setInputFiles(docs+'engineer-act-good.docx');await banner.getByText('Исправленный документ загружен — версия 3').waitFor({timeout:20000});
  await banner.getByRole('button',{name:'Сверить исправления'}).click();
  const compareSel=review.getByRole('combobox',{name:'Документ для сравнения'});await review.locator('iframe').nth(1).waitFor({timeout:20000});
- assert.match(await compareSel.locator('option:checked').textContent()??'',/версия 2 · замечаний: \d/,'Right pane defaults to the version with remarks');
+ assert.match(await compareSel.locator('option:checked').textContent()??'',/версия 2 · замечаний: 1$/,'Right pane defaults to the version with remarks; return adds no duplicate general remark');
  assert.ok(await review.getByLabel('Синхронная прокрутка').isChecked(),'Scroll sync is on when comparing versions');
  await review.getByLabel('Что исправлено').first().fill('Мощность исправлена по расчёту нагрузки (синтетика).');await review.getByRole('button',{name:'Указать исправление'}).first().click();
  await review.locator('.review-note').filter({hasText:'Исправлено, ждёт проверки'}).waitFor({timeout:15000});await page.waitForTimeout(500);await shot('07b-rework-compare');

@@ -111,7 +111,9 @@ export async function decide(db:DB,taskId:string,decision:string,reason:string,v
     if(unresolved.rowCount) throw new HttpError(409,'COMMENT_VERIFICATION_REQUIRED');
   }
   await db.query('INSERT INTO app.decisions(task_id,actor_id,actor_name,decision,reason) VALUES($1,app.uid(),$2,$3,$4)',[taskId,user.profile.name,decision,reason]);
-  if(decision==='RETURN') await db.query('INSERT INTO app.comments(act_id,version_id,task_id,author_id,text) VALUES($1,$2,$3,app.uid(),$4)',[act.id,cycle.version_id,taskId,reason]);
+  // Причина возврата становится общим замечанием, только если своих замечаний к версии нет: иначе одно и то же пришлось бы исправлять дважды.
+  const ownRemarks=decision==='RETURN'&&!!(await db.query('SELECT 1 FROM app.comments WHERE task_id=$1 LIMIT 1',[taskId])).rowCount;
+  if(decision==='RETURN'&&!ownRemarks) await db.query('INSERT INTO app.comments(act_id,version_id,task_id,author_id,text) VALUES($1,$2,$3,app.uid(),$4)',[act.id,cycle.version_id,taskId,reason]);
   await db.query("UPDATE app.tasks SET status='DONE',completed_at=now() WHERE id=$1",[taskId]);
   if(t.role==='RIRU_HEAD') {
     if(decision==='RETURN')await returned(db,act,cycle.id);

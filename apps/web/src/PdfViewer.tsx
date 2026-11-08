@@ -3,6 +3,7 @@ import {getDocument,GlobalWorkerOptions,TextLayer,type PDFDocumentProxy,type Pag
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type {BlockMark,DocumentViewerHandle,JumpHit,SelectionAnchor} from './DocumentViewer.js';
 import './pdf.css';
+import ViewerTools from './ViewerTools.js';
 import {RossetiLoader} from './Brand.js';
 GlobalWorkerOptions.workerSrc=workerUrl;
 type Row=Record<string,any>;
@@ -169,15 +170,10 @@ export default function PdfViewer({bytes,model,comments,onSelection,onComment,fo
  const hits=query.trim()?blocks.filter(b=>b.text.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())):[];
  useEffect(()=>{state.current.search=query.trim()||undefined;setHit(0);if(ready){draw();if(hits[0])scrollToRect(hits[0].id);}},[query,ready]);
  const pages=doc?.numPages??0;
- return <section className="word-preview pdf-preview" aria-label="Просмотр PDF"><div className="word-tools">
-  <div className="zoom-control" role="group" aria-label="Масштаб">
-   <button type="button" aria-label="Уменьшить" title="Уменьшить" disabled={zoom<=40} onClick={()=>{setZoomChosen(true);setZoom(z=>Math.max(40,z-10));}}>−</button><output aria-live="polite">{zoom}%</output>
-   <button type="button" aria-label="Увеличить" title="Увеличить" disabled={zoom>=200} onClick={()=>{setZoomChosen(true);setZoom(z=>Math.min(200,z+10));}}>+</button>
-   <button type="button" className="zoom-fit" title="Страница по ширине окна" onClick={()=>{setZoomChosen(true);if(scroller.current)setZoom(Math.max(40,Math.min(200,Math.floor((scroller.current.clientWidth-48)/((model.pages?.[0]?.width??595)*96/72)*100))));}}>По ширине</button></div>
-  <label>Страница<select aria-label="Страница" value={page} onChange={e=>{const n=Number(e.target.value);setPage(n);const v=viewOf(n);if(v&&scroller.current){silentScroll.current=true;scroller.current.scrollTop=v.el.offsetTop-24;}}}>{Array.from({length:pages},(_,i)=><option key={i} value={i+1}>{i+1} / {pages}</option>)}</select></label>
-  <label>Поиск в документе<input value={query} onChange={e=>setQuery(e.target.value)}/></label>
-  <button className="secondary-button" disabled={!hits.length} onClick={()=>{const next=(hit+1)%hits.length;setHit(next);scrollToRect(hits[next].id);}}>Далее {hits.length?`${hit+1}/${hits.length}`:'0'}</button>
- </div>{error&&<p role="alert">{error}</p>}
+ return <section className="word-preview pdf-preview" aria-label="Просмотр PDF"><ViewerTools zoom={zoom} onZoom={z=>{setZoomChosen(true);setZoom(z);}} onFit={()=>{setZoomChosen(true);if(scroller.current)setZoom(Math.max(40,Math.min(200,Math.floor((scroller.current.clientWidth-48)/((model.pages?.[0]?.width??595)*96/72)*100))));}}
+  page={page} pages={pages} onPage={n=>{setPage(n);const v=viewOf(n);if(v&&scroller.current){silentScroll.current=true;scroller.current.scrollTop=v.el.offsetTop-24;}}}
+  query={query} onQuery={setQuery} hits={hits.length} hit={hit} onNext={()=>{const next=(hit+1)%hits.length;setHit(next);scrollToRect(hits[next].id);}}/>
+ {error&&<p role="alert">{error}</p>}
  <div className="word-frame pdf-frame" ref={frame}><div className={`pdf-scroll${onMarkClick?' mark-click':''}`} ref={scroller} role="document" aria-label="Документ PDF"/>
   {float&&onAddRemark&&(float.invalid?<span className="float-remark float-hint" style={{left:Math.max(4,float.x),top:float.y+6}}>Замечание ставится к тексту документа — начните выделение с текста абзаца</span>
    :<button type="button" className={`float-remark${remarkBlocked?' float-blocked':''}`} title={remarkBlocked} style={{left:Math.max(4,float.x),top:float.y+6}} onMouseDown={e=>e.preventDefault()} onClick={()=>{setFloat(null);onAddRemark();}}>＋ Замечание</button>)}

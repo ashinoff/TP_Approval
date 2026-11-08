@@ -161,15 +161,16 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
    </label>}
    {view&&!openDoc&&<span className="word-meta">{!current?'файл не загружен':cycle?`цикл согласования ${cycle.number}`:'ещё не отправлялась'}</span>}
    {view&&openDoc&&<span className="word-meta">справочный документ</span>}
-   {current&&<button className="primary-button review-launch" onClick={()=>{if(canLeave())setReviewOpen(true);}} title="Акт и ТУ рядом, замечания и автосверка"><Icon name="view" size={16}/>Режим проверки</button>}
    {view&&(shownRef||current)&&<button className="text-button" disabled={busy} onClick={()=>void action(()=>shownRef?onDownload(shownRef.file_id,shownRef.number):onDownload(current.file_id,current.number))}><Icon name="download"/>Скачать оригинал</button>}
-   <span className="word-heading-spacer"/>
+   <div className="doc-bar-actions">
    {effective&&<p className={`task-deadline ${task.overdue?'overdue':''}`}>Ваша задача: {roleNames[task.role]} · срок {dateTime(task.due_at)} МСК{task.overdue?' · Просрочено':''}</p>}
    {effective&&<div className="word-review-actions">
     <button className="danger-button" disabled={busy||!!form} onClick={()=>setChoice('return')}><Icon name="return"/>Вернуть с замечаниями</button>
     <button className="primary-button" disabled={busy||!detail.presentation.actions.approve||!!form} title={notes.some(c=>c.task_id===task.id&&c.anchor)?'К этой версии есть ваше замечание — требуется возврат.':!detail.presentation.actions.approve?'Сначала подтвердите устранение своих предыдущих замечаний.':undefined} onClick={()=>setChoice('approve')}><Icon name="check"/>Согласовать</button>
    </div>}
    {preparing&&<SendButton detail={detail} api={api} action={action} busy={busy} onFillCard={()=>onPanel('details')} onCheck={toCheck}/>}
+   {current&&<button className="primary-button review-launch" onClick={()=>{if(canLeave())setReviewOpen(true);}} title="Акт и ТУ рядом, замечания и автосверка"><Icon name="view" size={20}/>Режим проверки</button>}
+   </div>
   </div>
   {reviewOpen&&<ReviewMode detail={detail} profile={profile} tasks={tasks} api={api} loadFile={loadFile} action={action} busy={busy} section={section} startVersion={versionId} onClose={()=>setReviewOpen(false)} onFillCard={()=>{setReviewOpen(false);onPanel('details');}}/>}
   {view&&historical&&!openDoc&&<p role="note" className="historical-note">Историческая версия · только просмотр. Решения недоступны.{assigned?<button onClick={()=>changeVersion(assigned)}>Открыть назначенную версию</button>:newest&&<button onClick={()=>changeVersion(newest.id)}>Открыть последнюю версию</button>}</p>}

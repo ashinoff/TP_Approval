@@ -338,3 +338,35 @@
 .file-list-caption+.file-tile-optional,.file-list-caption:not(:first-child){}
 .file-list>.file-list-caption:not(:first-child){color:#5d6b78!important;background:var(--paper)!important;border-left-color:#8a96a0}
 .file-list>.file-list-caption:not(:first-child)::before{background:#8a96a0;box-shadow:none}
+
+/* ══ 09.11.2026: панель просмотра в одну строку — значки в рамке со свечением, поиск с подсказкой в поле ══ */
+.word-tools.viewer-tools{display:flex!important;align-items:center!important;flex-wrap:nowrap;gap:8px!important;padding:6px 8px!important;background:var(--surface)!important;border-bottom:1px solid var(--line)}
+.viewer-tools .zoom-control{display:inline-flex;gap:4px!important;padding:0!important;border:0!important;background:transparent!important;align-self:center}
+.viewer-tools .tool-icon{width:34px!important;min-width:34px!important;height:34px!important;padding:0!important;display:grid!important;place-items:center;border:1.5px solid var(--line)!important;border-radius:10px!important;background:var(--surface)!important;color:var(--ink-2)!important;cursor:pointer;transition:border-color .2s,box-shadow .2s,color .2s;margin:0!important}
+.viewer-tools .tool-icon:hover:not(:disabled){border-color:var(--brand)!important;color:var(--brand)!important;box-shadow:0 0 0 1px var(--glow-soft),0 0 10px var(--glow-soft)}
+.viewer-tools .tool-icon:hover:not(:disabled) svg{filter:drop-shadow(0 0 2px var(--glow))}
+.viewer-tools .tool-icon:disabled{opacity:.4;cursor:not-allowed}
+.viewer-tools .page-select{flex:none;width:auto!important;height:34px;padding:0 8px!important;border:1.5px solid var(--line)!important;border-radius:10px!important;background:var(--surface);font-weight:600}
+.viewer-search{flex:1;min-width:120px;display:flex!important;flex-direction:row!important;align-items:center;gap:6px;height:34px;padding:0 3px 0 10px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--muted);margin:0!important}
+.viewer-search:focus-within{border-color:var(--brand);box-shadow:0 0 0 1px var(--glow-soft),0 0 10px var(--glow-soft)}
+.viewer-search input{flex:1;min-width:0;border:0!important;outline:none;background:transparent!important;padding:0!important;font-size:var(--fs-s);box-shadow:none!important}
+.viewer-search .tool-icon{width:28px!important;min-width:28px!important;height:28px!important;border-radius:8px!important}
+.viewer-hits{font-size:12px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+
+/* строка документа: контур у всех кнопок, «Режим проверки» — отдельная крупная кнопка справа */
+.doc-tab:not([aria-pressed=true]){border-color:var(--line)!important;background:var(--surface)!important}
+.doc-bar .text-button{border:1.5px solid var(--line)!important;border-radius:12px!important;background:var(--surface)!important}
+.doc-bar .text-button:hover:not(:disabled){border-color:var(--brand)!important;box-shadow:0 0 0 1px var(--glow-soft),0 0 10px var(--glow-soft)}
+.doc-bar .doc-picker select{border-width:1.5px!important;border-radius:12px!important}
+.doc-bar .word-meta{padding:4px 10px!important;border:1px dashed var(--line)!important;border-radius:10px}
+.doc-bar .review-launch{order:99;margin-left:auto;padding:11px 22px!important;font-size:var(--fs-m)!important;border-radius:14px!important;box-shadow:0 0 0 1px var(--glow-soft),0 4px 14px rgb(49 86 163 / .35)!important}
+
+/* режим проверки: кнопка сворачивания панели заметна, легенда под вкладками справа */
+.review-side-head .review-collapse{width:34px;height:34px;display:grid;place-items:center;border:1.5px solid var(--brand,#3156a3)!important;border-radius:10px!important;background:rgb(49 86 163 / .06)!important;color:var(--brand,#3156a3)!important;cursor:pointer;box-shadow:0 0 8px rgb(49 86 163 / .2)}
+.review-side-head .review-collapse:hover{box-shadow:0 0 0 1px rgb(49 86 163 / .2),0 0 12px rgb(49 86 163 / .4)}
+.review-side>.review-legend{margin:0;padding:8px 12px;border-bottom:1px solid #e3e9ee;background:#fafbfd;display:flex;flex-wrap:wrap;gap:4px 12px}
+.doc-bar .word-heading-spacer{order:96;flex:1 1 0!important;min-width:0}
+.doc-bar .task-deadline{order:97}
+.doc-bar .word-review-actions,.doc-bar .send-wrap{order:98}
+.doc-bar .review-launch{margin-left:0!important}
+.doc-bar-actions{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px 10px}

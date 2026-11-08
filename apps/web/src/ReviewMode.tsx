@@ -133,7 +133,6 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
       {detail.versions.map((v:Row)=><option key={v.id} value={v.id}>{kind} · версия {v.number}{v.id===newest?.id?' · последняя':''}</option>)}
      </select>
     </div>
-    {showMarks&&(leftMarks.length>0)&&<div className="mark-legend review-legend">{rightVersion?<span><i className="changed"/>отличается от версии {rightVersion.number}</span>:<><span><i className="ok"/>совпадает с ТУ</span><span><i className="bad"/>расхождение</span><span><i className="warn"/>проверить вручную</span><span><i className="same"/>одинаково во всём акте</span>{pairedTu&&<span className="legend-hint">клик по пункту — парный пункт в ТУ</span>}</>}</div>}
     {leftDoc.data?<DocumentViewer key={versionId} ref={left} bytes={leftDoc.data.bytes} model={leftDoc.data.model} comments={versionNotes} onSelection={setSelection} onComment={id=>{setFocused(id);setPanel(true);setTab('remarks');}} focusedId={focused} focusRequest={focusRequest} onScrollRatio={sync?r=>right.current?.scrollToRatio(r):undefined} marks={leftMarks} onMarkClick={pairedTu?pairFromLeft:undefined} onAddRemark={addRemark} remarkBlocked={blocked}/>:viewerTitle(leftDoc,kind)}
    </section>
    <section className="review-pane" aria-label="Документ для сравнения">
@@ -155,8 +154,9 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
       <button role="tab" aria-selected={tab==='remarks'} onClick={()=>setTab('remarks')}>Замечания <b>{notes.length}</b></button>
       {detail.tu_check_required!==false&&<button role="tab" aria-selected={tab==='check'} onClick={()=>setTab('check')}>Сверка с ТУ{check?<b className={openBlockers(check).length?'warn':'ok'}>{openBlockers(check).length||'✓'}</b>:null}</button>}
      </div>
-     <button type="button" className="review-icon" aria-label="Скрыть панель" onClick={()=>setPanel(false)}>»</button>
+     <button type="button" className="review-icon review-collapse" aria-label="Скрыть панель" title="Свернуть панель" onClick={()=>setPanel(false)}><Icon name="collapse" size={18}/></button>
     </div>
+    {showMarks&&(leftMarks.length>0)&&<div className="mark-legend review-legend">{rightVersion?<span><i className="changed"/>отличается от версии {rightVersion.number}</span>:<><span><i className="ok"/>совпадает с ТУ</span><span><i className="bad"/>расхождение</span><span><i className="warn"/>проверить вручную</span><span><i className="same"/>одинаково во всём акте</span>{pairedTu&&<span className="legend-hint">клик по пункту — парный пункт в ТУ</span>}</>}</div>}
     {tab==='check'?<div className="review-side-scroll">
      {flagged.length>0&&<div className="review-nav"><button type="button" aria-label="Предыдущее расхождение" onClick={()=>goFlag(-1)}>‹</button><span>{nav>=0?`${nav+1} из ${flagged.length}`:`Требуют внимания: ${flagged.length}`}</span><button type="button" aria-label="Следующее расхождение" onClick={()=>goFlag(1)}>›</button></div>}
      {check&&<p className="helper-text">Пункты акта{pairedTu?' и ТУ':''} размечены цветом: зелёный — совпадает, красный — расхождение, жёлтый — проверить вручную. Нажмите на значение или на пункт в документе, чтобы перейти к паре.</p>}
