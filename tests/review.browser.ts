@@ -76,6 +76,10 @@ try{
  assert.equal(await review.locator('.zoom-control output').first().textContent(),'140%');
  assert.ok(await actFrame.locator('section.docx').first().evaluate((el:Element)=>{el.ownerDocument.defaultView!.scrollTo({left:0});return el.getBoundingClientRect().left>=0;}),'Zoomed page is not clipped on the left');
  await review.getByRole('button',{name:'По ширине'}).first().click();
+ // Инструменты: калькулятор присоединения берёт мощность и фазность из карточки (15 кВт, 3ф).
+ await review.getByRole('button',{name:'Инструменты'}).click();const tools=review.getByRole('complementary',{name:'Инструменты проверки'});
+ await tools.getByText('21,7 А').waitFor();await tools.getByText(/не выше \d+ А/).waitFor();await tools.getByLabel('Ток, А').fill('25');await tools.getByText('17,32 кВт').waitFor();
+ await page.waitForTimeout(300);await shot('02c-tools');await tools.getByRole('button',{name:'Закрыть инструменты'}).click();
  await review.getByLabel('Синхронная прокрутка').check({force:true});await page.waitForTimeout(800);await shot('02-review-engineer');console.log('OK 2: act and TU side by side; requisites marked green/red in both panes with tooltips; zoom +/− without left clipping');
  assert.equal(await review.getByRole('button',{name:'+ Добавить замечание'}).count(),0);
  await review.getByRole('button',{name:'Завершить проверку'}).click();await review.waitFor({state:'detached'});

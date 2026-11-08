@@ -77,3 +77,27 @@ body.review-open{overflow:hidden}
 .review-edge{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:3;writing-mode:vertical-rl;background:#2f7fd0;color:#fff;border:0;border-radius:8px 0 0 8px;padding:16px 8px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:-2px 2px 10px #0002}
 .review-edge:hover{background:#2468ad}
 .panel-hidden .review-body{padding-right:44px}
+/* Инструменты проверки — панель поверх правой части окна (08.11.2026) */
+.review-mode{position:relative}
+.review-tools{position:absolute;top:62px;right:12px;bottom:12px;z-index:30;width:min(380px,calc(100% - 24px));display:flex;flex-direction:column;background:#fff;border:1px solid #cfd6e0;border-radius:14px;box-shadow:0 12px 36px rgb(20 34 56 / .28);overflow:hidden}
+.review-tools-head{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--menu,#142238);color:#fff}
+.review-tools-head svg{color:#8fb0ff}
+.review-tools-head .review-icon{color:#fff;background:transparent;border:1px solid #ffffff40;border-radius:8px;width:30px;height:30px;cursor:pointer}
+.review-tools-body{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.tool-block{border:1px solid var(--line,#dfe5ed);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.tool-block h3{display:flex;align-items:center;gap:8px;margin:0;font-size:15px;color:var(--ink,#1b2b33)}
+.tool-block h3 svg{color:var(--brand,#3156a3)}
+.tool-inputs{display:grid;grid-template-columns:1fr 90px;gap:10px}
+.tool-inputs:has(label:only-child){grid-template-columns:1fr}
+.tool-inputs label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted,#6d7f88)}
+.tool-inputs input{padding:8px 10px;border:1px solid var(--line,#dfe5ed);border-radius:8px;font-size:16px;font-variant-numeric:tabular-nums}
+.tool-result{margin:0;display:grid;gap:6px}
+.tool-result>div{display:flex;justify-content:space-between;gap:10px;padding:6px 10px;border-radius:8px;background:var(--paper,#eef2f3);font-size:14px}
+.tool-result dt{color:var(--ink-2,#4d616b)}
+.tool-result dd{margin:0;font-weight:700;text-align:right}
+.tool-result .tool-main{background:rgb(49 86 163 / .08);border:1.5px solid var(--brand,#3156a3)}
+.tool-result .tool-main dd{font-size:18px;color:var(--brand,#3156a3)}
+.tool-note{margin:0;font-size:12px;color:var(--muted,#6d7f88)}
+.tool-result dd{color:var(--ink,#1b2b33)!important}
+.tool-result dt{color:var(--ink-2,#4d616b)!important}
+.review-tools-body .doc-type-switch>button{color:var(--ink-2)!important}

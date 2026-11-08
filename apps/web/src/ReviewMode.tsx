@@ -10,6 +10,7 @@ import {RossetiLoader} from './Brand.js';
 import {extraNames} from './ContractDocuments.js';
 import {checkMarks,changedMarks,pairedBlock,findingTone} from './review-marks.js';
 import './review.css';
+import ReviewTools from './ReviewTools.js';
 
 type Row=Record<string,any>;
 type Api=(p:string,b?:object|FormData)=>Promise<any>;
@@ -74,7 +75,7 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  const rightTuId=source?.startsWith('tu:')?source.slice(3):undefined;
  const rightVersion=source?.startsWith('v:')?detail.versions.find((v:Row)=>v.id===source.slice(2)):undefined;
  const pairedTu=!!check&&rightTuId===check.technical_conditions_id;
- const [showMarks,setShowMarks]=useState(true);
+ const [showMarks,setShowMarks]=useState(true),[tools,setTools]=useState(false);
  const flagged=useMemo(()=>(check?.findings??[]).filter((f:Row)=>BLOCKING.includes(f.status)&&!check?.confirmations?.some((c:Row)=>c.field===f.field)),[check]);
  const leftMarks=useMemo(()=>!showMarks?[]:rightVersion?changedMarks(leftDoc.data?.model,rightDoc.data?.model,`версии ${rightVersion.number}`):checkMarks(check,'act'),[showMarks,rightVersion,leftDoc.data,rightDoc.data,check]);
  const rightMarks=useMemo(()=>!showMarks?[]:rightVersion?changedMarks(rightDoc.data?.model,leftDoc.data?.model,`версии ${version?.number}`):pairedTu?checkMarks(check,'tu'):[],[showMarks,rightVersion,leftDoc.data,rightDoc.data,check,pairedTu,version]);
@@ -119,10 +120,12 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
    <span className="review-spacer"/>
    <label className="review-switch"><input type="checkbox" checked={showMarks} onChange={e=>setShowMarks(e.target.checked)}/><span aria-hidden="true"/>Подсветка</label>
    <label className="review-switch"><input type="checkbox" checked={sync} onChange={e=>setSync(e.target.checked)}/><span aria-hidden="true"/>Синхронная прокрутка</label>
+   <button type="button" className="review-toggle" aria-pressed={tools} onClick={()=>setTools(v=>!v)}><Icon name="wrench"/>Инструменты</button>
    <button type="button" className="review-toggle" aria-pressed={panel} onClick={()=>setPanel(v=>!v)}><Icon name="file"/>Замечания · {notes.length}</button>
    <button type="button" className="review-icon" aria-label="Во весь экран" title="Во весь экран" onClick={fullscreen}>⛶</button>
   </header>
   {error&&<p role="alert" className="review-error top">{error}<button type="button" aria-label="Скрыть" onClick={()=>setError('')}>×</button></p>}
+  {tools&&<ReviewTools detail={detail} api={api} onClose={()=>setTools(false)}/>}
   <div className="review-body">
    <section className="review-pane review-pane-main" aria-label="Проверяемый документ">
     <div className="review-pane-head"><Icon name="file"/>
