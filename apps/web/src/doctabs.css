@@ -246,3 +246,39 @@
  .simple-registry tbody tr.reg-row:hover{background:var(--tone-soft)}
  .simple-registry tbody tr.reg-row>td,.simple-registry tbody tr.reg-row>td:first-child,.simple-registry tbody tr.reg-row>td:last-child{border:0!important;border-radius:0;background:transparent!important}
 }
+
+/* ══ 08.11.2026 (днём): вкладки «Все документы» — контур у каждой кнопки, свечение в цвет раздела ══ */
+.document-tabs>button:not(.zz):not(.zy){border-color:var(--line)!important;background:var(--surface)!important}
+.document-tabs>button{--tab:var(--brand);--tab-fill:var(--sel-fill);--tab-glow:var(--glow);--tab-glow-soft:var(--glow-soft)}
+.document-tabs>button[data-tab=progress]{--tab:#d97a0c;--tab-fill:rgb(224 138 30 / .12);--tab-glow:rgb(224 138 30 / .55);--tab-glow-soft:rgb(224 138 30 / .2)}
+.document-tabs>button[data-tab=corrections]{--tab:#d14343;--tab-fill:rgb(209 67 67 / .10);--tab-glow:rgb(209 67 67 / .5);--tab-glow-soft:rgb(209 67 67 / .18)}
+.document-tabs>button[data-tab=approved]{--tab:#2e8b4a;--tab-fill:rgb(46 139 74 / .11);--tab-glow:rgb(46 139 74 / .5);--tab-glow-soft:rgb(46 139 74 / .18)}
+.document-tabs>button:hover:not(:disabled):not([aria-pressed=true]){border-color:var(--tab)!important;color:var(--tab)!important;background:var(--surface)!important}
+.document-tabs>button:hover:not(:disabled)>svg{border-color:var(--tab);color:var(--tab)}
+.document-tabs>button[aria-pressed=true]:not(.zz):not(.zy){background:var(--tab-fill)!important;border-color:var(--tab)!important;color:var(--tab)!important;box-shadow:0 0 0 1px var(--tab-glow-soft),0 0 12px var(--tab-glow-soft)!important}
+.document-tabs>button[aria-pressed=true]>svg{border-color:var(--tab);color:var(--tab);box-shadow:0 0 0 1px var(--tab-glow-soft),0 0 10px var(--tab-glow);filter:drop-shadow(0 0 1.5px var(--tab-glow))}
+
+/* ══ Счётчики — квадратные метки ══ */
+.tab-count,.main-sidebar nav button>b,.doc-tab-badge,.bell-button b{border-radius:6px!important}
+.document-tabs .tab-count{min-width:24px;height:24px;font-size:13px!important}
+.document-tabs>button[aria-pressed=true] .tab-count:not(.is-zero){background:var(--tab)!important;color:#fff!important}
+
+/* ══ Реестр: крупнее и читабельнее, важное подсвечено ══ */
+.simple-registry tbody tr.reg-row>td{padding:16px 14px!important;font-size:var(--fs-m)!important;vertical-align:middle}
+.simple-registry thead th{font-size:12px!important;padding:6px 14px!important}
+.simple-registry td:first-child{font-size:var(--fs-m)!important}
+.simple-registry .registry-number a b{font-size:17px!important;font-variant-numeric:tabular-nums}
+.simple-registry .registry-number a small{font-size:13px!important;padding:2px 10px;margin-top:6px!important}
+.simple-registry td[data-label="Дата договора"]{font-size:var(--fs-m)!important;font-weight:600}
+.simple-registry .mini-route{font-size:13px!important;gap:6px!important}
+.simple-registry .mini-step{padding:4px 10px!important;font-size:13px!important;font-weight:600}
+.simple-registry .mini-step svg{width:14px;height:14px}
+.simple-registry .stage-caption{font-size:var(--fs-m)!important;margin-top:8px!important;color:var(--ink)!important}
+.simple-registry .stage-caption::before{content:"Сейчас: ";font-weight:500;color:var(--muted)}
+.simple-registry .status-badge{font-size:var(--fs-s)!important;padding:5px 12px!important;font-weight:700}
+.simple-registry .status-badge svg{width:16px;height:16px}
+.simple-registry td[data-label="Статус"] small{font-size:var(--fs-s)!important;margin-top:8px!important;font-weight:600}
+.simple-registry td[data-label="Статус"] small.deadline-danger{display:inline-flex!important;align-items:center;gap:5px;padding:2px 8px;border-radius:6px;background:var(--red-soft)}
+.simple-registry .simple-actions .icon-button,.simple-registry .row-more summary{width:40px;height:40px}
+.simple-registry .simple-actions svg{width:20px;height:20px}
+.simple-registry td small.reg-remarks{display:inline-flex!important;align-items:center;gap:6px;padding:3px 9px;border-radius:6px;border:1px solid #efb7b3;background:var(--red-soft);color:var(--red)!important}
