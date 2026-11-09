@@ -33,6 +33,7 @@ const symbols:Record<string,ReactNode>={
   calendar:<><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/></>,
   form:<><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 7.5h8M8 11.5h8M8 15.5h5"/></>,
   book:<><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v16H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5M8 6.5h8M8 10h5"/></>,
+  sync:<><rect x="2.5" y="4" width="7" height="9" rx="1.5"/><rect x="14.5" y="11" width="7" height="9" rx="1.5"/><path d="M12 6h5.5a2 2 0 0 1 2 2v1.5m-1.8-1.7 1.8 1.8 1.8-1.8"/><path d="M12 18H6.5a2 2 0 0 1-2-2v-1.5m1.8 1.7-1.8-1.8-1.8 1.8"/></>,
   wrench:<><path d="M14.7 6.3a4.5 4.5 0 0 0 5.6 5.6l-8.6 8.6a2.1 2.1 0 0 1-3-3z"/><path d="M14.7 6.3 17.5 3.5a4.5 4.5 0 0 1 3 3l-2.8 2.8"/></>,
   pencil:<><path d="M4 20h4L19.5 8.5a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></>,
   send:<><path d="M21 3 10 14"/><path d="m21 3-7 18-4-7-7-4z"/></>,

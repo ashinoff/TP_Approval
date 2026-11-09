@@ -1,4 +1,4 @@
-import {StatusBadge,roleNames,shortDate} from './Ui.js';
+import {Icon,StatusBadge,dateTime,roleNames,shortDate} from './Ui.js';
 import RouteLine from './RouteLine.js';
 
 type Row=Record<string,any>;
@@ -25,6 +25,7 @@ export default function ActHeader({detail,profile,onDelete}:{detail:Row;profile?
    <h2 className="act-title"><span className="act-kind">{kind}</span>{' '}<span className="act-number">{detail.act_number}</span></h2>
    <StatusBadge status={presentation.status}/>
    {presentation.overdue&&<span className="deadline-danger">⚠ Просрочено</span>}
+   {detail.puSync&&detail.puSync.status!=='NOT_SYNCED'&&<span className={`pu-sync-chip pu-${detail.puSync.status.toLowerCase()}`} title={detail.puSync.status==='SYNCED'?`Данные договора переданы в «Учёт ПУ» ${dateTime(detail.puSync.syncedAt)}`:'Данные договора изменились после передачи в «Учёт ПУ» — нужна повторная синхронизация'}><Icon name={detail.puSync.status==='SYNCED'?'check':'alert'} size={14}/>{detail.puSync.status==='SYNCED'?'Учёт ПУ: синхронизирован':'Учёт ПУ: изменён после синхронизации'}</span>}
    <span className="act-title-spacer"/>
    {onDelete&&<button type="button" className="danger-button act-delete" onClick={onDelete} title="Только администратор: удалить документ насовсем">Удалить документ</button>}
   </div>

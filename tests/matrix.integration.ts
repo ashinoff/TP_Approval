@@ -15,6 +15,7 @@ import {runContractDocumentChecks} from './contract-documents.integration.js';
 import {runRiruChecks} from './riru-review.integration.js';
 import {runEngineerChecks} from './engineer.integration.js';
 import {synthContract} from './synthetic-contract.js';
+import {runPuSyncChecks} from './pu-sync.integration.js';
 
 export async function runMatrixIntegration(ownerUrl:string,runtimeUrl:string,root:string){
   const owner=new pg.Pool({connectionString:ownerUrl});const runtime=new pg.Pool({connectionString:runtimeUrl});
@@ -89,5 +90,7 @@ export async function runMatrixIntegration(ownerUrl:string,runtimeUrl:string,roo
     await runContractDocumentChecks({owner,runtime,app:createApp(runtime,config,verifier(config,createLocalJWKSet({keys:[jwk]}))),tokens,users,area});
     await runRiruChecks({owner,app:createApp(runtime,config,verifier(config,createLocalJWKSet({keys:[jwk]}))),tokens,users,area});
     await runEngineerChecks({owner,runtime,app:createApp(runtime,config,verifier(config,createLocalJWKSet({keys:[jwk]}))),tokens,users,area});
+    const syncKey='synthetic-sync-key-'+'0'.repeat(32);
+    await runPuSyncChecks({app:createApp(runtime,{...config,syncApiKey:syncKey},verifier(config,createLocalJWKSet({keys:[jwk]}))),offApp:createApp(runtime,config,verifier(config,createLocalJWKSet({keys:[jwk]}))),tokens,area,syncKey});
   }finally{await runtime.end();await owner.end();}
 }

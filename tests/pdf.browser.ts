@@ -77,6 +77,15 @@ try{
   const warn=again.getByRole('alert').filter({hasText:'уже есть в системе'});await warn.waitFor();assert.equal(await again.getByRole('button',{name:'Сохранить документ',exact:true}).isDisabled(),true);
   await warn.screenshot({path:`${out}/00c-duplicate.png`});await warn.getByRole('button',{name:'Открыть документ'}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor();
   console.log('OK 1b: the same contract number is blocked before saving; the existing document opens from the warning');}
+ // «Синхронизация» с «Учёт ПУ»: договор с техническими характеристиками из ТУ и отметкой «не синхронизирован».
+ {await page.getByRole('button',{name:'Синхронизация',exact:true}).click();const panel=page.getByRole('region',{name:'Синхронизация с «Учёт ПУ»'});
+  const row=panel.getByRole('article',{name:'Договор 00001-26-00000004-1'});await row.waitFor();
+  const tech=await row.getByLabel('Технические характеристики').innerText();assert.ok(tech.includes('15 кВт')&&tech.includes('0,4 кВ'),tech);
+  assert.ok((await row.getByRole('status').innerText()).includes('Не синхронизирован'));
+  assert.equal(await panel.getByRole('button',{name:'Не синхронизированы: 1'}).count(),1);
+  await page.screenshot({path:`${out}/00d-sync.png`,fullPage:true});
+  await row.getByRole('button',{name:'00001-26-00000004-1'}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor();
+  console.log('OK 1c: «Синхронизация» lists the contract with TU characteristics and sync status; the document opens from the list');}
  // 2. Сверка: рамки цвета статуса прямо на странице; клик по красному значению — пара в ТУ обведена, значение выделено.
  await page.getByRole('button',{name:'Режим проверки'}).click();const review=page.getByRole('dialog',{name:'Режим проверки документов'});
  await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();await review.getByText(/⚠ Расхождение/).first().waitFor({timeout:20000});

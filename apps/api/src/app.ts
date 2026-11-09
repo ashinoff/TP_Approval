@@ -29,9 +29,10 @@ import {requireContractNumber} from './contract-number.js';
 import {cardFields,cardValues,missingCardFields,saveCard,cardFromTu,createCardField,updateCardField} from './card.js';
 import {documentModel} from './documents.js';
 import {prepareTu} from './prepare-tu.js';
+import {syncService,workplaceSync,actSync} from './pu-sync.js';
 import {localAuth,listLocalUsers,createLocalUser,updateLocalAccess,addLocalRole,updateLocalProfile,deleteLocalUser} from './local-auth.js';
 
-export type AppConfig = {storagePath:string;maxFileBytes:number;production:boolean;clamavHost?:string;clamavPort?:number;webPath?:string;trustProxyHops?:number} &
+export type AppConfig = {storagePath:string;maxFileBytes:number;production:boolean;clamavHost?:string;clamavPort?:number;webPath?:string;trustProxyHops?:number;syncApiKey?:string} &
   ((AuthConfig & {authMode?:'keycloak';platformOrigin:string}) | {authMode:'local';appOrigin?:string});
 const id=z.string().uuid();
 const text=z.string().trim().min(1).max(2000);
@@ -59,6 +60,8 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   app.use((req,res,next)=>{res.locals.requestId=randomUUID();res.setHeader('X-Request-Id',res.locals.requestId);res.setHeader('Cache-Control','no-store');next();});
   app.get('/health',(_req,res)=>res.json({status:'ok'}));
   app.get('/ready',async(_req,res)=>{try{await pool.query('SELECT id FROM app.res_units LIMIT 1');res.json({status:'ready',uploadsConfigured:!config.production||!!config.clamavHost});}catch{res.status(503).json({status:'unavailable'});}});
+  // Сервисный API для «Учёт ПУ» — по ключу X-Sync-Key, без пользовательского входа (pu-sync.ts).
+  app.use('/sync/v1',syncService(pool,config.syncApiKey));
   if(standalone)standalone.install(app);
   else app.get('/auth/session',(_req,res)=>res.json({mode:'keycloak',authenticated:false}));
   app.use('/api',async(req,res,next)=>{
@@ -91,6 +94,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   }
   get('/api/v1/registry',async(db,req)=>registry(db,req.query));
   get('/api/v1/registry-counts',async db=>registryCounts(db));
+  get('/api/v1/sync',async(db,req)=>({...await workplaceSync(db,req.query),configured:!!config.syncApiKey}),true);
   get('/api/v1/workspace-state',async db=>({tasks:await myTasks(db),notifications:await myNotifications(db),badge:await myBadge(db),counts:await registryCounts(db)}),true);
   get('/api/v1/error-categories',async db=>(await db.query('SELECT * FROM app.error_categories ORDER BY name')).rows);
   post('/api/v1/admin/error-categories',async(db,req)=>{
@@ -235,7 +239,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
     const comments=(await db.query('SELECT c.*,coalesce(c.author_snapshot->>\'name\',(SELECT actor_name FROM app.decisions WHERE task_id=c.task_id)) AS author_name,(SELECT role FROM app.tasks WHERE id=c.task_id) AS author_role,coalesce((SELECT jsonb_agg(e ORDER BY e.created_at,e.id) FROM app.comment_events e WHERE e.comment_id=c.id),\'[]\'::jsonb) AS events FROM app.comments c WHERE c.act_id=$1 ORDER BY c.created_at,c.id',[act.id])).rows;
     const releases=(await db.query('SELECT * FROM app.releases WHERE act_id=$1 ORDER BY published_at',[act.id])).rows;
     const checks=(await db.query("SELECT c.*,coalesce((SELECT jsonb_agg(jsonb_build_object('id',x.id,'field',x.field,'comment',x.comment,'actorId',x.actor_id,'actorName',x.actor_name,'createdAt',x.created_at) ORDER BY x.created_at) FROM app.tu_check_confirmations x WHERE x.check_id=c.id),'[]'::jsonb) AS confirmations FROM app.tu_checks c WHERE c.act_id=$1 ORDER BY c.created_at DESC,c.id DESC LIMIT 100",[act.id])).rows;
-    return {...act,checks,checkRulesVersion:await currentRulesVersion(db),card:await cardValues(db,act.id),cardMissing:await missingCardFields(db,act),contractDocuments:await contractDocuments(db,act),versions,cycles,tasks,comments,releases,presentation:await registryAct(db,act.id),timeline:await timeline(db,act.id)};
+    return {...act,checks,checkRulesVersion:await currentRulesVersion(db),card:await cardValues(db,act.id),cardMissing:await missingCardFields(db,act),puSync:await actSync(db,act.contract_number),contractDocuments:await contractDocuments(db,act),versions,cycles,tasks,comments,releases,presentation:await registryAct(db,act.id),timeline:await timeline(db,act.id)};
   },true);
   const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:config.maxFileBytes,files:1,fields:4}});
   app.post('/api/v1/documents/extract-tu',upload.single('file'),async(req,res)=>{

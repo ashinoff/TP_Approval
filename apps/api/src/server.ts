@@ -10,10 +10,10 @@ const env=z.object({
   PORT:z.coerce.number().int().min(1).max(65535).default(3000),NODE_ENV:z.enum(['development','test','production']).default('development'),
   CLAMAV_HOST:z.string().trim().min(1).optional(),CLAMAV_PORT:z.coerce.number().int().min(1).max(65535).default(3310),
   HOST:z.enum(['127.0.0.1','0.0.0.0']).default('127.0.0.1'),WEB_PATH:z.string().optional(),
-  TRUST_PROXY_HOPS:z.coerce.number().int().min(0).max(3).default(0),APP_ORIGIN:z.url().optional()
+  TRUST_PROXY_HOPS:z.coerce.number().int().min(0).max(3).default(0),SYNC_API_KEY:z.string().trim().min(32).optional(),APP_ORIGIN:z.url().optional()
 }).parse(process.env);
 const production=env.NODE_ENV==='production';
-const base={storagePath:env.STORAGE_PATH,maxFileBytes:env.MAX_FILE_BYTES,production,clamavHost:env.CLAMAV_HOST,clamavPort:env.CLAMAV_PORT,webPath:env.WEB_PATH,trustProxyHops:env.TRUST_PROXY_HOPS};
+const base={storagePath:env.STORAGE_PATH,maxFileBytes:env.MAX_FILE_BYTES,production,clamavHost:env.CLAMAV_HOST,clamavPort:env.CLAMAV_PORT,webPath:env.WEB_PATH,trustProxyHops:env.TRUST_PROXY_HOPS,syncApiKey:env.SYNC_API_KEY};
 let config:AppConfig;
 if(env.AUTH_MODE==='local'){
   if(production&&env.APP_ORIGIN&&!env.APP_ORIGIN.startsWith('https://'))throw new Error('APP_ORIGIN must use HTTPS');
