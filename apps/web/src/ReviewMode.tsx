@@ -105,7 +105,7 @@ export default function ReviewMode({detail,profile,tasks,api,loadFile,action,bus
  useEffect(()=>{document.body.classList.add('review-open');return()=>document.body.classList.remove('review-open');},[]);
  const fullscreen=()=>{if(document.fullscreenElement)void document.exitFullscreen();else void root.current?.requestFullscreen?.();};
 
- const kind=detail.act_type==='AVTU'?'АВТУ':'Акт ТП';
+ const kind=(detail.act_type==='AVTU'?'АВТУ':detail.act_type==='NOTICE'?'Уведомление':'Акт ТП');
  const sourceLabel=(t:Row)=>`Технические условия · ред. ${t.number}${t.document_number?` № ${t.document_number}`:''}${t.id===checkTuId?' · по ним сверка':''}`;
  const ownRemark=!!task&&notes.some(c=>c.task_id===task.id&&c.version_id===versionId);
  const viewerTitle=(d:typeof leftDoc,label:string)=>d.error?<p role="alert" className="review-error">{d.error}</p>:<RossetiLoader label={`Загрузка: ${label}…`}/>;

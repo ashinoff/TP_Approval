@@ -132,7 +132,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
 
  const tus:Row[]=detail.contractDocuments?.technicalConditions??[];
  const extras:Row[]=detail.contractDocuments?.extraDocuments??[];
- const kind=detail.act_type==='AVTU'?'АВТУ':'Акт ТП';
+ const kind=(detail.act_type==='AVTU'?'АВТУ':detail.act_type==='NOTICE'?'Уведомление':'Акт ТП');
  const missingCard:string[]=preparing?detail.cardMissing??[]:[];
  // Скачать то, что сейчас открыто в просмотре: версию акта, ТУ или доп. документ.
  const shownRef=openDoc?openDoc.startsWith('tu:')?tus.find(t=>'tu:'+t.id===openDoc):extras.find(x=>'x:'+x.id===openDoc):undefined;
@@ -140,6 +140,8 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
  const openInView=(key?:string)=>{setOpenDoc(key);onPanel('document');};
  const toCheck=()=>{onPanel('document');setOpenDoc(undefined);requestAnimationFrame(()=>{if(checkRef.current){checkRef.current.open=true;checkRef.current.scrollIntoView({block:'start',behavior:'smooth'});}});};
  const view=panel==='document';
+ // ПСУ договора — к п. 4 уведомления «Открыть ПСУ» в отчёте сверки.
+ const psuDoc=extras.find(x=>x.kind==='PSU');
  // Доработка: после возврата инженер загружает исправленный документ (новая версия), затем сверяет его с версией, где были замечания.
  const rework=isPreparing(detail)&&['RETURNED','REVISING'].includes(detail.state)&&!!newest;
  const newestSent=rework&&detail.cycles.some((c:Row)=>c.version_id===newest.id);
@@ -231,7 +233,7 @@ export default function WordWorkspace({detail,profile,tasks,api,loadFile,action,
      <aside className="word-remarks" aria-label="Замечания к документу">
       {showCheck&&<details ref={checkRef} className="side-block check-block" open={preparing||!!effective||undefined}>
        <summary>{checkSummary(check)}</summary>
-       <TuPreflight check={check} required={detail.tu_check_required} busy={busy} editable={preparing} onCheck={preparing?runCheck:undefined} onConfirm={preparing?confirm:undefined} onJump={id=>viewerRef.current?.scrollToBlock(id)}/>
+       <TuPreflight check={check} required={detail.tu_check_required} busy={busy} editable={preparing} onCheck={preparing?runCheck:undefined} onConfirm={preparing?confirm:undefined} onJump={id=>viewerRef.current?.scrollToBlock(id)} onOpenPsu={psuDoc?()=>openInView('x:'+psuDoc.id):undefined}/>
       </details>}
       {!detail.tu_check_required&&preparing&&<p className="helper-text">Проверка ТУ отключена для этой карточки. Отправка не подтверждает соответствие ТУ.</p>}
 

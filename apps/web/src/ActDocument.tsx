@@ -80,6 +80,7 @@ export default function PreparationControls({detail,api,action,busy,onVersion}:{
   <label>Тип загружаемого документа
    <select aria-label="Тип загружаемого документа" value={type} disabled={busy} onChange={e=>setType(e.target.value)}>
     <option value="ACT_TP" disabled={!!latest&&detail.act_type!=='ACT_TP'}>Акт ТП</option>
+    <option value="NOTICE" disabled={!!latest&&detail.act_type!=='NOTICE'}>Уведомление</option>
     <option value="AVTU" disabled={!!latest&&detail.act_type!=='AVTU'}>АВТУ</option>
     <option value="TU">ТУ</option>
     <optgroup label="Дополнительные документы">{EXTRA_KINDS.map(k=><option key={k} value={k}>{extraNames[k]}</option>)}</optgroup>

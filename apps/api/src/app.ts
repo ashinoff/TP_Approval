@@ -17,7 +17,7 @@ import {approvalMatrix} from './matrix.js';
 import {registry,registryAct,registryCounts} from './registry.js';
 import {timeline} from './timeline.js';
 import {preview,createRemark,compareVersions} from './documents.js';
-import {documentKinds,fileKind,documentFilename,extraPreview,extraLabels,contractDocuments,contractActs,rejectDuplicate,registerDocument,selectTechnicalConditions,tuPreview} from './contract-documents.js';
+import {documentKinds,pdfKinds,fileKind,documentFilename,extraPreview,extraLabels,contractDocuments,contractActs,rejectDuplicate,registerDocument,selectTechnicalConditions,tuPreview} from './contract-documents.js';
 import {checkTechnicalConditions,confirmTuFinding,enforceTechnicalConditions} from './tu-validation.js';
 import {currentRulesVersion,referenceBooks,saveReferenceBook} from './references.js';
 import {renderVector} from './vector.js';
@@ -30,6 +30,7 @@ import {cardFields,cardValues,missingCardFields,saveCard,cardFromTu,createCardFi
 import {documentModel} from './documents.js';
 import {prepareTu} from './prepare-tu.js';
 import {syncService,workplaceSync,actSync} from './pu-sync.js';
+import {inspectDocument,pdfPages} from './document-kind.js';
 import {localAuth,listLocalUsers,createLocalUser,updateLocalAccess,addLocalRole,updateLocalProfile,deleteLocalUser} from './local-auth.js';
 
 export type AppConfig = {storagePath:string;maxFileBytes:number;production:boolean;clamavHost?:string;clamavPort?:number;webPath?:string;trustProxyHops?:number;syncApiKey?:string} &
@@ -37,7 +38,7 @@ export type AppConfig = {storagePath:string;maxFileBytes:number;production:boole
 const id=z.string().uuid();
 const text=z.string().trim().min(1).max(2000);
 const expected=z.number().int().nonnegative();
-const createAct=z.object({resId:id,contractNumber:text,contractDate:z.iso.date().nullable(),actNumber:text,applicant:z.string().trim().max(2000),address:z.string().trim().max(2000),actType:z.enum(['ACT_TP','AVTU']).default('ACT_TP')}).strict();
+const createAct=z.object({resId:id,contractNumber:text,contractDate:z.iso.date().nullable(),actNumber:text,applicant:z.string().trim().max(2000),address:z.string().trim().max(2000),actType:z.enum(['ACT_TP','AVTU','NOTICE']).default('ACT_TP')}).strict();
 const myTasks=async(db:DB)=>(await db.query("SELECT t.*,app.task_role(t.role,t.cycle_id) AS role,a.act_number,a.contract_number,a.applicant,a.res_id,a.state AS act_state,(t.due_at<now()) AS overdue FROM app.tasks t JOIN app.acts a ON a.id=t.act_id WHERE app.task_user(t.assignment_id,t.assignee_id)=app.uid() AND t.status='OPEN' AND app.has_role(app.task_role(t.role,t.cycle_id),a.res_id) ORDER BY t.due_at")).rows;
 const myBadge=async(db:DB)=>({count:Number((await db.query("SELECT count(DISTINCT t.act_id) FROM app.tasks t JOIN app.acts a ON a.id=t.act_id WHERE app.task_user(t.assignment_id,t.assignee_id)=app.uid() AND t.status='OPEN' AND app.has_role(app.task_role(t.role,t.cycle_id),a.res_id)")).rows[0].count)});
 const myNotifications=async(db:DB)=>(await db.query("SELECT n.*,a.act_number,a.contract_number,CASE WHEN n.type='RETURNED' THEN (SELECT c.id FROM app.comments c WHERE c.act_id=n.act_id AND c.created_at<=n.created_at ORDER BY c.created_at DESC,c.id LIMIT 1) END AS comment_id FROM app.notifications n JOIN app.acts a ON a.id=n.act_id ORDER BY n.created_at DESC LIMIT 100")).rows;
@@ -213,7 +214,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
   });
   // Есть ли уже документ этого вида по номеру договора (во всех РЭС): форма «Новый документ» предупреждает до сохранения.
   get('/api/v1/contract-acts',async(db,req)=>{
-    const q=z.object({contractNumber:text,actType:z.enum(['ACT_TP','AVTU']).optional()}).parse(req.query);
+    const q=z.object({contractNumber:text,actType:z.enum(['ACT_TP','AVTU','NOTICE']).optional()}).parse(req.query);
     return (await contractActs(db,requireContractNumber(q.contractNumber),q.actType)).map(a=>a.readable?a:{act_type:a.act_type,state:a.state,res_name:a.res_name,readable:false});
   });
   post('/api/v1/acts',async(db,req)=>{
@@ -254,11 +255,23 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
     if(model.blocks.reduce((n,b)=>n+b.text.length,0)>200000)throw new HttpError(422,'DOCUMENT_TOO_LARGE');
     res.json({...extractTuMetadata(model.blocks),sha256:model.sha256,...(prepared.removedTemplateLinks?{preparedFile:{base64:prepared.bytes.toString('base64'),originalSha256:prepared.originalSha256,removedTemplateLinks:prepared.removedTemplateLinks},notice:'Удалена ссылка на локальный шаблон Word. Будет загружена безопасная копия ТУ; исходный файл на компьютере не изменён. Текст, таблицы, изображения и колонтитулы сохранены.'}:{})});
   });
+  // Вид документа по заголовку и разбиение скреплённого PDF на документы (форма «Новый документ», 09.11.2026).
+  app.post('/api/v1/documents/inspect',upload.single('file'),async(req,res)=>{
+    const area=id.parse(req.body.resId);
+    await transaction(pool,res.locals.userId,db=>role(db,'RIRU_ENGINEER',area));
+    const file=requireValue(req.file,422,'FILE_REQUIRED');
+    if(!isPdf(file.buffer))throw new HttpError(415,'PDF_REQUIRED','Загружайте PDF, сформированный из Word или Excel.');
+    await scan(file.buffer);await validatePdf(file.buffer);
+    res.json(await inspectDocument(file.buffer));
+  });
   app.post('/api/v1/acts/:id/files',upload.single('file'),async(req,res)=>{
     const actId=id.parse(req.params.id);const file=requireValue(req.file,422,'FILE_REQUIRED');
-    const meta=z.object({documentType:z.enum(['ACT_TP','AVTU','TU','PSU','PREV_ACT','POLE_SCHEME','TU_CHANGE','PROJECT']).default('ACT_TP'),documentNumber:z.string().trim().max(200).optional(),documentDate:z.iso.date().optional()}).strict().parse(req.body);
+    const meta=z.object({documentType:z.enum(['ACT_TP','AVTU','NOTICE','TU','PSU','PREV_ACT','POLE_SCHEME','TU_CHANGE','PROJECT']).default('ACT_TP'),documentNumber:z.string().trim().max(200).optional(),documentDate:z.iso.date().optional(),pages:z.string().regex(/^\d{1,3}(?:-\d{1,3})?(?:,\d{1,3}(?:-\d{1,3})?){0,40}$/).optional()}).strict().parse(req.body);
     await transaction(pool,res.locals.userId,async db=>{const a=await lockAct(db,actId);await role(db,'RIRU_ENGINEER',a.res_id);if(!['DRAFT','RETURNED','REVISING'].includes(a.state))throw new HttpError(409,'INVALID_STATE');});
+    // Скреплённый PDF (акт + АВТУ + расчёт потерь): форма передаёт страницы своего документа — сохраняется только их копия.
+    if(meta.pages){if(!isPdf(file.buffer))throw new HttpError(415,'PDF_REQUIRED','Разделять можно только PDF.');file.buffer=await pdfPages(file.buffer,meta.pages);file.size=file.buffer.length;}
     const pdf=isPdf(file.buffer);
+    if(meta.documentType==='NOTICE'&&!pdf)throw new HttpError(415,'PDF_REQUIRED','Уведомление загружается только в PDF.');
     const extra=meta.documentType in extraLabels;
     if(extra&&!pdf)throw new HttpError(415,'PDF_REQUIRED','Дополнительные документы загружаются только в PDF.');
     if(pdf)await validatePdf(file.buffer);
@@ -294,7 +307,7 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
     const a=await lockAct(db,id.parse(req.params.id));revision(a,b.expectedRevision);await role(db,'RIRU_ENGINEER',a.res_id);
     if(!['DRAFT','RETURNED','REVISING'].includes(a.state)) throw new HttpError(409,'INVALID_STATE');
     const source=requireValue((await db.query("SELECT * FROM app.files WHERE id=$1 AND act_id=$2 AND scan_status='READY'",[b.fileId,a.id])).rows[0]);
-    if(![documentKinds,{ACT_TP:'ACT_PDF',AVTU:'AVTU_PDF'}].some(k=>source.kind===k[a.act_type as 'ACT_TP'|'AVTU']))throw new HttpError(422,'WRONG_DOCUMENT_TYPE','Для версии акта требуется файл выбранного вида: акт ТП или АВТУ, не ТУ.');
+    if(![documentKinds,pdfKinds].some(k=>source.kind===k[a.act_type as 'ACT_TP'|'AVTU'|'NOTICE']))throw new HttpError(422,'WRONG_DOCUMENT_TYPE','Для версии требуется файл выбранного вида: акт ТП, уведомление или АВТУ, не ТУ.');
     const v=(await db.query('INSERT INTO app.versions(act_id,number,file_id,snapshot,created_by) SELECT $1,coalesce(max(number),0)+1,$2,$3,app.uid() FROM app.versions WHERE act_id=$1 RETURNING *',[a.id,b.fileId,JSON.stringify({actType:a.act_type,contractNumber:a.contract_number,contractDate:a.contract_date,actNumber:a.act_number,applicant:a.applicant,address:a.address,resId:a.res_id,technicalData:b.technicalData})])).rows[0];
     await db.query('UPDATE app.acts SET revision=revision+1 WHERE id=$1',[a.id]);await audit(db,a.id,'VERSION_CREATED',{versionId:v.id});return v;
   });

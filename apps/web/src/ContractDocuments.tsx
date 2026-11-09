@@ -16,7 +16,7 @@ export default function PackagePanel({detail,cycle,onOpen,action,busy,api,onDown
  const latest=detail.versions.at(-1);
  // Согласованная версия — единственная «к печати»; остальные версии остаются историей.
  const pub=detail.presentation.approvedPublication;
- const kind=detail.act_type==='AVTU'?'АВТУ':'АКТ ТП';
+ const kind=(detail.act_type==='AVTU'?'АВТУ':detail.act_type==='NOTICE'?'УВЕДОМЛЕНИЕ':'АКТ ТП');
  const others=folder.acts.filter((a:Row)=>a.id!==detail.id);
  return <section className="data-block contract-documents package-panel" aria-label="Пакет документов">
   <h3 className="data-title"><Icon name="file" size={16}/>Пакет документов<small>договор № {folder.contract.number}</small></h3>
@@ -38,13 +38,13 @@ export default function PackagePanel({detail,cycle,onOpen,action,busy,api,onDown
    </li>)}
    {!tus.length&&<li className="package-item package-missing"><b>ТУ</b><small>не прикреплены — без них отправка невозможна</small></li>}
    {(folder.extraDocuments??[]).map((x:Row)=><li key={x.id} className="package-item package-extra">
-    <button type="button" className="package-open" title="Открыть в просмотре" onClick={()=>onOpen('x:'+x.id)}><Icon name="file"/><span><b>{extraNames[x.kind]??'Документ'}{x.number>1?` (${x.number})`:''}</b><small>к {x.act_type==='AVTU'?'АВТУ':'акту ТП'} · загружено {dateTime(x.created_at)}</small></span></button>
+    <button type="button" className="package-open" title="Открыть в просмотре" onClick={()=>onOpen('x:'+x.id)}><Icon name="file"/><span><b>{extraNames[x.kind]??'Документ'}{x.number>1?` (${x.number})`:''}</b><small>к {(x.act_type==='AVTU'?'АВТУ':x.act_type==='NOTICE'?'уведомлению':'акту ТП')} · загружено {dateTime(x.created_at)}</small></span></button>
     <button type="button" className="icon-button package-download" aria-label={`Скачать: ${extraNames[x.kind]}`} title="Скачать" disabled={busy} onClick={()=>void action(()=>onDownload(x.file_id,x.number))}><Icon name="download"/></button>
    </li>)}
   </ul>
   {others.length>0&&<div className="package-others">
    <small>Другие акты этого договора:</small>
-   {others.map((a:Row)=><a key={a.id} href={`#/acts/${a.id}?section=work`}>{a.act_type==='AVTU'?'АВТУ':'АКТ ТП'} № {a.act_number}</a>)}
+   {others.map((a:Row)=><a key={a.id} href={`#/acts/${a.id}?section=work`}>{(a.act_type==='AVTU'?'АВТУ':a.act_type==='NOTICE'?'УВЕДОМЛЕНИЕ':'АКТ ТП')} № {a.act_number}</a>)}
   </div>}
  </section>;
 }

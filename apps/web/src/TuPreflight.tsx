@@ -61,7 +61,7 @@ function ConfirmForm({field,busy,onConfirm,onReject}:{field:Row;busy:boolean;onC
  * «Сверка с ТУ». The engineer runs the check and confirms disputable items; reviewers see the same report read-only,
  * including who confirmed what manually.
  */
-export default function TuPreflight({check,required,busy,editable=true,onCheck,onConfirm,onJump,tuJump}:{check?:Row;required:boolean;busy:boolean;editable?:boolean;onCheck?:()=>void;onConfirm?:(field:string,comment:string)=>void;onJump?:Jump;tuJump?:boolean}){
+export default function TuPreflight({check,required,busy,editable=true,onCheck,onConfirm,onJump,tuJump,onOpenPsu}:{check?:Row;required:boolean;busy:boolean;editable?:boolean;onCheck?:()=>void;onConfirm?:(field:string,comment:string)=>void;onJump?:Jump;tuJump?:boolean;onOpenPsu?:()=>void}){
  const onTuJump=tuJump?onJump:undefined;
  const [rejected,setRejected]=useRejected(check?.id);
  const findings:Row[]=check?.findings??[];
@@ -103,6 +103,7 @@ export default function TuPreflight({check,required,busy,editable=true,onCheck,o
      <Evidence side="Акт" values={f.act} onJump={onJump} tone={tone}/>
      {(!f.norm||f.tu?.length>0)&&<Evidence side="ТУ" values={f.tu} onJump={onTuJump} tone={tone}/>}
      {f.norm&&<p className="tu-evidence tu-norm"><span>Норма</span>{f.norm}</p>}
+     {f.field==='psu'&&onOpenPsu&&<button type="button" className="secondary-button tu-open-psu" onClick={onOpenPsu}>Открыть ПСУ</button>}
      {confirmation&&<p className="tu-confirmed">Подтверждено вручную: {confirmation.actorName}, {dateTime(confirmation.createdAt)}. «{confirmation.comment}»</p>}
      {no&&<p className="tu-rejected" role="status">✗ Отмечено: не соответствует. Исправьте документ и загрузите новую версию{f.act?.[0]&&onJump?<> — <button type="button" className="text-button" onClick={()=>onJump(f.act[0].blockId,'act',f.act[0].shown??f.act[0].value,'bad')}>показать в акте</button></>:null}. <button type="button" className="text-button" onClick={()=>setRejected(r=>r.filter(x=>x!==f.field))}>Отменить</button></p>}
      {!confirmation&&!no&&editable&&onConfirm&&CONFIRMABLE.includes(f.status)&&<ConfirmForm field={f} busy={busy} onConfirm={onConfirm} onReject={()=>{setRejected(r=>[...r,f.field]);const v=f.act?.[0];if(v&&onJump)onJump(v.blockId,'act',v.shown??v.value,'bad');}}/>}
@@ -113,7 +114,7 @@ export default function TuPreflight({check,required,busy,editable=true,onCheck,o
    <summary>Совпадает: {count('MATCH')}</summary>
    <ul>
     {findings.filter(f=>f.status==='MATCH').map(f=><li key={f.field} className="tu-match">
-     <span className="tu-match-label" title={f.norm}>✓ {f.label}</span>
+     <span className="tu-match-label" title={f.norm}>✓ {f.label}{f.field==='psu'&&onOpenPsu&&<button type="button" className="text-button tu-open-psu" onClick={onOpenPsu}>Открыть ПСУ</button>}</span>
      <span className="tu-match-value" title={f.act[0]?.quote}>{f.act[0]?(onJump?<button type="button" className="tu-quote" onClick={()=>onJump(f.act[0].blockId,'act',f.act[0].shown??f.act[0].value,'ok')}>{shown(f.act[0])}</button>:shown(f.act[0])):''}</span>
     </li>)}
    </ul>

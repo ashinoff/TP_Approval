@@ -7,6 +7,7 @@ import {documentModel} from './documents.js';
 import {compareRequisites,findingsPass,BLOCKING_STATUSES,CONFIRMABLE_STATUSES} from './tu-rules.js';
 import {nominalFindings} from './nominal-rules.js';
 import {actFindings} from './act-rules.js';
+import {noticeFindings} from './notice-rules.js';
 import {currentRulesVersion,loadReferences,rulesVersion} from './references.js';
 
 const PREPARATION_STATES=['DRAFT','RETURNED','REVISING'];
@@ -31,7 +32,12 @@ export async function checkTechnicalConditions(db:DB,storage:string,actId:string
  // Номиналы (ВА, ТТ, сечение) — по справочникам администратора; фазность и мощность из карточки, если заполнены.
  const refs=await loadReferences(db);
  const card=Object.fromEntries((await db.query('SELECT field_code,value FROM app.card_values WHERE act_id=$1',[a.id])).rows.map(r=>[r.field_code,r.value]));
- const findings=[...compareRequisites(models[0].blocks,models[1].blocks,a.contract_number),...nominalFindings(models[0].blocks,models[1].blocks,refs,{phases:card.phases,powerKw:card.power_kw}),...actFindings(models[0] as Parameters<typeof actFindings>[0])];
+ const actChecks=actFindings(models[0] as Parameters<typeof actFindings>[0]);
+ // Уведомление (09.11.2026): свои проверки по разбору владельца; п. 8.1 по схеме заменяет общий вопрос «подтвердите сторону».
+ const notice=a.act_type==='NOTICE'?noticeFindings(models[0] as Parameters<typeof noticeFindings>[0],{tuBlocks:models[1].blocks,attorneys:refs.attorneys.rows,tg:refs.tg.rows,contractDate:(await db.query("SELECT to_char(contract_date,'YYYY-MM-DD') AS d FROM app.acts WHERE id=$1",[a.id])).rows[0].d,
+  psuAttached:!!(await db.query("SELECT 1 FROM app.extra_documents e JOIN app.acts o ON o.id=e.act_id WHERE o.contract_id=$1 AND e.kind='PSU' LIMIT 1",[a.contract_id])).rowCount}):[];
+ const replaced=new Set(notice.map(f=>f.field));
+ const findings=[...compareRequisites(models[0].blocks,models[1].blocks,a.contract_number),...nominalFindings(models[0].blocks,models[1].blocks,refs,{phases:card.phases,powerKw:card.power_kw}),...actChecks.filter(f=>!replaced.has(f.field)),...notice];
  const status=findingsPass(findings)?'PASS':'BLOCKED';
  const result=(await db.query('INSERT INTO app.tu_checks(act_id,version_id,technical_conditions_id,act_hash,tu_hash,rules_version,status,findings,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,app.uid()) RETURNING *',[a.id,versionId,s.tu.id,s.version.sha256,s.tu.sha256,rulesVersion(refs),status,JSON.stringify(findings)])).rows[0];
  await audit(db,a.id,'TU_CHECKED',{checkId:result.id,versionId,technicalConditionsId:s.tu.id,status});

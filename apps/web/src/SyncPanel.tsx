@@ -45,7 +45,7 @@ export default function SyncPanel({api,resUnits,fixedRes,onOpen}:{api:(p:string)
     return <article key={r.number_key} className={`sync-row sync-${s.toLowerCase()}`} aria-label={`Договор ${r.contract_number}`}>
      <div className="sync-main">
       <button type="button" className="sync-number" onClick={()=>onOpen(r.act_id)} title="Открыть документ">{r.contract_number}</button>
-      <span className="sync-meta">{r.contract_day?`от ${shortDate(r.contract_day)} · `:''}{r.res_name} · {r.act_type==='AVTU'?'АВТУ':'Акт ТП'} · {stateNames[r.state]??r.state}{r.documents>1?` · документов: ${r.documents}`:''}</span>
+      <span className="sync-meta">{r.contract_day?`от ${shortDate(r.contract_day)} · `:''}{r.res_name} · {(r.act_type==='AVTU'?'АВТУ':r.act_type==='NOTICE'?'Уведомление':'Акт ТП')} · {stateNames[r.state]??r.state}{r.documents>1?` · документов: ${r.documents}`:''}</span>
       {(r.applicant||r.address)&&<span className="sync-who">{[r.applicant,r.address].filter(Boolean).join(' · ')}</span>}
      </div>
      <div className="sync-tech" aria-label="Технические характеристики">

@@ -30,7 +30,7 @@ export default function ApprovalSheet({detail,api,profile,onClose,inline=false}:
  useEffect(()=>{if(!printing)return;const t=setTimeout(()=>{window.print();setPrinting(false);},50);return()=>clearTimeout(t);},[printing]);
  const print=()=>{if(inline)setPrinting(true);else window.print();};
  const pub=detail.presentation?.approvedPublication;
- const kind=detail.act_type==='AVTU'?'АВТУ':'Акт ТП';
+ const kind=(detail.act_type==='AVTU'?'АВТУ':detail.act_type==='NOTICE'?'Уведомление':'Акт ТП');
  const finalCycle=pub?detail.cycles.find((c:Row)=>c.id===pub.cycleId):detail.cycles.at(-1);
  const finalMatrix=matrices?.find(m=>m.cycle?.id===finalCycle?.id);
  const earlier=(matrices??[]).filter(m=>m.cycle?.id!==finalCycle?.id);

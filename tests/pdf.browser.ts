@@ -15,7 +15,8 @@ import {migrate} from '../scripts/migrate.js';
 import {setupStandalone} from '../scripts/setup-standalone.js';
 import {createApp} from '../apps/api/src/app.js';
 import {hashPassword} from '../apps/api/src/passwords.js';
-import {checkedPdf} from './pdf-fixtures.js';
+import {checkedPdf,syntheticPdf} from './pdf-fixtures.js';
+import {PDFDocument} from 'pdf-lib';
 
 const out=resolve('.local/pdf-browser-report');await mkdir(out,{recursive:true});
 const root=await mkdtemp(resolve(tmpdir(),'tp-review-'));
@@ -51,6 +52,8 @@ try{
  const shot=(n:string)=>page.screenshot({path:`${out}/${n}.png`});
  const login=async(l:string)=>{await page.goto(url);await page.getByLabel('Логин',{exact:true}).fill(l);await page.getByLabel('Пароль',{exact:true}).fill(userPassword);await page.getByRole('button',{name:'Войти',exact:true}).click();await page.getByRole('button',{name:'Выйти',exact:true}).waitFor();};
  const docs=resolve(root,'pdf')+'/';await mkdir(docs,{recursive:true});
+ // Скреплённый PDF «уведомление + АВТУ» (09.11.2026): вид по заголовку, документы сохраняются раздельно.
+ {const out=await PDFDocument.create();for(const lines of [['УВЕДОМЛЕНИЕ','об обеспечении сетевой организацией возможности присоединения к электрическим сетям','Приложение к договору № 00001-26-00000004-1'],['АКТ','О ВЫПОЛНЕНИИ ТЕХНИЧЕСКИХ УСЛОВИЙ','Приложение к договору № 00001-26-00000004-1']]){const src=await PDFDocument.load(await syntheticPdf({lines}));for(const pg of await out.copyPages(src,[0]))out.addPage(pg);}await writeFile(docs+'stapled.pdf',await out.save());}
  await writeFile(docs+'tu.pdf',await checkedPdf('15','00001-26-00000004-1','TU'));await writeFile(docs+'act-bad.pdf',await checkedPdf('150'));await writeFile(docs+'act-good.pdf',await checkedPdf('15'));
  // 1. Инженер: загрузка ТУ и акта в PDF, карточка из ТУ.
  await login('eng');const form=page.getByRole('region',{name:'Загрузка документа инженером'});
@@ -75,8 +78,17 @@ try{
  {await page.getByRole('button',{name:'Новый документ',exact:true}).click();const again=page.getByRole('region',{name:'Загрузка документа инженером'});
   await again.getByLabel('Файл технических условий').setInputFiles(docs+'tu.pdf');await again.getByText('Реквизиты извлечены из ТУ').waitFor({timeout:20000});await again.getByLabel('Файл загружаемого документа').setInputFiles(docs+'act-bad.pdf');
   const warn=again.getByRole('alert').filter({hasText:'уже есть в системе'});await warn.waitFor();assert.equal(await again.getByRole('button',{name:'Сохранить документ',exact:true}).isDisabled(),true);
-  await warn.screenshot({path:`${out}/00c-duplicate.png`});await warn.getByRole('button',{name:'Открыть документ'}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor();
-  console.log('OK 1b: the same contract number is blocked before saving; the existing document opens from the warning');}
+  await warn.screenshot({path:`${out}/00c-duplicate.png`});
+  // Тот же договор, но другие виды: уведомление и АВТУ в одном PDF — два документа, каждый своего вида.
+  await again.getByLabel('Файл загружаемого документа').setInputFiles(docs+'stapled.pdf');
+  const parts=again.getByRole('list',{name:'Документы в файле'});await parts.getByRole('listitem').nth(1).waitFor({timeout:20000});
+  const partText=await parts.innerText();assert.ok(partText.includes('Уведомление')&&partText.includes('АВТУ')&&partText.includes('стр. 1')&&partText.includes('стр. 2'),partText);
+  await warn.waitFor({state:'detached'});await page.screenshot({path:`${out}/00e-stapled.png`,fullPage:true});
+  await again.getByRole('button',{name:'Сохранить документ',exact:true}).click();await again.getByRole('status').filter({hasText:'Документ учтён'}).waitFor({timeout:30000});
+  const steps=await again.getByRole('list',{name:'Ход сохранения'}).innerText();assert.ok(steps.includes('Уведомление · версия 1 · стр. 1')&&steps.includes('АВТУ · версия 1 · стр. 2'),steps);
+  await page.getByRole('button',{name:'Режим проверки'}).waitFor({timeout:20000});
+  assert.equal(await page.getByRole('heading',{level:1}).innerText(),'Уведомление');
+  console.log('OK 1b: duplicate of the same kind is blocked; a stapled PDF is split by titles into a notice and an AVTU saved as separate documents');}
  // «Синхронизация» с «Учёт ПУ»: договор с техническими характеристиками из ТУ и отметкой «не синхронизирован».
  {await page.getByRole('button',{name:'Синхронизация',exact:true}).click();const panel=page.getByRole('region',{name:'Синхронизация с «Учёт ПУ»'});
   const row=panel.getByRole('article',{name:'Договор 00001-26-00000004-1'});await row.waitFor();

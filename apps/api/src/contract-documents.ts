@@ -5,11 +5,13 @@ import {type DB,HttpError,requireValue} from './db.js';
 import {audit,lockAct,role,revision} from './workflow.js';
 import {documentModel} from './documents.js';
 
-export const documentKinds={ACT_TP:'ACT_DOCX',AVTU:'AVTU_DOCX',TU:'TU_DOCX'} as const;
-export const pdfKinds={ACT_TP:'ACT_PDF',AVTU:'AVTU_PDF',TU:'TU_PDF'} as const;
+// Уведомление (NOTICE, 09.11.2026) — только PDF: DOCX-вида у него нет.
+export const documentKinds={ACT_TP:'ACT_DOCX',AVTU:'AVTU_DOCX',TU:'TU_DOCX',NOTICE:'NOTICE_PDF'} as const;
+export const pdfKinds={ACT_TP:'ACT_PDF',AVTU:'AVTU_PDF',TU:'TU_PDF',NOTICE:'NOTICE_PDF'} as const;
 /** Вид файла по типу документа и формату (PDF — основной, DOCX — для ранее загруженных). */
 export const fileKind=(type:keyof typeof documentKinds,pdf:boolean)=>(pdf?pdfKinds:documentKinds)[type];
-export const documentLabels={ACT_TP:'Акт ТП',AVTU:'АВТУ',TU:'ТУ'} as const;
+export const documentLabels={ACT_TP:'Акт ТП',AVTU:'АВТУ',NOTICE:'Уведомление',TU:'ТУ'} as const;
+export const ACT_TYPES=['ACT_TP','AVTU','NOTICE'] as const;
 /** Дополнительные документы договора (только PDF, без маршрута согласования). */
 export const extraLabels={PSU:'ПСУ',PREV_ACT:'Предыдущий акт ТП',POLE_SCHEME:'Поопорная схема',TU_CHANGE:'Изменения к ТУ',PROJECT:'Проект'} as const;
 export type ExtraKind=keyof typeof extraLabels;
@@ -23,7 +25,7 @@ export async function rejectDuplicate(db:DB,number:string,type:string,exceptId?:
  // Параллельные сохранения одного номера сериализуются, иначе оба пройдут проверку до вставки.
  await db.query("SELECT pg_advisory_xact_lock(hashtextextended('act:'||app.contract_key($1)||':'||$2,0))",[number,type]);
  const same=(await contractActs(db,number,type)).find(a=>a.id!==exceptId);
- if(same)throw new HttpError(409,'CONTRACT_DUPLICATE',`${documentLabels[type as 'ACT_TP'|'AVTU']} по договору ${number} уже есть в системе (${same.res_name}, ${stateNames[same.state]??same.state}). Повторная загрузка не нужна — откройте существующий документ.`);
+ if(same)throw new HttpError(409,'CONTRACT_DUPLICATE',`${documentLabels[type as 'ACT_TP'|'AVTU'|'NOTICE']} по договору ${number} уже есть в системе (${same.res_name}, ${stateNames[same.state]??same.state}). Повторная загрузка не нужна — откройте существующий документ.`);
 }
 export async function contractDocuments(db:DB,act:Record<string,any>){
  return {contract:requireValue((await db.query('SELECT * FROM app.contracts WHERE id=$1',[act.contract_id])).rows[0]),
@@ -63,7 +65,7 @@ export async function tuPreview(db:DB,storage:string,actId:string,tuId:string){
  return {...await documentModel(bytes),sha256:tu.sha256,versionNumber:tu.number,technicalConditionsId:tu.id};
 }
 export function documentFilename(kind:string,contractNumber:string,number?:number,extraKind?:string){
- const label=extraKind?extraLabels[extraKind as ExtraKind]??'Документ':kind.startsWith('TU_')?'ТУ':kind.startsWith('AVTU_')?'АВТУ':'АКТ ТП';
+ const label=extraKind?extraLabels[extraKind as ExtraKind]??'Документ':kind.startsWith('TU_')?'ТУ':kind.startsWith('AVTU_')?'АВТУ':kind.startsWith('NOTICE_')?'УВЕДОМЛЕНИЕ':'АКТ ТП';
  return `${contractNumber.replace(/[\\/:*?"<>|\r\n]/g,'_').slice(0,120)} ${label}${number&&number>1?` — редакция ${number}`:''}.${kind.endsWith('_PDF')?'pdf':'docx'}`;
 }
 

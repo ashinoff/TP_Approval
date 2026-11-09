@@ -5,7 +5,7 @@ import {breakers,cables,currentTransformers,nominalFindings} from '../apps/api/s
 const blocks=(lines:string[])=>lines.map((text,i)=>({id:`b${i}`,part:'word/document.xml',text,sha256:''})) as any;
 // Справочники берутся из миграции, чтобы тест проверял именно исходные значения владельца.
 const seeds=[...readFileSync(new URL('../db/migrations/021_reference_books.sql',import.meta.url),'utf8').matchAll(/'(\[\{[\s\S]*?\}\])'/g)].map(m=>JSON.parse(m[1]));
-const refs={breakers:{rows:seeds[0],revision:1},cables:{rows:seeds[1],revision:1,brands:['СИП']}};
+const refs={breakers:{rows:seeds[0],revision:1},cables:{rows:seeds[1],revision:1,brands:['СИП']},tg:{rows:[],revision:1},attorneys:{rows:[],revision:1}};
 const act=(power:string,extra:string[])=>blocks([`Максимальная мощность (всего) ${power} кВт, в том числе:`,'Уровень напряжения: 0,4 кВ',...extra]);
 const tu=blocks(['Максимальная мощность: 30 кВт','Класс напряжения: 0,4 кВ','Установка трёхфазных средств учёта прямого включения. Установить автоматический выключатель с Iн по расчету.']);
 const byField=(f:any[])=>Object.fromEntries(f.map(x=>[x.field,x]));

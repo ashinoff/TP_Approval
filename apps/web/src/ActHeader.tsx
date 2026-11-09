@@ -17,7 +17,7 @@ function stageCaption(detail:Row,presentation:Row){
  */
 export default function ActHeader({detail,profile,onDelete}:{detail:Row;profile?:Row;onDelete?:()=>void}){
  const presentation=detail.presentation;
- const kind=detail.act_type==='AVTU'?'АВТУ':'Акт';
+ const kind=(detail.act_type==='AVTU'?'АВТУ':detail.act_type==='NOTICE'?'Уведомление':'Акт');
  const showContractNumber=detail.contract_number&&detail.contract_number!==detail.act_number;
  return <div className="act-header">
   <div className="act-header-top navy-head">

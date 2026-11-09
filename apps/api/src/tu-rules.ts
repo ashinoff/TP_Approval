@@ -9,7 +9,8 @@ import type {Block} from './documents.js';
  * table columns of «Перечень точек присоединения», «(всего) 15,0 (пятнадцать) кВт», existing/new power,
  * the TU number, the applicant, the supply centre, the TU sub-item ranges and the reliability category.
  */
-export const RULES_VERSION='DOCX_CONTEXT_V8';
+export const RULES_VERSION='DOCX_CONTEXT_V9';
+// V9: уведомление (notice-rules.ts), номер ТУ с буквенным хвостом («-сс», «сс/у», «-вд»), «согласно техническим условиям».
 // V7: ФИО и организация с учётом падежа, адрес без «Российская Федерация» и по кадастру, мощность категории (п. 4 ТУ), обозначение ТП и «Р =» на схеме, все места значения.
 // V6: текст рамок схем (mc:AlternateContent) берётся один раз из VML — надписи схемы участвуют в отметках.
 // V5: проверка номиналов ВА/ТТ/сечения по справочникам (nominal-rules.ts); версия отчёта дополняется ревизиями справочников.
@@ -288,7 +289,7 @@ function applicant(blocks:Block[]):Extracted{
  return {values,found:values.length>0};
 }
 
-const TU_NUMBER=/^\s*№?\s*(\d{1,3}-\d{1,3}\/\d{1,6}-\d{2})\s*$/u;
+const TU_NUMBER=/^\s*(?:от\s*)?№?\s*(\d{1,3}-\d{1,3}\/\d{1,6}-\d{2}(?:[-\/]?[\p{L}]{1,3}(?:\/[\p{L}]{1,2})?)?)\s*$/u;
 /** TU own number: the standalone first line / footer of the TU; in the act — «технических условиях от … № …». */
 function tuNumberInTu(blocks:Block[]):Extracted{
  const values:Value[]=[];
@@ -299,9 +300,12 @@ function tuNumberInTu(blocks:Block[]):Extracted{
 }
 function tuNumberInAct(blocks:Block[]):Extracted{
  const values:Value[]=[];
- const pattern=/(?:по\s+техническим\s+условиям|выполнение\s+ТУ|технических\s+условий)\s+от\s+(\d{2}\.\d{2}\.\d{4})\s*(?:г\.?\s*)?№\s*([^\s,;]+)/giu;
- for(const b of textBlocks(blocks)){
-  for(const m of b.text.matchAll(pattern)){
+ const pattern=/(?:по\s+техническим\s+условиям|согласно\s+техническим\s+условиям|выполнение\s+ТУ|технических\s+условий)\s+от\s+(\d{2}\.\d{2}\.\d{4})\s*(?:г\.?\s*)?№\s*([^\s,;]+)/giu;
+ const list=textBlocks(blocks);
+ for(const [i,b] of list.entries()){
+  // «…согласно техническим условиям от» в конце строки, дата и номер — в следующей строке PDF.
+  const text=/\sот\s*$/u.test(b.text)&&list[i+1]?b.text+' '+list[i+1].text:b.text;
+  for(const m of text.matchAll(pattern)){
    const number=trimEnd(m[2]);
    values.push(value(number,b,`${number} от ${m[1]}`));
   }

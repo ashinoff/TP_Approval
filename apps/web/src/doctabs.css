@@ -449,3 +449,22 @@
 .sync-tabs [aria-pressed=true] .tab-count{background:var(--brand);color:#fff}
 .sync-tabs [data-sync=SYNCED] .tab-count:not(.is-zero){background:#2e8b57;color:#fff}
 .sync-tabs [data-sync=CHANGED] .tab-count:not(.is-zero){background:#c98a2e;color:#fff}
+
+/* 09.11.2026: документы в загруженном файле (вид по заголовку, скреплённые — раздельно), справочники tg и доверенностей. */
+.doc-parts{display:grid;gap:6px;padding:10px 16px 12px 58px;border-bottom:1px solid var(--line);background:#fbfcfe}
+.doc-parts-wait{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;color:#5d6b78}
+.doc-part{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 12px;border:1.5px solid #2e8b57;border-radius:8px;background:rgba(46,139,87,.05)}
+.doc-part-guess{border-color:#c98a2e;background:rgba(201,138,46,.06)}
+.doc-part-mark{width:22px;height:22px;flex:none;border-radius:6px;display:grid;place-items:center;background:#2e8b57;color:#fff}
+.doc-part-guess .doc-part-mark{background:#c98a2e}
+.doc-part-name{display:grid;gap:1px;flex:1 1 240px}
+.doc-part-name b{font-size:14px;color:#1d2b3a}
+.doc-part-name small{font-size:12px;color:#5d6b78}
+.doc-part-pick{display:flex;align-items:center;gap:10px;flex:1 1 240px;font-size:13px;color:#7a4f12}
+.doc-part-pick select{min-width:160px}
+.doc-part-pages{font-size:12px;font-weight:600;color:#3d4c5a;padding:2px 8px;border:1px solid var(--line);border-radius:5px;background:#fff}
+.doc-parts-note{font-size:12px;color:#1d3e78}
+.other-book{margin-top:6px}
+.other-table td,.other-table th{text-align:left}
+.tu-open-psu{margin:6px 0 0;font-size:12px}
+.tu-match-label .tu-open-psu{margin:0 0 0 8px;padding:0 4px}

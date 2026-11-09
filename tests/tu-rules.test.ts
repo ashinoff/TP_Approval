@@ -15,7 +15,7 @@ const generic=(power='15 кВт',voltage='0,4 кВ',contract='00001-TEST-1',poin
 type F=ReturnType<typeof compareRequisites>;
 const field=(f:F,name:string)=>{const found=f.find(x=>x.field===name);assert.ok(found,`finding ${name}`);return found!;};
 
-test('TU rules V8: version label',()=>assert.equal(RULES_VERSION,'DOCX_CONTEXT_V8'));
+test('TU rules V9: version label',()=>assert.equal(RULES_VERSION,'DOCX_CONTEXT_V9'));
 
 test('TU rules: exact units, decimal separators and leading-zero contract; existing power is not total',()=>{
  const f=compareRequisites(generic('15,0 кВт','400 В'),generic('15000 Вт'),'00001-TEST-1');
