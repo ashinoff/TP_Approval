@@ -199,8 +199,60 @@ function meter(blocks:Block[],line?:PdfBoundary):NominalFinding[]{
  return findings;
 }
 
+// 12. Описание точки присоединения — по элементам: «Контакты присоединения <провод L=…> заявителя от <ВУ…, ТП…> сетевой
+// организации в сторону <ВРУ…> заявителя». Элементы сети — в п. 7 ТУ и на схеме со стороны сети, ВРУ — на схеме у заявителя, провод — на схеме.
+const key=(s:string)=>s.toLowerCase().replace(/ё/g,'е').replace(/кв(?![\p{L}])/gu,'').replace(/[\s\-–—«»"'.]/g,'');
+function point(blocks:Block[],tu:Block[],line?:PdfBoundary):NominalFinding[]{
+ const desc=cell(blocks,/^Описание\s+точки\s+присоединения/iu);if(!desc)return [];
+ const d=text(desc);
+ const network=/\sот\s+(.+?)\s+сетевой\s+организаци/iu.exec(d)?.[1];
+ const vru=/в\s+сторону\s+(ВРУ.*?)\s+заявител/iu.exec(d)?.[1];
+ const cable=/((?:СИП|А?ВВГ\p{L}*|АПвП\p{L}*)[-\s]*\d?[-\s]*\d\s*[xх×]\s*\d+(?:[.,]\d+)?)/iu.exec(d)?.[1];
+ const length=/L\s*=\s*\d+(?:[.,]\d+)?\s*м/u.exec(d)?.[0];
+ if(!network)return [];
+ const items=network.split(/,\s+/).map(s=>s.trim()).filter(Boolean);
+ const tu7=first(tu,/^\s*7\.\s*Точк\p{L}*.*?:\s*(.+)$/iu);
+ // Надписи схемы по сторонам красной границы.
+ const labels=line?(blocks as PdfLike[]).filter(b=>b.page===line.page&&b.spans?.length&&!b.table&&b.text.length<=80&&!/^\s*\d+(?:\.\d+)*\.\s/u.test(b.text)):[];
+ const side=(b:PdfLike)=>((centreY(b)>line!.y)===line!.networkAbove)?'network':'applicant';
+ const onScheme=(s:string,want?:'network'|'applicant')=>labels.find(b=>key(b.text).includes(key(s))&&(!want||side(b)===want));
+ const act:Value[]=[value(key(network),desc,d.length>90?d.slice(0,90)+'…':d)];const tuValues:Value[]=[];const problems:string[]=[],seen:string[]=[];
+ const mark=(b:PdfLike,shown:string)=>act.push({value:key(shown),quote:b.text,blockId:b.id,part:b.part,shown,area:{page:b.page!,box:b.spans![0].box}});
+ // Граница на опоре: «от опоры №14 ВЛ-0,4 кВ фидер «Чайная» ТП-А16» — по частям: опора (в ТУ — «ближайшая опора», номер только на схеме),
+ // фидер (в ТУ, если там указан; на схеме — подпись линии), ТП (в ТУ и на схеме со стороны сети).
+ const pole=/опор\p{L}*\s*№\s*([\d/]+)/iu.exec(network);
+ if(pole){
+  const feeder=/(?:фидер\p{L}*|ф\.)\s*«([^»]+)»/iu.exec(network)?.[1];
+  const tp=/(?<![\p{L}])((?:к?тпн?|ктп|рп)\s*-?\s*[\p{L}]{0,3}\d[\p{L}\d]*)/iu.exec(network)?.[1];
+  const poleLabel=labels.find(b=>{const k=key(b.text);return ['оп№','опора№','опоры№'].some(p=>{const at=k.indexOf(p+pole[1]);return at>=0&&!/\d/.test(k[at+p.length+pole[1].length]??'');});});
+  if(tu7&&!/опор/iu.test(tu7.m[1]))problems.push('в п. 7 ТУ точка не на опоре');
+  if(line){if(poleLabel){mark(poleLabel,`схема: ${poleLabel.text.trim()}`);seen.push(`опора №${pole[1]}`);}else problems.push(`опора №${pole[1]} не найдена на схеме`);}
+  if(feeder){const inTu=tu7?key(tu7.m[1]).includes(key(feeder)):true;const sch=line?labels.find(b=>key(b.text).includes(key(feeder))):undefined;
+   if(tu7&&/фидер|«/iu.test(tu7.m[1].replace(/«Россети[^»]*»|«Кубаньэнерго»/gu,''))&&!inTu)problems.push(`фидер «${feeder}» не совпадает с п. 7 ТУ`);
+   if(line&&!sch)problems.push(`фидер «${feeder}» не найден на схеме`);else if(sch){mark(sch,`схема: ${sch.text.trim()}`);seen.push(`фидер «${feeder}»`);}}
+  if(tp){if(tu7&&!key(tu7.m[1]).includes(key(tp)))problems.push(`«${tp}» нет в п. 7 ТУ`);
+   const sch=line?onScheme(tp,'network'):undefined;if(line&&!sch)problems.push(`«${tp}» не найден на схеме со стороны сети`);else if(sch){mark(sch,`схема: ${sch.text.trim()}`);seen.push(tp);}}
+ }
+ else for(const item of items){
+  const tuOk=tu7?key(tu7.m[1]).includes(key(item)):false;
+  const sch=line?onScheme(item,'network'):undefined;
+  if(tu7&&!tuOk)problems.push(`«${item}» нет в п. 7 ТУ`);
+  if(line&&!sch)problems.push(`«${item}» не найден на схеме со стороны сети`);
+  if(sch){mark(sch,`схема: ${sch.text.trim()}`);seen.push(item);}
+ }
+ if(tu7)tuValues.push(value(key(tu7.m[1]),tu7.b,tu7.m[1].trim()));
+ if(vru&&line){const sch=onScheme(vru.replace(/\s*заявител\p{L}*$/iu,''),'applicant');if(sch){mark(sch,`схема: ${sch.text.trim()} (заявитель)`);seen.push(vru);}else problems.push(`«${vru}» не найден на схеме у заявителя`);}
+ for(const part of [cable,length].filter(Boolean) as string[]){if(!line)break;const sch=onScheme(part);if(sch){mark(sch,`схема: ${sch.text.trim()}`);seen.push(part);}else problems.push(`«${part}» нет на схеме`);}
+ // ТП: другое обозначение ТП в ТУ — расхождение, не «проверить вручную».
+ const codes=(s:string)=>[...s.matchAll(/(?<![\p{L}])(к?тпн?|ктп|рп)\s*-?\s*([\p{L}]{0,3}\d[\p{L}\d]*)/giu)].map(m=>key(m[1]+m[2]));
+ const tuCodes=tu7?codes(tu7.m[1]):[],ourCodes=codes(network);
+ if(tuCodes.length&&ourCodes.length&&!ourCodes.some(c=>tuCodes.includes(c)))return [result('point','Точка присоединения','DIFFERENCE',`ТП в описании точки (${network}) не совпадает с п. 7 ТУ (${tu7!.m[1].trim()}).`,act,tuValues)];
+ return [problems.length?result('point','Точка присоединения','MANUAL_REVIEW',`Описание точки разобрано по элементам; не подтверждено: ${problems.join('; ')}. Сверьте вручную.`,act,tuValues)
+  :result('point','Точка присоединения','MATCH',`Все элементы описания точки подтверждены${tu7?' п. 7 ТУ':''}${line?' и схемой':''}: ${seen.join(', ')}.`,act,tuValues)];
+}
+
 export function noticeFindings(model:{blocks:Block[];boundaries?:PdfBoundary[]},ctx:NoticeContext):NominalFinding[]{
  const b=model.blocks;
  return [...attorney(b,ctx.attorneys),...contractDate(b,ctx.contractDate),...powers(b),...transformers(b),...tgPhi(b,ctx.tg),...meterByTu(b,ctx.tuBlocks),
-  ...psu(b,ctx.psuAttached),...breakerByTu(b,ctx.tuBlocks),...reserve(b,ctx.tuBlocks),...losses(b),...meter(b,model.boundaries?.[0])];
+  ...psu(b,ctx.psuAttached),...breakerByTu(b,ctx.tuBlocks),...reserve(b,ctx.tuBlocks),...losses(b),...meter(b,model.boundaries?.[0]),...point(b,ctx.tuBlocks,model.boundaries?.[0])];
 }

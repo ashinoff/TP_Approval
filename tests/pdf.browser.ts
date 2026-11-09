@@ -53,7 +53,7 @@ try{
  const login=async(l:string)=>{await page.goto(url);await page.getByLabel('Логин',{exact:true}).fill(l);await page.getByLabel('Пароль',{exact:true}).fill(userPassword);await page.getByRole('button',{name:'Войти',exact:true}).click();await page.getByRole('button',{name:'Выйти',exact:true}).waitFor();};
  const docs=resolve(root,'pdf')+'/';await mkdir(docs,{recursive:true});
  // Скреплённый PDF «уведомление + АВТУ» (09.11.2026): вид по заголовку, документы сохраняются раздельно.
- {const out=await PDFDocument.create();for(const lines of [['УВЕДОМЛЕНИЕ','об обеспечении сетевой организацией возможности присоединения к электрическим сетям','Приложение к договору № 00001-26-00000004-1'],['АКТ','О ВЫПОЛНЕНИИ ТЕХНИЧЕСКИХ УСЛОВИЙ','Приложение к договору № 00001-26-00000004-1']]){const src=await PDFDocument.load(await syntheticPdf({lines}));for(const pg of await out.copyPages(src,[0]))out.addPage(pg);}await writeFile(docs+'stapled.pdf',await out.save());}
+ {const out=await PDFDocument.create();for(const lines of [['УВЕДОМЛЕНИЕ','об обеспечении сетевой организацией возможности присоединения к электрическим сетям','по договору об осуществлении технологического присоединения от 01.02.2026','Приложение к договору № 00001-26-00000004-1'],['АКТ','О ВЫПОЛНЕНИИ ТЕХНИЧЕСКИХ УСЛОВИЙ','Приложение к договору № 00001-26-00000004-1']]){const src=await PDFDocument.load(await syntheticPdf({lines}));for(const pg of await out.copyPages(src,[0]))out.addPage(pg);}await writeFile(docs+'stapled.pdf',await out.save());}
  await writeFile(docs+'tu.pdf',await checkedPdf('15','00001-26-00000004-1','TU'));await writeFile(docs+'act-bad.pdf',await checkedPdf('150'));await writeFile(docs+'act-good.pdf',await checkedPdf('15'));
  // 1. Инженер: загрузка ТУ и акта в PDF, карточка из ТУ.
  await login('eng');const form=page.getByRole('region',{name:'Загрузка документа инженером'});
@@ -83,6 +83,7 @@ try{
   await again.getByLabel('Файл загружаемого документа').setInputFiles(docs+'stapled.pdf');
   const parts=again.getByRole('list',{name:'Документы в файле'});await parts.getByRole('listitem').nth(1).waitFor({timeout:20000});
   const partText=await parts.innerText();assert.ok(partText.includes('Уведомление')&&partText.includes('АВТУ')&&partText.includes('стр. 1')&&partText.includes('стр. 2'),partText);
+  assert.equal(await again.getByLabel('Дата договора').inputValue(),'2026-02-01','дата договора из уведомления (в ТУ её нет)');
   await warn.waitFor({state:'detached'});await page.screenshot({path:`${out}/00e-stapled.png`,fullPage:true});
   await again.getByRole('button',{name:'Сохранить документ',exact:true}).click();await again.getByRole('status').filter({hasText:'Документ учтён'}).waitFor({timeout:30000});
   const steps=await again.getByRole('list',{name:'Ход сохранения'}).innerText();assert.ok(steps.includes('Уведомление · версия 1 · стр. 1')&&steps.includes('АВТУ · версия 1 · стр. 2'),steps);

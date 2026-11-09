@@ -25,21 +25,23 @@ const lines=[
 const blocks=(texts:string[],prefix='n'):Block[]=>texts.map((text,i)=>({id:`${prefix}${i}`,part:'pdf/page1',text,sha256:''}));
 const table=(header:string,value:string,cell:number):Block[]=>[{id:'h'+cell,part:'pdf/page1',text:header,sha256:'',table:{table:0,row:0,cell}},{id:'v'+cell,part:'pdf/page1',text:value,sha256:'',table:{table:0,row:1,cell}}];
 const notice=[...blocks(lines),...table('Уровень напряжения (кВ)','0,4',3),...table('Максимальная мощность (кВт)','50',4),
- ...table('Величина номинальной мощности присоединенных трансформаторов (кВА)','0,0',5),...table('Предельное значение коэффициента реактивной мощности (tg)','0,35',6)];
-const tu=blocks(['9. Резервный источник питания: нет.','10.2. Комплекс мероприятий, необходимых для организации учёта электроэнергии на границе балансовой принадлежности, применив прибор учёта электрической энергии.','11.5. Установить автоматический выключатель с Iн по расчету.'],'t');
+ ...table('Величина номинальной мощности присоединенных трансформаторов (кВА)','0,0',5),...table('Предельное значение коэффициента реактивной мощности (tg)','0,35',6),
+ ...table('Описание точки присоединения','Контакты присоединения ВВГ 4х25 L=5м заявителя от ВУ-0,4кВ Учебное, ТП-У1 сетевой организации в сторону ВРУ-0,4кВ заявителя',2)];
+const tu=blocks(['7. Точка(и) присоединения (вводные распределительные устройства): ВУ-0,4 кВ Учебное от ТП-У1 (50 кВт).','9. Резервный источник питания: нет.','10.2. Комплекс мероприятий, необходимых для организации учёта электроэнергии на границе балансовой принадлежности, применив прибор учёта электрической энергии.','11.5. Установить автоматический выключатель с Iн по расчету.'],'t');
 const ctx={tuBlocks:tu,attorneys:[{number:'1/2-ТЕСТ',date:'2025-12-15',person:'Учебная Л.О.',position:'Помощник директора',validUntil:null}],tg:[{voltage:'0.4',tg:0.35}],psuAttached:true,contractDate:'2026-04-22'};
 const byField=(f:{field:string}[])=>Object.fromEntries(f.map(x=>[x.field,x]))as Record<string,any>;
 
 test('Notice: attorney, contract date, powers, transformers, tg, meter by TU, PSU, breaker, reserve match the owner walkthrough',()=>{
  const f=byField(noticeFindings({blocks:notice},ctx));
- for(const field of ['attorney','contractDate','powerSum','powerEverywhere','transformers','tg','meterNetwork','psu','breakerTu','reserve'])assert.equal(f[field]?.status,'MATCH',field+': '+f[field]?.reason);
+ for(const field of ['point','attorney','contractDate','powerSum','powerEverywhere','transformers','tg','meterNetwork','psu','breakerTu','reserve'])assert.equal(f[field]?.status,'MATCH',field+': '+f[field]?.reason);
  assert.equal(f.losses.status,'DIFFERENCE','«прилагается», а таблицы расчёта нет');
 });
 test('Notice: wrong attorney, sum, tg and missing PSU are reported',()=>{
  const changed=notice.map(b=>b.text.startsWith('ранее присоединенная')?{...b,text:'ранее присоединенная максимальная мощность 10 кВт'}:b.id==='v6'?{...b,text:'0,4'}:b);
  const f=byField(noticeFindings({blocks:changed},{...ctx,attorneys:[{...ctx.attorneys[0],date:'2025-12-16'}],psuAttached:false}));
  assert.equal(f.attorney.status,'DIFFERENCE');assert.match(f.attorney.reason,/дата/);
- assert.equal(f.powerSum.status,'DIFFERENCE');assert.equal(f.tg.status,'DIFFERENCE');assert.equal(f.psu.status,'MANUAL_REVIEW');
+ assert.equal(f.powerSum.status,'DIFFERENCE');
+ assert.equal(byField(noticeFindings({blocks:notice},{...ctx,tuBlocks:blocks(['7. Точка(и) присоединения: ВУ-0,4 кВ Учебное от ТП-У2 (50 кВт).'],'t')})).point.status,'DIFFERENCE','другая ТП в п. 7 ТУ');assert.equal(f.tg.status,'DIFFERENCE');assert.equal(f.psu.status,'MANUAL_REVIEW');
  assert.equal(byField(noticeFindings({blocks:notice},{...ctx,attorneys:[]})).attorney.status,'MANUAL_REVIEW','пустой справочник — ручная проверка');
 });
 

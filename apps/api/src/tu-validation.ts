@@ -37,7 +37,8 @@ export async function checkTechnicalConditions(db:DB,storage:string,actId:string
  const notice=a.act_type==='NOTICE'?noticeFindings(models[0] as Parameters<typeof noticeFindings>[0],{tuBlocks:models[1].blocks,attorneys:refs.attorneys.rows,tg:refs.tg.rows,contractDate:(await db.query("SELECT to_char(contract_date,'YYYY-MM-DD') AS d FROM app.acts WHERE id=$1",[a.id])).rows[0].d,
   psuAttached:!!(await db.query("SELECT 1 FROM app.extra_documents e JOIN app.acts o ON o.id=e.act_id WHERE o.contract_id=$1 AND e.kind='PSU' LIMIT 1",[a.contract_id])).rowCount}):[];
  const replaced=new Set(notice.map(f=>f.field));
- const findings=[...compareRequisites(models[0].blocks,models[1].blocks,a.contract_number),...nominalFindings(models[0].blocks,models[1].blocks,refs,{phases:card.phases,powerKw:card.power_kw}),...actChecks.filter(f=>!replaced.has(f.field)),...notice];
+ // Поле уведомления заменяет одноимённую общую проверку (точка присоединения, п. 8.1): правило уведомления точнее.
+ const findings=[...[...compareRequisites(models[0].blocks,models[1].blocks,a.contract_number),...nominalFindings(models[0].blocks,models[1].blocks,refs,{phases:card.phases,powerKw:card.power_kw}),...actChecks].filter(f=>!replaced.has(f.field)),...notice];
  const status=findingsPass(findings)?'PASS':'BLOCKED';
  const result=(await db.query('INSERT INTO app.tu_checks(act_id,version_id,technical_conditions_id,act_hash,tu_hash,rules_version,status,findings,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,app.uid()) RETURNING *',[a.id,versionId,s.tu.id,s.version.sha256,s.tu.sha256,rulesVersion(refs),status,JSON.stringify(findings)])).rows[0];
  await audit(db,a.id,'TU_CHECKED',{checkId:result.id,versionId,technicalConditionsId:s.tu.id,status});

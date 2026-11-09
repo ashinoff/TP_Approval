@@ -51,7 +51,7 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,drafts,
  const [inputKey,setInputKey]=useState(0);
  const [fields,setFields]=useState<CardField[]>([]),[cardDraft,setCardDraft]=useState<CardDraft>({});
  const [steps,setSteps]=useState<Step[]>([]),[done,setDone]=useState<string>(),[dupes,setDupes]=useState<Row[]>([]);
- const [parts,setParts]=useState<Part[]>([]),[inspecting,setInspecting]=useState(false);
+ const [parts,setParts]=useState<Part[]>([]),[inspecting,setInspecting]=useState(false),[docDate,setDocDate]=useState('');
  useEffect(()=>{let active=true;api('/api/v1/card-fields').then(f=>{if(active)setFields(f);}).catch(()=>{});return()=>{active=false;};},[api]);
  const request=useRef(0),saved=useRef({tu:undefined as File|undefined,acts:{} as Record<string,File|undefined>,extras:{} as Record<string,File|undefined>}),inspection=useRef(0);
  useEffect(()=>()=>{request.current++;},[]);
@@ -59,7 +59,8 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,drafts,
  const readTu=async(selected:File|undefined)=>{
   setTu(selected);setReport(undefined);setError('');const seq=++request.current;onDirty(true);
   if(!selected){setExtracting(false);return;}setExtracting(true);
-  try{const data=new FormData();data.append('resId',resId);data.append('file',selected);const result=await api('/api/v1/documents/extract-tu',data);if(seq!==request.current)return;if(result.preparedFile){const decoded=Uint8Array.from(atob(result.preparedFile.base64),(c:string)=>c.charCodeAt(0));setTu(new File([decoded],selected.name,{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));}setReport(result);setCardDraft(d=>{const next={...d};for(const f of fields)if(f.tu_source){const sug=result.card?.[f.tu_source];if(sug?.value)next[f.code]={value:sug.value,origin:'TU'};else if(next[f.code]?.origin==='TU')delete next[f.code];}return next;});setValues({contractNumber:result.fields.contractNumber.value,contractDate:result.fields.contractDate.value,applicant:result.fields.applicant.value,address:result.fields.address.value});}
+  try{const data=new FormData();data.append('resId',resId);data.append('file',selected);const result=await api('/api/v1/documents/extract-tu',data);if(seq!==request.current)return;if(result.preparedFile){const decoded=Uint8Array.from(atob(result.preparedFile.base64),(c:string)=>c.charCodeAt(0));setTu(new File([decoded],selected.name,{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));}setReport(result);setCardDraft(d=>{const next={...d};for(const f of fields)if(f.tu_source){const sug=result.card?.[f.tu_source];if(sug?.value)next[f.code]={value:sug.value,origin:'TU'};else if(next[f.code]?.origin==='TU')delete next[f.code];}return next;});// Пустое значение из ТУ не стирает уже подставленное из документа (дата договора есть в уведомлении/акте, а в ТУ её нет).
+   setValues(v=>({contractNumber:result.fields.contractNumber.value||v.contractNumber,contractDate:result.fields.contractDate.value||v.contractDate,applicant:result.fields.applicant.value||v.applicant,address:result.fields.address.value||v.address}));}
   catch(e){if(seq===request.current)setError(e instanceof Error?e.message:String(e));}
   finally{if(seq===request.current)setExtracting(false);}
  };
@@ -70,7 +71,7 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,drafts,
   if(!/\.pdf$/i.test(selected.name)&&selected.type!=='application/pdf'){setParts([{type:null,pages:[],range:''}]);return;}
   setInspecting(true);
   try{const data=new FormData();data.append('resId',resId);data.append('file',selected);const r=await api('/api/v1/documents/inspect',data);if(seq!==inspection.current)return;
-   setParts(r.parts);const date=r.parts.find((x:Part)=>x.contractDate)?.contractDate;const number=r.parts.find((x:Part)=>x.contractNumber)?.contractNumber;
+   setParts(r.parts);const date=r.parts.find((x:Part)=>x.contractDate)?.contractDate;setDocDate(date??'');const number=r.parts.find((x:Part)=>x.contractNumber)?.contractNumber;
    setValues(v=>({...v,contractDate:v.contractDate||date||'',contractNumber:v.contractNumber||number||''}));}
   catch(e){if(seq===inspection.current){setParts([{type:null,pages:[],range:''}]);setError((e as Error).message);}}
   finally{if(seq===inspection.current)setInspecting(false);}
@@ -164,7 +165,7 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,drafts,
      {([['contractNumber','Номер договора','text'],['contractDate','Дата договора','date'],['applicant','Заявитель','text'],['address','Адрес объекта','text']] as const).map(([name,label,inputType])=>{
       const status=report?.fields[name]?.status;const badNumber=name==='contractNumber'&&!!values.contractNumber&&!numberValid;
       return <label key={name} className={name==='address'||name==='applicant'?'wide':undefined}>{label}<input aria-label={label} name={name} type={inputType} value={values[name]} required={name==='contractNumber'} maxLength={2000} placeholder={name==='contractNumber'?'ххххх-хх-хххххххх-х':undefined} aria-invalid={badNumber||undefined} readOnly={isCreated} disabled={locked} onBlur={name==='contractNumber'?()=>setValues(v=>({...v,contractNumber:normalizeContractNumber(v.contractNumber)})):undefined} onChange={e=>setValues(v=>({...v,[name]:e.target.value}))}/>
-       {badNumber?<small className="field-error">Формат: ххххх-хх-хххххххх-х, например 00123-26-00004567-1.</small>:report&&status!=='FOUND'&&<small>Не определено однозначно — проверьте по ТУ.</small>}</label>;
+       {badNumber?<small className="field-error">Формат: ххххх-хх-хххххххх-х, например 00123-26-00004567-1.</small>:name==='contractDate'&&docDate&&values.contractDate===docDate?<small className="field-source">из документа</small>:report&&status!=='FOUND'&&<small>Не определено однозначно — проверьте по ТУ.</small>}</label>;
      })}
     </div>
     {fields.length>0&&<section className="upload-card" aria-label="Технические данные">
