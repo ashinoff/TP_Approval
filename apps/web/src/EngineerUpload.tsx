@@ -24,12 +24,28 @@ function FileTile({title,ariaLabel,file,disabled,onFile,optional,children}:{titl
  </div>;
 }
 
-export default function EngineerUpload({api,action,busy,resUnits,profile,onCreated,onDirty}:{api:(p:string,b?:object|FormData)=>Promise<any>;action:(fn:()=>Promise<unknown>)=>Promise<unknown>;busy:boolean;resUnits:Row[];profile:Row;onCreated:(id:string)=>void;onDirty:(dirty:boolean)=>void}){
+type Step={key:string;label:string;status:'wait'|'run'|'done'|'fail';note?:string};
+const stateNames:Record<string,string>={DRAFT:'черновик',RIRU_REVIEW:'на согласовании',RES_REVIEW:'на согласовании',CENTRAL_REVIEW:'на согласовании',CENTRAL_COLLECTING:'на согласовании',RETURNED:'на доработке',REVISING:'на пересмотре',APPROVED:'согласован'};
+const stepState={wait:'ожидает',run:'выполняется',done:'готово',fail:'ошибка'};
+
+/** Ход сохранения по шагам: инженер видит, что именно загружено и учтено, а при сбое — на каком шаге (09.11.2026). */
+function UploadProgress({steps}:{steps:Step[]}){
+ return <ol className="upload-progress" aria-label="Ход сохранения">
+  {steps.map(s=><li key={s.key} className={`up-step up-${s.status}`}>
+   <span className="up-mark" aria-hidden="true">{s.status==='done'?<Icon name="check" size={14}/>:s.status==='fail'?<Icon name="x" size={14}/>:s.status==='run'?<span className="up-spin"/>:null}</span>
+   <span className="up-label">{s.label}<span className="sr-only">: {stepState[s.status]}</span></span>
+   {s.note&&<small className="up-note">{s.note}</small>}
+  </li>)}
+ </ol>;
+}
+
+export default function EngineerUpload({api,action,busy,resUnits,profile,drafts,onRefresh,onCreated,onDirty}:{api:(p:string,b?:object|FormData)=>Promise<any>;action:(fn:()=>Promise<unknown>)=>Promise<unknown>;busy:boolean;resUnits:Row[];profile:Row;drafts?:number;onRefresh:()=>Promise<unknown>;onCreated:(id:string)=>void;onDirty:(dirty:boolean)=>void}){
  const areas=resUnits.filter(r=>profile.roles.some((role:Row)=>role.role==='RIRU_ENGINEER'&&role.resId===r.id));
  const [resId,setResId]=useState(areas[0]?.id??''),[mode,setMode]=useState<'NEW'|'EXTRA'>('NEW'),[type,setType]=useState('ACT_TP'),[extraKind,setExtraKind]=useState('TU'),[extras,setExtras]=useState<Record<string,File|undefined>>({}),[file,setFile]=useState<File>(),[tu,setTu]=useState<File>(),[query,setQuery]=useState(''),[targets,setTargets]=useState<Row[]>([]),[target,setTarget]=useState(''),[error,setError]=useState(''),[created,setCreated]=useState<string>(),[extracting,setExtracting]=useState(false),[report,setReport]=useState<Row>();
  const [values,setValues]=useState({contractNumber:'',contractDate:'',applicant:'',address:''});
  const [inputKey,setInputKey]=useState(0);
  const [fields,setFields]=useState<CardField[]>([]),[cardDraft,setCardDraft]=useState<CardDraft>({});
+ const [steps,setSteps]=useState<Step[]>([]),[done,setDone]=useState<string>(),[dupes,setDupes]=useState<Row[]>([]);
  useEffect(()=>{let active=true;api('/api/v1/card-fields').then(f=>{if(active)setFields(f);}).catch(()=>{});return()=>{active=false;};},[api]);
  const request=useRef(0),saved=useRef({tu:undefined as File|undefined,act:undefined as File|undefined,extras:{} as Record<string,File|undefined>});
  useEffect(()=>()=>{request.current++;},[]);
@@ -48,6 +64,10 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
  const contractNumber=normalizeContractNumber(values.contractNumber);
  const numberValid=CONTRACT_NUMBER_PATTERN.test(contractNumber);
  const actLabel=type==='AVTU'?'АВТУ':'Акт ТП';
+ // Номер договора уникален: о существующем документе того же вида предупреждаем до сохранения, во всех РЭС.
+ useEffect(()=>{if(mode!=='NEW'||!numberValid||created){setDupes([]);return;}let active=true;const timer=setTimeout(()=>{api(`/api/v1/contract-acts?contractNumber=${encodeURIComponent(contractNumber)}&actType=${type}`).then(r=>{if(active)setDupes(r);}).catch(()=>{});},250);return()=>{active=false;clearTimeout(timer);};},[mode,numberValid,contractNumber,type,created,api]);
+ // «Документ учтён» виден сразу, затем документ открывается сам.
+ useEffect(()=>{if(!done)return;const timer=setTimeout(()=>onCreated(done),1600);return()=>clearTimeout(timer);},[done]);
  return <section className="card engineer-upload" aria-label="Загрузка документа инженером">
   <div className="navy-head upload-head">
    <b className="upload-head-title"><Icon name="newdoc" size={20}/>Новый документ</b>
@@ -58,17 +78,34 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
   </div>
   <p className="helper-text">{mode==='EXTRA'?'Выберите документ договора, вид дополнительного документа и загрузите один PDF.':`Загрузите ТУ — реквизиты заполнятся автоматически. Проверьте их и приложите ${type==='AVTU'?'АВТУ':'акт ТП'}. ПСУ, предыдущий акт и поопорную схему можно приложить сразу или позже.`}</p>
   {error&&<p role="alert">{error}</p>}
-  <form id="engineer-upload-form" onChange={()=>onDirty(true)} onSubmit={e=>{e.preventDefault();void action(async()=>{
-   if(mode==='EXTRA'){if(!target||!file)throw new Error('Выберите документ договора и файл.');await uploadDocument(api,target,file,extraKind);onDirty(false);onCreated(target);return;}
-   if(!tu||!file||!report)throw new Error(`Загрузите ТУ и ${type==='AVTU'?'АВТУ':'акт ТП'}.`);
-   if(!numberValid)throw new Error('Номер договора ТП должен быть в формате ххххх-хх-хххххххх-х.');
-   let actId=created;if(!actId){const a=await api('/api/v1/acts',{resId,...values,contractNumber,contractDate:values.contractDate||null,actNumber:contractNumber,actType:type});actId=a.id;setCreated(actId);}
-   if(saved.current.tu!==tu){await uploadDocument(api,actId!,tu,'TU');saved.current.tu=tu;}
-   if(saved.current.act!==file){await uploadDocument(api,actId!,file,type);saved.current.act=file;}
-   for(const [kind,extra]of Object.entries(extras))if(extra&&saved.current.extras[kind]!==extra){await uploadDocument(api,actId!,extra,kind);saved.current.extras[kind]=extra;}
+  <form id="engineer-upload-form" onChange={()=>onDirty(true)} onSubmit={e=>{e.preventDefault();if(done)return;void action(async()=>{
+   if(mode==='NEW'){
+    if(!tu||!file||!report)throw new Error(`Загрузите ТУ и ${type==='AVTU'?'АВТУ':'акт ТП'}.`);
+    if(!numberValid)throw new Error('Номер договора ТП должен быть в формате ххххх-хх-хххххххх-х.');
+    if(!created&&dupes.length)throw new Error(`${actLabel} по договору ${contractNumber} уже есть в системе — откройте существующий документ.`);
+   }else if(!target||!file)throw new Error('Выберите документ договора и файл.');
    const card=Object.entries(cardDraft).filter(([,v])=>v.value.trim()).map(([code,v])=>({code,value:v.value,origin:v.origin}));
-   if(card.length)await api(`/api/v1/acts/${actId}/card`,{values:card});
-   onDirty(false);onCreated(actId!);
+   const pending=Object.entries(extras).filter(([kind,extra])=>extra&&saved.current.extras[kind]!==extra) as [string,File][];
+   const wait='wait' as const;
+   const plan:Step[]=mode==='EXTRA'?[{key:'extra',label:extraKinds.find(([k])=>k===extraKind)![1],status:wait}]:[
+    ...(!created?[{key:'create',label:`Документ по договору ${contractNumber}`,status:wait}]:[]),
+    ...(saved.current.tu!==tu?[{key:'tu',label:'Технические условия',status:wait}]:created?[{key:'tu-kept',label:'Технические условия',status:'done' as const,note:'уже загружены в этот документ'}]:[]),
+    ...(saved.current.act!==file?[{key:'act',label:`${actLabel} · версия 1`,status:wait}]:[]),
+    ...pending.map(([kind])=>({key:'x:'+kind,label:optional.find(([k])=>k===kind)?.[1]??kind,status:wait})),
+    ...(card.length?[{key:'card',label:'Технические данные',status:wait}]:[])];
+   plan.push({key:'count',label:'Учёт в реестре документов',status:wait});
+   setSteps(plan);
+   const mark=(key:string,status:Step['status'],note?:string)=>setSteps(list=>list.map(x=>x.key===key?{...x,status,note}:x));
+   const step=async(key:string,fn:()=>Promise<string|void>)=>{if(!plan.some(x=>x.key===key))return;mark(key,'run');try{const note=await fn();mark(key,'done',note||undefined);}catch(err){mark(key,'fail',(err as Error).message);throw err;}};
+   let actId=mode==='EXTRA'?target:created;
+   await step('extra',async()=>{await uploadDocument(api,target,file!,extraKind);});
+   await step('create',async()=>{const a=await api('/api/v1/acts',{resId,...values,contractNumber,contractDate:values.contractDate||null,actNumber:contractNumber,actType:type});actId=a.id;setCreated(a.id);});
+   await step('tu',async()=>{await uploadDocument(api,actId!,tu!,'TU');saved.current.tu=tu;});
+   await step('act',async()=>{await uploadDocument(api,actId!,file!,type);saved.current.act=file;});
+   for(const [kind,extra]of pending)await step('x:'+kind,async()=>{await uploadDocument(api,actId!,extra,kind);saved.current.extras[kind]=extra;});
+   await step('card',async()=>{await api(`/api/v1/acts/${actId}/card`,{values:card});});
+   await step('count',async()=>{await onRefresh();});
+   onDirty(false);setDone(actId);
   });}}>
    {areas.length>1&&<label className="res-field">РЭС<select name="resId" value={resId} disabled={locked||!!created} onChange={e=>{setResId(e.target.value);setReport(undefined);setTu(undefined);setInputKey(k=>k+1);}}>{areas.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label>}
    {mode==='EXTRA'?<>
@@ -100,8 +137,21 @@ export default function EngineerUpload({api,action,busy,resUnits,profile,onCreat
     </section>}
    </>}
    {mode==='NEW'&&numberValid&&<p className="helper-text">Пакет договора: <strong>{contractNumber}</strong> · {contractNumber} {labels[type]} · {contractNumber} ТУ</p>}
-   {created&&<p role="status">Документ сохранён. Повторная попытка продолжит загрузку в тот же документ. <button type="button" onClick={()=>{onDirty(false);onCreated(created);}}>Открыть сохранённый документ</button></p>}
-   <div className="upload-submit"><button className="primary-button" disabled={locked||(mode==='EXTRA'?!target||!file:!report||!file||!numberValid)}>{mode==='EXTRA'?(extraKind==='TU'?'Загрузить ТУ':'Загрузить документ'):'Сохранить документ'}</button><small>{mode==='EXTRA'?'Документ появится в пакете выбранного документа и в режиме проверки для сравнения.':'После сохранения откроется документ с проверкой соответствия ТУ и отправкой на согласование. Только PDF из Word или Excel — сканы не принимаются.'}</small></div>
+   {mode==='NEW'&&!created&&dupes.length>0&&<div role="alert" className="dup-warning">
+    <Icon name="alert" size={22}/>
+    <div className="dup-text"><b>{actLabel} по договору {contractNumber} уже есть в системе</b>
+     {dupes.map((d,i)=><p key={d.id??i}>{d.res_name} · {stateNames[d.state]??d.state}{d.readable&&!d.versions?' · файл акта ещё не загружен':''}</p>)}
+     <small>Номер договора уникален — второй документ того же вида не создаётся.</small></div>
+    <div className="dup-actions">{dupes.filter(d=>d.own_draft&&!d.versions).slice(0,1).map(d=><button key={'c'+d.id} type="button" className="primary-button" onClick={()=>{if(d.has_tu)saved.current.tu=tu;setCreated(d.id);setDupes([]);}}><Icon name="upload" size={16}/>Догрузить в этот черновик</button>)}
+     {dupes.filter(d=>d.readable).slice(0,1).map(d=><button key={'o'+d.id} type="button" className="secondary-button" onClick={()=>{onDirty(false);onCreated(d.id);}}><Icon name="view" size={16}/>Открыть документ</button>)}</div>
+   </div>}
+   {steps.length>0&&<UploadProgress steps={steps}/>}
+   {done?<div role="status" className="upload-done">
+    <span className="upload-done-mark" aria-hidden="true"><Icon name="check" size={22}/></span>
+    <div className="upload-done-text"><b>Документ учтён</b><small>{mode==='EXTRA'?'Файл приложен к документу. Открываем документ…':<>Добавлен в «Черновики»{drafts!==undefined?<> — теперь там <b className="upload-done-count">{drafts}</b></>:null}. Открываем документ…</>}</small></div>
+    <button type="button" className="primary-button" onClick={()=>onCreated(done)}><Icon name="view" size={16}/>Открыть документ</button>
+   </div>:created&&steps.some(x=>x.status==='fail')&&<p role="status" className="helper-text">Документ уже создан — «Сохранить документ» повторит только невыполненные шаги. <button type="button" className="text-button" onClick={()=>{onDirty(false);onCreated(created);}}>Открыть сохранённый документ</button></p>}
+   {!done&&<div className="upload-submit"><button className="primary-button" disabled={locked||(mode==='EXTRA'?!target||!file:!report||!file||!numberValid||!created&&dupes.length>0)}>{mode==='EXTRA'?(extraKind==='TU'?'Загрузить ТУ':'Загрузить документ'):'Сохранить документ'}</button><small>{mode==='EXTRA'?'Документ появится в пакете выбранного документа и в режиме проверки для сравнения.':'После сохранения откроется документ с проверкой соответствия ТУ и отправкой на согласование. Только PDF из Word или Excel — сканы не принимаются.'}</small></div>}
   </form>
  </section>;
 }

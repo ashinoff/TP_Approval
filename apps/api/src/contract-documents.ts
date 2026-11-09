@@ -13,6 +13,18 @@ export const documentLabels={ACT_TP:'Акт ТП',AVTU:'АВТУ',TU:'ТУ'} as 
 /** Дополнительные документы договора (только PDF, без маршрута согласования). */
 export const extraLabels={PSU:'ПСУ',PREV_ACT:'Предыдущий акт ТП',POLE_SCHEME:'Поопорная схема',TU_CHANGE:'Изменения к ТУ',PROJECT:'Проект'} as const;
 export type ExtraKind=keyof typeof extraLabels;
+const stateNames:Record<string,string>={DRAFT:'черновик',RIRU_REVIEW:'на согласовании',RES_REVIEW:'на согласовании',CENTRAL_REVIEW:'на согласовании',CENTRAL_COLLECTING:'на согласовании',RETURNED:'на доработке',REVISING:'на пересмотре',APPROVED:'согласован'};
+/** Документы того же вида по номеру договора во всех РЭС (номер ТП уникален, решение владельца 09.11.2026). */
+export async function contractActs(db:DB,number:string,type?:string){
+ return (await db.query('SELECT * FROM app.contract_act($1,$2)',[number,type??null])).rows;
+}
+/** Блокирует второй документ того же вида по номеру договора; exceptId — сам документ при смене вида черновика. */
+export async function rejectDuplicate(db:DB,number:string,type:string,exceptId?:string){
+ // Параллельные сохранения одного номера сериализуются, иначе оба пройдут проверку до вставки.
+ await db.query("SELECT pg_advisory_xact_lock(hashtextextended('act:'||app.contract_key($1)||':'||$2,0))",[number,type]);
+ const same=(await contractActs(db,number,type)).find(a=>a.id!==exceptId);
+ if(same)throw new HttpError(409,'CONTRACT_DUPLICATE',`${documentLabels[type as 'ACT_TP'|'AVTU']} по договору ${number} уже есть в системе (${same.res_name}, ${stateNames[same.state]??same.state}). Повторная загрузка не нужна — откройте существующий документ.`);
+}
 export async function contractDocuments(db:DB,act:Record<string,any>){
  return {contract:requireValue((await db.query('SELECT * FROM app.contracts WHERE id=$1',[act.contract_id])).rows[0]),
   technicalConditions:(await db.query('SELECT * FROM app.technical_conditions WHERE contract_id=$1 ORDER BY number',[act.contract_id])).rows,
@@ -23,6 +35,7 @@ export async function registerDocument(db:DB,act:Record<string,any>,fileId:strin
  if(type!=='TU'){
   if(act.act_type!==type){
    if((await db.query('SELECT 1 FROM app.versions WHERE act_id=$1 LIMIT 1',[act.id])).rowCount)throw new HttpError(409,'ACT_TYPE_LOCKED','Вид акта уже зафиксирован. Для другого вида создайте отдельный акт по этому договору.');
+   await rejectDuplicate(db,act.contract_number,type,act.id);
    await db.query('UPDATE app.acts SET act_type=$2,revision=revision+1 WHERE id=$1',[act.id,type]);
   }
   return null;

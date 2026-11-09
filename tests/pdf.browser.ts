@@ -62,9 +62,21 @@ try{
  assert.equal(await form.getByLabel('Номер договора').inputValue(),'00001-26-00000004-1');assert.equal(await form.getByLabel('Максимальная мощность').inputValue(),'15');
  await form.getByLabel('Планируемая дата исполнения').fill('2026-12-15');await form.getByLabel('Файл загружаемого документа').setInputFiles(docs+'act-bad.pdf');
  await form.getByLabel('Файл: Поопорная схема').setInputFiles(docs+'tu.pdf');await page.screenshot({path:`${out}/00-upload-form.png`,fullPage:true});
- await form.getByRole('button',{name:'Сохранить документ',exact:true}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor({timeout:20000});
+ await form.getByRole('button',{name:'Сохранить документ',exact:true}).click();
+ // Ход сохранения по шагам и «Документ учтён» со счётчиком черновиков, затем документ открывается сам (09.11.2026).
+ const progress=form.getByRole('list',{name:'Ход сохранения'});await progress.waitFor();
+ const done=form.getByRole('status').filter({hasText:'Документ учтён'});await done.waitFor({timeout:20000});
+ assert.equal(await progress.locator('.up-done').count(),await progress.locator('li').count());assert.match(await done.innerText(),/теперь там\s*1/);
+ await page.screenshot({path:`${out}/00b-upload-done.png`,fullPage:true});
+ await page.getByRole('button',{name:'Режим проверки'}).waitFor({timeout:20000});
  await page.locator('.pdf-page canvas').first().waitFor({timeout:20000});await shot('01-document');
- await page.locator('.doc-picker select option').filter({hasText:'Поопорная схема'}).waitFor({state:'attached'});await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Данные'}).click();await page.locator('.package-extra').filter({hasText:'Поопорная схема'}).waitFor();await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Просмотр'}).click();console.log('OK 1: TU and act uploaded as PDF; the act opens in the exact PDF view');
+ await page.locator('.doc-picker select option').filter({hasText:'Поопорная схема'}).waitFor({state:'attached'});await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Данные'}).click();await page.locator('.package-extra').filter({hasText:'Поопорная схема'}).waitFor();await page.getByRole('group',{name:'Разделы документа'}).getByRole('button',{name:'Просмотр'}).click();console.log('OK 1: TU and act uploaded as PDF with visible step progress and «Документ учтён»; the act opens in the exact PDF view');
+ // Тот же номер договора второй раз не проходит: предупреждение до сохранения, кнопка сохранения заблокирована.
+ {await page.getByRole('button',{name:'Новый документ',exact:true}).click();const again=page.getByRole('region',{name:'Загрузка документа инженером'});
+  await again.getByLabel('Файл технических условий').setInputFiles(docs+'tu.pdf');await again.getByText('Реквизиты извлечены из ТУ').waitFor({timeout:20000});await again.getByLabel('Файл загружаемого документа').setInputFiles(docs+'act-bad.pdf');
+  const warn=again.getByRole('alert').filter({hasText:'уже есть в системе'});await warn.waitFor();assert.equal(await again.getByRole('button',{name:'Сохранить документ',exact:true}).isDisabled(),true);
+  await warn.screenshot({path:`${out}/00c-duplicate.png`});await warn.getByRole('button',{name:'Открыть документ'}).click();await page.getByRole('button',{name:'Режим проверки'}).waitFor();
+  console.log('OK 1b: the same contract number is blocked before saving; the existing document opens from the warning');}
  // 2. Сверка: рамки цвета статуса прямо на странице; клик по красному значению — пара в ТУ обведена, значение выделено.
  await page.getByRole('button',{name:'Режим проверки'}).click();const review=page.getByRole('dialog',{name:'Режим проверки документов'});
  await review.getByRole('tab',{name:/Сверка с ТУ/}).click();await review.getByRole('button',{name:'Проверить по ТУ',exact:true}).click();await review.getByText(/⚠ Расхождение/).first().waitFor({timeout:20000});

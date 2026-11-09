@@ -11,8 +11,8 @@ export async function runContractDocumentChecks({app,owner,runtime,tokens,users,
  const get=(u:string,p:string)=>request(app).get(p).set('Authorization','Bearer '+tokens[u]);
  const post=(u:string,p:string,b:object)=>completeRiruReview(request(app).post(p).set('Authorization','Bearer '+tokens[u]).set('Idempotency-Key',randomUUID()).send(b),app,tokens,owner);
  const ok=(r:request.Response)=>{assert.equal(r.status,200,JSON.stringify(r.body));return r.body;};
- const create=(actNumber:string,contractNumber='00001-26-00000001-1')=>post('riru','/api/v1/acts',{resId:area,contractNumber,contractDate:'2026-11-02',actNumber,applicant:'Синтетический комплект',address:'Учебный адрес'});
- const a=ok(await create('SYNTH-AVTU')),b=ok(await create('SYNTH-TP','00001–26-00000001-1'));
+ const create=(actNumber:string,contractNumber='00001-26-00000001-1',actType='ACT_TP')=>post('riru','/api/v1/acts',{resId:area,contractNumber,contractDate:'2026-11-02',actNumber,actType,applicant:'Синтетический комплект',address:'Учебный адрес'});
+ const a=ok(await create('SYNTH-AVTU','00001-26-00000001-1','AVTU')),b=ok(await create('SYNTH-TP','00001–26-00000001-1'));
  assert.equal(a.contract_id,b.contract_id);assert.notEqual(a.id,b.id);assert.equal(a.contract_number,'00001-26-00000001-1');
  const path=`/api/v1/acts/${a.id}`;const card=()=>get('riru',path).then(ok);
  const upload=(p:string,type:string,u='riru')=>request(app).post(p+'/files').set('Authorization','Bearer '+tokens[u]).field('documentType',type).field('documentNumber','TU-OWN-001').attach('file',zip(docxParts),'synthetic.docx');

@@ -17,7 +17,7 @@ import {approvalMatrix} from './matrix.js';
 import {registry,registryAct,registryCounts} from './registry.js';
 import {timeline} from './timeline.js';
 import {preview,createRemark,compareVersions} from './documents.js';
-import {documentKinds,fileKind,documentFilename,extraPreview,extraLabels,contractDocuments,registerDocument,selectTechnicalConditions,tuPreview} from './contract-documents.js';
+import {documentKinds,fileKind,documentFilename,extraPreview,extraLabels,contractDocuments,contractActs,rejectDuplicate,registerDocument,selectTechnicalConditions,tuPreview} from './contract-documents.js';
 import {checkTechnicalConditions,confirmTuFinding,enforceTechnicalConditions} from './tu-validation.js';
 import {currentRulesVersion,referenceBooks,saveReferenceBook} from './references.js';
 import {renderVector} from './vector.js';
@@ -207,9 +207,15 @@ export function createApp(pool:pg.Pool, config:AppConfig, verify?:ReturnType<typ
     const limit=z.coerce.number().int().min(1).max(100).default(50).parse(req.query.limit);
     return (await db.query("SELECT a.*,(SELECT min(t.due_at) FROM app.tasks t WHERE t.act_id=a.id AND t.status='OPEN') AS due_at,EXISTS(SELECT 1 FROM app.tasks t WHERE t.act_id=a.id AND t.status='OPEN' AND t.due_at<now()) AS overdue FROM app.acts a WHERE ($1::uuid IS NULL OR a.res_id=$1) ORDER BY a.created_at DESC,a.id LIMIT $2",[req.query.resId?id.parse(req.query.resId):null,limit])).rows;
   });
+  // Есть ли уже документ этого вида по номеру договора (во всех РЭС): форма «Новый документ» предупреждает до сохранения.
+  get('/api/v1/contract-acts',async(db,req)=>{
+    const q=z.object({contractNumber:text,actType:z.enum(['ACT_TP','AVTU']).optional()}).parse(req.query);
+    return (await contractActs(db,requireContractNumber(q.contractNumber),q.actType)).map(a=>a.readable?a:{act_type:a.act_type,state:a.state,res_name:a.res_name,readable:false});
+  });
   post('/api/v1/acts',async(db,req)=>{
     const b=createAct.parse(req.body);await role(db,'RIRU_ENGINEER',b.resId);
     const contractNumber=requireContractNumber(b.contractNumber),actNumber=b.actNumber===b.contractNumber?contractNumber:b.actNumber;
+    await rejectDuplicate(db,contractNumber,b.actType);
     const act=(await db.query('INSERT INTO app.acts(res_id,author_id,contract_number,contract_date,act_number,applicant,address,act_type) VALUES($1,app.uid(),$2,$3,$4,$5,$6,$7) RETURNING *',[b.resId,contractNumber,b.contractDate,actNumber,b.applicant,b.address,b.actType])).rows[0];
     await audit(db,act.id,'CREATED');return act;
   });
